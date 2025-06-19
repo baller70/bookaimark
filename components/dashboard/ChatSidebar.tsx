@@ -2,10 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Send } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface Message {
   id: string
@@ -36,8 +38,7 @@ export function ChatSidebar() {
       timestamp: new Date(Date.now() - 180000) // 3 minutes ago
     }
   ])
-  const [inputValue, setInputValue] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [newMessage, setNewMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -56,19 +57,18 @@ export function ChatSidebar() {
     }
   }, [isOpen])
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return
+  const handleSendMessage = () => {
+    if (!newMessage.trim()) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue.trim(),
+      content: newMessage.trim(),
       isUser: true,
       timestamp: new Date()
     }
 
     setMessages(prev => [...prev, userMessage])
-    setInputValue('')
-    setIsLoading(true)
+    setNewMessage('')
 
     // Simulate AI response
     setTimeout(() => {
@@ -79,7 +79,6 @@ export function ChatSidebar() {
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiResponse])
-      setIsLoading(false)
     }, 1000)
   }
 
@@ -100,7 +99,7 @@ export function ChatSidebar() {
 
   return (
     <>
-      {/* Toggle Button - Fixed on right edge */}
+      {/* Toggle Button - Fixed on right edge with arrow */}
       <Button
         onClick={() => setIsOpen(!isOpen)}
         variant="ghost"
@@ -122,30 +121,31 @@ export function ChatSidebar() {
         </svg>
       </Button>
 
-      {/* Chat Sidebar Sheet */}
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent 
-          side="right" 
-          className="w-80 p-0 flex flex-col"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          {/* Header */}
-          <SheetHeader className="p-4 border-b border-slate-200 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-blue-500 text-white text-xs">AI</AvatarFallback>
-              </Avatar>
-              <div>
-                <SheetTitle className="text-left text-lg">AI Assistant</SheetTitle>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Chat for help and guidance
-                </p>
-              </div>
+      {/* Chat Panel - Slide from right WITHOUT backdrop overlay */}
+      <div
+        className={cn(
+          "fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-xl z-30 flex flex-col transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-blue-500 text-white text-xs">AI</AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="text-left text-lg font-semibold text-slate-900 dark:text-slate-100">AI Assistant</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Chat for help and guidance
+              </p>
             </div>
-          </SheetHeader>
+          </div>
+        </div>
 
-          {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Messages Container */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -184,53 +184,37 @@ export function ChatSidebar() {
               </div>
             ))}
 
-            {/* Loading indicator */}
-            {isLoading && (
-              <div className="flex items-start space-x-3">
-                <Avatar className="w-7 h-7 mt-1">
-                  <AvatarFallback className="bg-blue-500 text-white text-xs">AI</AvatarFallback>
-                </Avatar>
-                <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div ref={messagesEndRef} />
           </div>
+        </ScrollArea>
 
-          <Separator />
+        <Separator />
 
-          {/* Input Area */}
-          <div className="p-4">
-            <div className="flex space-x-2">
-              <Input
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message here..."
-                disabled={isLoading}
-                className="flex-1"
-              />
-              <Button 
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isLoading}
-                size="sm"
-              >
-                Send
-              </Button>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              Press Enter to send • Shift+Enter for new line
-            </p>
+        {/* Input Area */}
+        <div className="p-4">
+          <div className="flex space-x-2">
+            <Input
+              ref={inputRef}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message here..."
+              className="flex-1"
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim()}
+              size="icon"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+            Press Enter to send • Shift+Enter for new line
+          </p>
+        </div>
+      </div>
     </>
   )
 } 

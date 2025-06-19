@@ -1,7 +1,12 @@
 import './globals.css'
-import { Inter } from 'next/font/google'
+import { Saira, Audiowide } from 'next/font/google'
 
-const inter = Inter({ subsets: ['latin'] })
+const saira = Saira({ subsets: ['latin'] })
+const audiowide = Audiowide({ 
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-audiowide'
+})
 
 export const metadata = {
   title: 'Best SAAS Kit Pro',
@@ -15,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} min-h-screen bg-primary text-secondary antialiased`} suppressHydrationWarning>
+      <body className={`${saira.className} ${audiowide.variable} min-h-screen antialiased`} suppressHydrationWarning>
         {children}
       </body>
     </html>
