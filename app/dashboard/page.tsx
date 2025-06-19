@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { ChatSidebar } from "@/components/dashboard/ChatSidebar"
 
 export default function Dashboard() {
   // const supabase = createClientComponentClient()
@@ -87,9 +88,9 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Quick Actions */}
-        <Card className="lg:col-span-1">
+        <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>
@@ -116,58 +117,53 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* AI Chat Interface */}
-        <Card className="lg:col-span-2">
+        {/* Project Overview */}
+        <Card>
           <CardHeader>
-            <CardTitle>AI Assistant</CardTitle>
+            <CardTitle>Project Overview</CardTitle>
             <CardDescription>
-              Chat with your AI assistant for help and guidance
+              Your latest projects and their status
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Sample conversation */}
-              <div className="flex items-start space-x-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback className="bg-blue-500 text-white text-xs">AI</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-                  <p className="text-sm">
-                    Hello! I'm your AI assistant. How can I help you today?
-                  </p>
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">P1</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">BookAI Dashboard</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Active</p>
+                  </div>
                 </div>
+                <Badge variant="secondary">Live</Badge>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">P2</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Analytics Engine</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">In Development</p>
+                  </div>
+                </div>
+                <Badge variant="outline">Dev</Badge>
               </div>
 
-              <div className="flex items-start space-x-3 justify-end">
-                <div className="flex-1 bg-blue-500 text-white rounded-lg p-3 max-w-xs ml-auto">
-                  <p className="text-sm">
-                    Can you help me understand my dashboard metrics?
-                  </p>
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">P3</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">API Gateway</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Planning</p>
+                  </div>
                 </div>
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback>You</AvatarFallback>
-                </Avatar>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback className="bg-blue-500 text-white text-xs">AI</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-                  <p className="text-sm">
-                    Absolutely! Your dashboard shows great performance with 1,250 total credits, 347 messages processed, and a 98.5% success rate. You've created 12 apps this period, which is excellent progress!
-                  </p>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Chat input area */}
-              <div className="flex space-x-2">
-                <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-                  <p className="text-sm text-slate-500">Type your message here...</p>
-                </div>
-                <Button>Send</Button>
+                <Badge variant="secondary">Soon</Badge>
               </div>
             </div>
           </CardContent>
@@ -275,6 +271,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Chat Sidebar */}
+      <ChatSidebar />
     </div>
   )
 } 
