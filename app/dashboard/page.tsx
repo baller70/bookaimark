@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,7 +50,9 @@ import {
   ImageIcon,
   Play,
   Pause,
-  MessageSquare
+  MessageSquare,
+  ArrowLeft,
+  BookmarkIcon as BookmarkIconLucide
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -94,12 +96,64 @@ export default function Dashboard() {
     category: 'Development',
     priority: 'medium',
     notes: '',
-    circularImage: ''
+    circularImage: '',
+    logo: ''
   })
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [editingValue, setEditingValue] = useState<string>('')
   const [notification, setNotification] = useState<string | null>(null)
+  const [userDefaultLogo, setUserDefaultLogo] = useState<string>('')
+  const [showDefaultLogoModal, setShowDefaultLogoModal] = useState(false)
+  const [newDefaultLogo, setNewDefaultLogo] = useState('')
+  // New states for folder-based compact view
+  const [compactViewMode, setCompactViewMode] = useState<'folders' | 'bookmarks'>('folders')
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+
+  // Reset compact view mode when switching away from compact view
+  useEffect(() => {
+    if (viewMode !== 'compact') {
+      setCompactViewMode('folders')
+      setSelectedFolder(null)
+    }
+  }, [viewMode])
+
+  // Load user profile picture as default logo from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Always check for the latest profile avatar from settings
+      const savedSettings = localStorage.getItem('userSettings')
+      if (savedSettings) {
+        try {
+          const settings = JSON.parse(savedSettings)
+          if (settings.profile?.avatar) {
+            setUserDefaultLogo(settings.profile.avatar)
+            console.log('Profile avatar loaded as default bookmark logo:', settings.profile.avatar)
+          }
+        } catch (error) {
+          console.log('Error loading profile avatar as default logo:', error)
+        }
+      }
+      
+      // Listen for storage changes to update when settings change
+      const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === 'userSettings' && e.newValue) {
+          try {
+            const settings = JSON.parse(e.newValue)
+            if (settings.profile?.avatar) {
+              setUserDefaultLogo(settings.profile.avatar)
+              console.log('Profile avatar updated from settings change:', settings.profile.avatar)
+            }
+          } catch (error) {
+            console.log('Error updating profile avatar from storage change:', error)
+          }
+        }
+      }
+      
+      window.addEventListener('storage', handleStorageChange)
+      return () => window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -117,11 +171,11 @@ export default function Dashboard() {
   const [bookmarks, setBookmarks] = useState([
     {
       id: 1,
-      title: "GitHub",
+      title: "GITHUB",
       url: "https://github.com",
       description: "Development platform for version control and collaboration",
       category: "Development",
-      tags: ["code", "git", "collaboration", "open-source"],
+      tags: [], // REMOVED ALL TAGS
       priority: "high",
       isFavorite: true,
       visits: 45,
@@ -130,112 +184,153 @@ export default function Dashboard() {
       favicon: "G",
       screenshot: "/placeholder.svg?height=200&width=300",
       circularImage: "/placeholder.svg?height=120&width=120",
+      logo: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png", // Background logo
       notes: "Main repository hosting platform for all projects. Contains personal and work repositories.",
       timeSpent: "2h 30m",
       weeklyVisits: 45,
-      siteHealth: "excellent"
+      siteHealth: "excellent",
+      project: {
+        name: "Web Development",
+        progress: 75,
+        status: "Active"
+      }
     },
     {
       id: 2,
-      title: "Figma",
+      title: "FIGMA",
       url: "https://figma.com",
-      description: "Collaborative design tool for UI/UX",
+      description: "Collaborative design tool for UI/UX design",
       category: "Design",
-      tags: ["design", "ui", "collaboration", "prototyping"],
+      tags: [], // REMOVED ALL TAGS
       priority: "high",
-      isFavorite: true,
+      isFavorite: false,
       visits: 32,
       lastVisited: "2024-01-14",
       dateAdded: "2024-01-08",
       favicon: "F",
       screenshot: "/placeholder.svg?height=200&width=300",
       circularImage: "/placeholder.svg?height=120&width=120",
-      notes: "Primary design tool for all UI/UX projects. Team collaboration workspace.",
+      logo: "https://cdn.sanity.io/images/599r6htc/localized/46a76c802176eb17b04e12108de7e7e0f3736dc6-1024x1024.png?w=804&h=804&q=75&fit=max&auto=format", // Background logo
+      notes: "Primary design tool for creating wireframes, prototypes, and design systems.",
       timeSpent: "1h 45m",
       weeklyVisits: 32,
-      siteHealth: "good"
+      siteHealth: "good",
+      project: {
+        name: "Design System",
+        progress: 60,
+        status: "Active"
+      }
     },
     {
       id: 3,
-      title: "Stack Overflow",
+      title: "STACK OVERFLOW",
       url: "https://stackoverflow.com",
       description: "Q&A platform for developers",
       category: "Development",
-      tags: ["help", "programming", "community", "q&a"],
+      tags: [], // REMOVED ALL TAGS
       priority: "medium",
-      isFavorite: false,
+      isFavorite: true,
       visits: 28,
-      lastVisited: "2024-01-16",
+      lastVisited: "2024-01-13",
       dateAdded: "2024-01-05",
-      favicon: "S",
+      favicon: "SO",
       screenshot: "/placeholder.svg?height=200&width=300",
       circularImage: "/placeholder.svg?height=120&width=120",
-      notes: "Go-to resource for coding questions and solutions. Great community support.",
+      logo: "https://cdn.sstatic.net/Sites/stackoverflow/Img/apple-touch-icon.png", // Background logo
+      notes: "Go-to resource for programming questions and solutions. Excellent community support.",
       timeSpent: "3h 15m",
       weeklyVisits: 28,
-      siteHealth: "good"
+      siteHealth: "excellent",
+      project: {
+        name: "Learning Hub",
+        progress: 40,
+        status: "Active"
+      }
     },
     {
       id: 4,
-      title: "Notion",
+      title: "NOTION",
       url: "https://notion.so",
-      description: "All-in-one workspace for notes and collaboration",
+      description: "All-in-one workspace for notes and project management",
       category: "Productivity",
-      tags: ["notes", "workspace", "organization", "collaboration"],
+      tags: [], // REMOVED ALL TAGS
       priority: "high",
-      isFavorite: true,
+      isFavorite: false,
       visits: 67,
-      lastVisited: "2024-01-13",
-      dateAdded: "2024-01-12",
+      lastVisited: "2024-01-16",
+      dateAdded: "2024-01-02",
       favicon: "N",
       screenshot: "/placeholder.svg?height=200&width=300",
       circularImage: "/placeholder.svg?height=120&width=120",
-      notes: "Main workspace for project management, documentation, and team collaboration.",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/4/45/Notion_app_logo.png", // Background logo
+      notes: "Central hub for project documentation, meeting notes, and task management.",
       timeSpent: "4h 20m",
       weeklyVisits: 67,
-      siteHealth: "excellent"
+      siteHealth: "excellent",
+      project: {
+        name: "Project Management",
+        progress: 85,
+        status: "Active"
+      }
     },
     {
       id: 5,
-      title: "Dribbble",
+      title: "DRIBBBLE",
       url: "https://dribbble.com",
-      description: "Design inspiration and portfolio platform",
+      description: "Design inspiration and portfolio showcase",
       category: "Design",
-      tags: ["inspiration", "portfolio", "design", "creative"],
+      tags: [], // REMOVED ALL TAGS
       priority: "low",
       isFavorite: false,
       visits: 15,
-      lastVisited: "2024-01-11",
-      dateAdded: "2024-01-09",
+      lastVisited: "2024-01-12",
+      dateAdded: "2024-01-07",
       favicon: "D",
       screenshot: "/placeholder.svg?height=200&width=300",
       circularImage: "/placeholder.svg?height=120&width=120",
-      notes: "Source of design inspiration and trends. Follow top designers for ideas.",
+      logo: "https://cdn.dribbble.com/assets/dribbble-ball-mark-2bd45f09c2fb58dbbfb44766d5d1d07c5a12972d602ef8b32204d28fa3dda554.svg", // Background logo
+      notes: "Source of design inspiration and trends. Great for discovering new design patterns.",
       timeSpent: "45m",
       weeklyVisits: 15,
-      siteHealth: "good"
+      siteHealth: "good",
+      project: {
+        name: "Design Inspiration",
+        progress: 25,
+        status: "Active"
+      }
     },
     {
       id: 6,
-      title: "Linear",
+      title: "LINEAR",
       url: "https://linear.app",
-      description: "Issue tracking and project management",
-      category: "Productivity",
-      tags: ["project", "tracking", "management", "agile"],
+      description: "Modern issue tracking for software teams",
+      category: "Development",
+      tags: [], // REMOVED ALL TAGS
       priority: "medium",
-      isFavorite: false,
+      isFavorite: true,
       visits: 23,
-      lastVisited: "2024-01-10",
-      dateAdded: "2024-01-06",
+      lastVisited: "2024-01-11",
+      dateAdded: "2024-01-04",
       favicon: "L",
       screenshot: "/placeholder.svg?height=200&width=300",
       circularImage: "/placeholder.svg?height=120&width=120",
+      logo: "https://asset.brandfetch.io/idZAyF9rlg/idkmvDNPVH.png", // Background logo
       notes: "Issue tracking for development projects. Clean interface and fast performance.",
       timeSpent: "1h 30m",
       weeklyVisits: 23,
-      siteHealth: "good"
+      siteHealth: "excellent",
+      project: {
+        name: "Bug Tracking",
+        progress: 50,
+        status: "Active"
+      }
     }
   ])
+
+  // Ensure any legacy bookmark objects that may still contain tags don't render them on the cards
+  useEffect(() => {
+    setBookmarks(prev => prev.map(b => ({ ...b, tags: Array.isArray(b.tags) ? b.tags : [] })))
+  }, [])
 
   const filteredBookmarks = bookmarks.filter(bookmark => {
     const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -270,11 +365,11 @@ export default function Dashboard() {
     // Create new bookmark object
     const bookmark = {
       id: bookmarks.length + 1,
-      title: newBookmark.title,
+      title: newBookmark.title.toUpperCase(),
       url: newBookmark.url,
       description: newBookmark.description || 'No description provided',
       category: newBookmark.category,
-      tags: newBookmark.tags ? newBookmark.tags.split(',').map(tag => tag.trim()) : [],
+      tags: newBookmark.tags ? newBookmark.tags.split(',').map(tag => tag.trim().toUpperCase()) : [],
       priority: newBookmark.priority,
       isFavorite: false,
       visits: 0,
@@ -282,12 +377,20 @@ export default function Dashboard() {
       dateAdded: new Date().toLocaleDateString(),
       favicon: newBookmark.title.charAt(0).toUpperCase(), // Use first letter as fallback
       screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: newBookmark.circularImage || "/placeholder.svg?height=120&width=120",
+      circularImage: newBookmark.circularImage || userDefaultLogo || "/placeholder.svg?height=120&width=120",
+      logo: newBookmark.logo || "", // Background logo
       notes: newBookmark.notes || 'No notes added',
       timeSpent: '0m',
       weeklyVisits: 0,
-      siteHealth: 'good'
+      siteHealth: 'good',
+      project: {
+        name: "NEW PROJECT",
+        progress: 0,
+        status: "Planning"
+      }
     }
+    
+    console.log('New bookmark created with circularImage:', bookmark.circularImage)
     
     // Add bookmark to the array
     setBookmarks(prev => [...prev, bookmark])
@@ -306,7 +409,8 @@ export default function Dashboard() {
       category: 'Development',
       priority: 'medium',
       notes: '',
-      circularImage: ''
+      circularImage: '',
+      logo: ''
     })
   }
 
@@ -342,7 +446,9 @@ export default function Dashboard() {
 
     let newValue: string | string[] = editingValue
     if (editingField === 'tags') {
-      newValue = editingValue.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      newValue = editingValue.split(',').map(tag => tag.trim().toUpperCase()).filter(tag => tag.length > 0)
+    } else if (editingField === 'title') {
+      newValue = editingValue.toUpperCase()
     }
 
     // Update the bookmark in the bookmarks array
@@ -452,6 +558,21 @@ export default function Dashboard() {
     setTimeout(() => setNotification(null), 3000)
   }
 
+  const handleSetDefaultLogo = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('userDefaultLogo', newDefaultLogo)
+      setUserDefaultLogo(newDefaultLogo)
+      setShowDefaultLogoModal(false)
+      setNewDefaultLogo('')
+      showNotification('Default logo updated successfully!')
+    }
+  }
+
+  const openDefaultLogoModal = () => {
+    setNewDefaultLogo(userDefaultLogo)
+    setShowDefaultLogoModal(true)
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
 
@@ -503,25 +624,42 @@ export default function Dashboard() {
     return Math.round((visits / totalVisits) * 100)
   }
 
+  // Get category color for folder icons
+  const getCategoryColor = (category: string) => {
+    const colors: { [key: string]: string } = {
+      'Development': 'text-red-500',
+      'Design': 'text-blue-500',
+      'Productivity': 'text-green-500',
+      'Entertainment': 'text-purple-500',
+      'Social': 'text-yellow-500',
+      'Education': 'text-indigo-500',
+      'News': 'text-orange-500',
+      'Shopping': 'text-pink-500',
+      'Finance': 'text-teal-500',
+      'Health': 'text-emerald-500'
+    }
+    return colors[category] || 'text-gray-600'
+  }
+
   // Hexagon component for displaying usage percentage
   const UsageHexagon = ({ percentage }: { percentage: number }) => (
     <div className="absolute bottom-2 right-2 flex items-center justify-center">
-      <svg width="65" height="57" viewBox="0 0 65 57" className="drop-shadow-sm">
+      <svg width="80" height="70" viewBox="0 0 80 70" className="drop-shadow-sm">
         {/* Hexagon shape */}
         <path
-          d="M32.5 4 L52 14.5 L52 37.5 L32.5 48 L13 37.5 L13 14.5 Z"
-          fill="#b3ab69"
+          d="M40 5 L65 18 L65 47 L40 60 L15 47 L15 18 Z"
+          fill="white"
           stroke="#b3ab69"
-          strokeWidth="1"
+          strokeWidth="2"
         />
         {/* Percentage text */}
         <text
-          x="32.5"
-          y="28.5"
+          x="40"
+          y="35"
           textAnchor="middle"
           dominantBaseline="middle"
-          fill="white"
-          fontSize="16"
+          fill="#b3ab69"
+          fontSize="18"
           fontWeight="bold"
         >
           {percentage}%
@@ -533,7 +671,7 @@ export default function Dashboard() {
   // Action icons component for top right corner
   const BookmarkActionIcons = ({ bookmark }: { bookmark: any }) => (
     <TooltipProvider>
-      <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <div className="absolute top-12 right-2 flex flex-col items-center space-y-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip>
           <TooltipTrigger asChild>
             <button 
@@ -574,28 +712,6 @@ export default function Dashboard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>View details</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button 
-              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-              onClick={(e) => {
-                e.stopPropagation()
-                // Copy bookmark URL
-                navigator.clipboard.writeText(bookmark.url).then(() => {
-                  showNotification('Bookmark URL copied to clipboard!')
-                }).catch(() => {
-                  showNotification('Failed to copy URL')
-                })
-              }}
-            >
-              <Edit className="h-4 w-4 text-gray-400 hover:text-green-500" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Copy URL</p>
           </TooltipContent>
         </Tooltip>
 
@@ -673,10 +789,10 @@ export default function Dashboard() {
 
     return (
       <div ref={setNodeRef} style={style} {...attributes} className="relative group">
-        {/* Drag Handle - Bottom Center */}
+        {/* Drag Handle - Top Right Corner */}
         <div 
           {...listeners} 
-          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
+          className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105"
         >
           <GripVertical className="h-4 w-4 text-gray-700" />
         </div>
@@ -687,14 +803,26 @@ export default function Dashboard() {
 
   const GridBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
-      className="group hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer bg-gradient-to-br from-white via-gray-50/30 to-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
+      className="group hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer bg-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
       onClick={() => handleBookmarkClick(bookmark)}
     >
+      {/* Background Logo with 12% opacity */}
+      {bookmark.logo && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
+          style={{
+            backgroundImage: `url(${bookmark.logo})`,
+            opacity: 0.05
+          }}
+        />
+      )}
+      
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/3 via-transparent to-purple-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <CardContent className="p-6 relative z-10">
+      
+      <CardContent className="p-6 relative z-20">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-700 font-bold text-xl ring-2 ring-blue-100/50 group-hover:ring-blue-200 transition-all duration-300 shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
               {bookmark.favicon}
             </div>
             <div className="flex-1 min-w-0">
@@ -707,7 +835,7 @@ export default function Dashboard() {
         <div className="mb-4 flex justify-center">
           <div className="relative">
             <img 
-              src={bookmark.circularImage || "/placeholder.svg?height=120&width=120"} 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=120&width=120"} 
               alt={`${bookmark.title} image`}
               className="w-24 h-24 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300 shadow-md group-hover:shadow-lg"
             />
@@ -726,20 +854,59 @@ export default function Dashboard() {
           </Badge>
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100/80">
+        <div className="flex items-center justify-between pt-4 border-t border-gray-100/80 mb-6 relative">
           <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
             <Eye className="h-4 w-4 text-gray-500" />
             <span className="text-sm text-gray-600 font-medium">{bookmark.visits} VISITS</span>
           </div>
-          <ExternalLink className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-all duration-300 hover:text-blue-600" />
+          {/* Usage Percentage Hexagon - Moved here to be even with visits */}
+          <div className="flex items-center justify-center">
+            <svg width="70" height="62" viewBox="0 0 70 62" className="drop-shadow-sm">
+              <path
+                d="M35 4 L55 15 L55 40 L35 51 L15 40 L15 15 Z"
+                fill="white"
+                stroke="#b3ab69"
+                strokeWidth="2"
+              />
+              <text
+                x="35"
+                y="30"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#b3ab69"
+                fontSize="16"
+                fontWeight="bold"
+              >
+                {getUsagePercentage(bookmark.visits)}%
+              </text>
+            </svg>
+          </div>
+        </div>
+
+        {/* Project Information Section - Moved to bottom and separated */}
+        <div className="border-t border-gray-200/60 pt-3 mt-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{bookmark.project?.name || "PROJECT"}</span>
+            </div>
+            <span className="text-xs text-gray-500 font-medium">{bookmark.project?.status || "Active"}</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${bookmark.project?.progress || 0}%` }}
+            ></div>
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-xs text-gray-500">Progress</span>
+            <span className="text-xs font-semibold text-blue-600">{bookmark.project?.progress || 0}%</span>
+          </div>
         </div>
       </CardContent>
       
       {/* Action Icons */}
       <BookmarkActionIcons bookmark={bookmark} />
-      
-      {/* Usage Percentage Hexagon */}
-      <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
     </Card>
   )
 
@@ -782,7 +949,7 @@ export default function Dashboard() {
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
       <CardContent className="p-4 relative z-10">
         <div className="flex items-center space-x-4">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-700 font-bold ring-2 ring-blue-100/50 group-hover:ring-blue-200 transition-all duration-300 shadow-sm">
+          <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center text-white font-bold ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
             {bookmark.favicon}
           </div>
           <div className="flex-1 min-w-0">
@@ -800,6 +967,14 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+          {/* Circular Image */}
+          <div className="flex-shrink-0">
+            <img 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"} 
+              alt={`${bookmark.title} image`}
+              className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300"
+            />
+          </div>
         </div>
       </CardContent>
       
@@ -809,6 +984,58 @@ export default function Dashboard() {
       {/* Usage Percentage Hexagon */}
       <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
     </Card>
+  )
+
+    const CompactFolderCard = ({ category, bookmarkCount }: { category: string, bookmarkCount: number }) => (
+    <div 
+      className="group cursor-pointer"
+      onClick={() => {
+        setSelectedFolder(category)
+        setCompactViewMode('bookmarks')
+      }}
+    >
+      {/* Simple Square Box Design */}
+      <div className="aspect-square w-full bg-white border-2 border-gray-300 relative overflow-hidden rounded-lg">
+        {/* Background Default Logo with 5% opacity */}
+        {userDefaultLogo && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${userDefaultLogo})`,
+              opacity: 0.05
+            }}
+          />
+        )}
+        <div className="p-2 h-full flex flex-col justify-between relative z-10">
+          {/* Top section with folder icon and title */}
+          <div>
+            <div className="mb-2">
+              <div className="w-20 h-20">
+                <Folder className={`h-16 w-16 ${getCategoryColor(category)} m-2`} />
+              </div>
+            </div>
+            <h3 className="font-bold text-gray-900 font-audiowide uppercase text-lg leading-tight ml-2">
+              {category}
+            </h3>
+          </div>
+          
+          {/* Bottom section with item count and profile image */}
+          <div className="flex justify-between items-end">
+            <div className="flex items-center space-x-2">
+              <Bookmark className="h-4 w-4 text-gray-600" />
+              <p className="text-sm text-gray-600">
+                {bookmarkCount} BOOKMARKS
+              </p>
+            </div>
+            <img 
+              src={userDefaultLogo || "/placeholder.svg?height=64&width=64"} 
+              alt={`${category} owner`}
+              className="w-16 h-16 object-cover rounded-full border border-gray-300"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   )
 
   const SortableListBookmarkCard = ({ bookmark }: { bookmark: any }) => {
@@ -850,7 +1077,7 @@ export default function Dashboard() {
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
       <CardContent className="p-6 relative z-10">
         <div className="flex items-start space-x-5">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-700 font-bold text-xl ring-2 ring-blue-100/50 group-hover:ring-blue-200 transition-all duration-300 shadow-sm">
+          <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
             {bookmark.favicon}
           </div>
           <div className="flex-1 min-w-0">
@@ -875,6 +1102,14 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+          </div>
+          {/* Circular Image */}
+          <div className="flex-shrink-0">
+            <img 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=60&width=60"} 
+              alt={`${bookmark.title} image`}
+              className="w-16 h-16 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300 shadow-md"
+            />
           </div>
         </div>
       </CardContent>
@@ -930,13 +1165,21 @@ export default function Dashboard() {
         <CardContent className="p-5 relative z-10">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-700 font-bold ring-2 ring-blue-100/50 group-hover:ring-blue-200 transition-all duration-300 shadow-sm">
+              <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center text-white font-bold ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
                 {bookmark.favicon}
               </div>
               <div>
                 <h3 className="font-bold text-gray-900 font-audiowide uppercase group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h3>
                 <p className="text-xs text-gray-500 font-medium mt-1 bg-gray-50/80 rounded-full px-2 py-1">Added {bookmark.dateAdded}</p>
               </div>
+            </div>
+            {/* Circular Image */}
+            <div className="flex-shrink-0">
+              <img 
+                src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"} 
+                alt={`${bookmark.title} image`}
+                className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300"
+              />
             </div>
           </div>
           <p className="text-sm text-gray-600 mb-3 leading-relaxed">{bookmark.description}</p>
@@ -1179,21 +1422,69 @@ export default function Dashboard() {
     
     switch (viewMode) {
       case 'compact':
-        return (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filteredBookmarks.map((bookmark) => (
-                  <SortableCompactBookmarkCard key={bookmark.id} bookmark={bookmark} />
-                ))}
+        if (compactViewMode === 'folders') {
+          // Show folder view - group bookmarks by category
+          const categories = [...new Set(bookmarks.map(bookmark => bookmark.category))]
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {categories.map((category) => {
+                const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
+                return (
+                  <CompactFolderCard 
+                    key={category} 
+                    category={category} 
+                    bookmarkCount={categoryBookmarks.length} 
+                  />
+                )
+              })}
+            </div>
+          )
+        } else {
+          // Show bookmarks within selected folder
+          const folderBookmarks = filteredBookmarks.filter(bookmark => bookmark.category === selectedFolder)
+          const folderBookmarkIds = folderBookmarks.map(bookmark => bookmark.id)
+          
+          return (
+            <div className="space-y-4">
+              {/* Back Button */}
+              <div className="flex items-center space-x-4 mb-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCompactViewMode('folders')
+                    setSelectedFolder(null)
+                  }}
+                  className="flex items-center space-x-2 hover:bg-blue-50 hover:border-blue-300 transition-all duration-300"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back to Folders</span>
+                </Button>
+                <div className="flex items-center space-x-2">
+                  <Folder className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-xl font-bold text-gray-900 font-audiowide uppercase">{selectedFolder}</h2>
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">
+                    {folderBookmarks.length} bookmarks
+                  </Badge>
+                </div>
               </div>
-            </SortableContext>
-          </DndContext>
-        )
+              
+              {/* Bookmarks Grid */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={folderBookmarkIds} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {folderBookmarks.map((bookmark) => (
+                      <SortableCompactBookmarkCard key={bookmark.id} bookmark={bookmark} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
+          )
+        }
       case 'list':
         return (
           <DndContext
@@ -1823,7 +2114,7 @@ export default function Dashboard() {
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={selectedBookmark.favicon} alt={selectedBookmark.title} />
-                      <AvatarFallback>{selectedBookmark.title[0]}</AvatarFallback>
+                      <AvatarFallback className="bg-black text-white">{selectedBookmark.title[0]}</AvatarFallback>
                     </Avatar>
                     <div>
                       <DialogTitle className="text-2xl font-audiowide uppercase">{selectedBookmark.title}</DialogTitle>
@@ -1879,7 +2170,7 @@ export default function Dashboard() {
                       <div className="flex justify-center">
                         <div className="relative">
                           <img
-                            src={selectedBookmark.circularImage || "/placeholder.svg?height=120&width=120"}
+                            src={userDefaultLogo || selectedBookmark.circularImage || "/placeholder.svg?height=120&width=120"}
                             alt={`${selectedBookmark.title} image`}
                             className="w-32 h-32 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 shadow-lg"
                           />
@@ -1935,8 +2226,17 @@ export default function Dashboard() {
                           </Button>
                         </div>
                       </div>
-                      <div className="text-center">
+                      <div className="text-center space-y-2">
                         <p className="text-sm text-gray-600">Click the camera icon to update image</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={openDefaultLogoModal}
+                          className="text-xs"
+                        >
+                          <ImageIcon className="h-3 w-3 mr-2" />
+                          Set Default Logo
+                        </Button>
                       </div>
                     </div>
                     <div className="space-y-4">
@@ -2018,7 +2318,7 @@ export default function Dashboard() {
                             {selectedBookmark.tags.map((tag: string) => (
                               <Badge key={tag} variant="secondary" className="text-xs">
                                 <Tag className="h-3 w-3 mr-1" />
-                                {tag}
+                                {tag.toUpperCase()}
                               </Badge>
                             ))}
                           </div>
@@ -2151,7 +2451,7 @@ export default function Dashboard() {
                                   {/* Circular Image */}
                                   <div className="flex-shrink-0">
                                     <img
-                                      src={bookmark.circularImage || "/placeholder.svg?height=40&width=40"}
+                                      src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"}
                                       alt={`${bookmark.title} image`}
                                       className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50"
                                     />
@@ -2435,6 +2735,93 @@ export default function Dashboard() {
               </Button>
               <Button onClick={handleAddBookmark}>
                 ADD BOOKMARK
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Default Logo Modal */}
+      <Dialog open={showDefaultLogoModal} onOpenChange={setShowDefaultLogoModal}>
+        <DialogContent className="max-w-md bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle>SET DEFAULT LOGO</DialogTitle>
+            <DialogDescription>
+              Set a default logo that will be used as placeholder for all bookmarks instead of letters.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">LOGO URL</label>
+              <Input
+                placeholder="https://example.com/logo.png"
+                value={newDefaultLogo}
+                onChange={(e) => setNewDefaultLogo(e.target.value)}
+              />
+            </div>
+            
+            {/* Preview */}
+            {newDefaultLogo && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">PREVIEW</label>
+                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 transition-all duration-300 shadow-sm overflow-hidden">
+                    <img 
+                      src={newDefaultLogo} 
+                      alt="Default logo preview" 
+                      className="w-full h-full object-cover rounded-xl"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement!.innerHTML = 'ERROR';
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">This logo will appear on all bookmark cards</p>
+                    <p className="text-xs text-gray-500">Individual bookmarks can still override this default</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Current Default */}
+            {userDefaultLogo && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">CURRENT DEFAULT</label>
+                <div className="flex items-center space-x-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 transition-all duration-300 shadow-sm overflow-hidden">
+                    <img 
+                      src={userDefaultLogo} 
+                      alt="Current default logo" 
+                      className="w-full h-full object-cover rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Currently active default logo</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setUserDefaultLogo('')
+                        localStorage.removeItem('userDefaultLogo')
+                        setShowDefaultLogoModal(false)
+                        showNotification('Default logo removed!')
+                      }}
+                      className="mt-1 h-7 text-xs"
+                    >
+                      Remove Default
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowDefaultLogoModal(false)}>
+                CANCEL
+              </Button>
+              <Button onClick={handleSetDefaultLogo} disabled={!newDefaultLogo}>
+                SET DEFAULT
               </Button>
             </div>
           </div>
