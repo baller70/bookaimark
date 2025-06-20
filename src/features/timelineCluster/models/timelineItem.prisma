@@ -1,0 +1,12 @@
+// Prisma schema for TimelineItem (timeline cluster feature)
+model TimelineItem {
+  id         String   @id @default(uuid())
+  folderId   String
+  bookmarkId String
+  position   Float
+  order      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([folderId, order])
+}
