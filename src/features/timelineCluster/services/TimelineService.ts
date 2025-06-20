@@ -24,7 +24,18 @@ export interface ITimelineService {
  * Basic fetch-based implementation. Swap out or extend as needed.
  */
 export class HttpTimelineService implements ITimelineService {
-  constructor(private readonly baseUrl = '/api') {}
+  constructor(
+    private readonly baseUrl = '/api',
+    wsUrl: string = (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_WS_URL : undefined) || ''
+  ) {
+    // Setup WebSocket listener (client-side only)
+    if (typeof window !== 'undefined' && wsUrl) {
+      import('socket.io-client').then(({ io }) => {
+        const socket = io(wsUrl, { path: '/api/socket_io' });
+        socket.on('timelineCluster.updated', () => this.emit('timelineCluster.updated'));
+      });
+    }
+  }
 
   // --- Event Handling ---
   private listeners: Map<keyof EventMap, Set<Listener>> = new Map();

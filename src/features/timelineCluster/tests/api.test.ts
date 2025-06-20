@@ -1,5 +1,5 @@
 /// <reference types="jest" />
-import { AddBookmarkDTO, UpdatePositionDTO } from '../services/TimelineController';
+import { AddBookmarkDTO, UpdatePositionDTO } from '../services/dto';
 
 describe('Zod DTO validation', () => {
   it('validates AddBookmarkDTO correctly', () => {

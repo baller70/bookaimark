@@ -1,26 +1,12 @@
-import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 import { timelineService } from './TimelineService';
+import { AddBookmarkDTO, UpdatePositionDTO } from './dto';
 
 // Simple broadcaster placeholder – in production this would emit via WebSocket/Socket.IO
 function broadcast(event: 'timelineCluster.updated') {
   // eslint-disable-next-line no-console
   console.log(`Broadcasting WS event: ${event}`);
 }
-
-// --------------------
-// Zod Schemas (DTOs)
-// --------------------
-export const AddBookmarkDTO = z.object({
-  id: z.string().uuid().optional(),
-  title: z.string().min(1),
-  url: z.string().url(),
-});
-
-export const UpdatePositionDTO = z.object({
-  position: z.number().optional(),
-  order: z.number().int().min(0).max(9).optional(),
-});
 
 // --------------------
 // Controller Handlers
