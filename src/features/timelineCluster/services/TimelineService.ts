@@ -26,6 +26,22 @@ export interface ITimelineService {
 export class HttpTimelineService implements ITimelineService {
   constructor(private readonly baseUrl = '/api') {}
 
+  // --- Event Handling ---
+  private listeners: Map<keyof EventMap, Set<Listener>> = new Map();
+
+  subscribe(event: keyof EventMap, listener: Listener): () => void {
+    const set = this.listeners.get(event) ?? new Set<Listener>();
+    set.add(listener);
+    this.listeners.set(event, set);
+    return () => {
+      set.delete(listener);
+    };
+  }
+
+  private emit(event: keyof EventMap) {
+    this.listeners.get(event)?.forEach((fn) => fn());
+  }
+
   async getFolderItems(folderId: string): Promise<TimelineItem[]> {
     const res = await fetch(`${this.baseUrl}/timeline/${folderId}`);
     if (!res.ok) throw new Error('Failed to fetch timeline items');
@@ -39,7 +55,9 @@ export class HttpTimelineService implements ITimelineService {
       body: JSON.stringify(bookmark),
     });
     if (!res.ok) throw new Error('Failed to add bookmark');
-    return (await res.json()) as TimelineItem;
+    const created = (await res.json()) as TimelineItem;
+    this.emit('timelineCluster.updated');
+    return created;
   }
 
   async updateItemPosition(
@@ -52,7 +70,9 @@ export class HttpTimelineService implements ITimelineService {
       body: JSON.stringify(params),
     });
     if (!res.ok) throw new Error('Failed to update item position');
-    return (await res.json()) as TimelineItem;
+    const item = (await res.json()) as TimelineItem;
+    this.emit('timelineCluster.updated');
+    return item;
   }
 
   async deleteItem(itemId: string): Promise<void> {
@@ -60,8 +80,13 @@ export class HttpTimelineService implements ITimelineService {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to delete item');
+    this.emit('timelineCluster.updated');
   }
 }
 
-// Singleton export used by the rest of the feature
+type Listener = () => void;
+type EventMap = {
+  'timelineCluster.updated': Listener;
+};
+
 export const timelineService = new HttpTimelineService();
