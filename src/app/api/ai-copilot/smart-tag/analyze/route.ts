@@ -1,7 +1,20 @@
 import { NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 export async function POST(req: Request) {
   try {
+    // Authenticate request
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { bookmarkIds } = await req.json();
     if (!Array.isArray(bookmarkIds) || bookmarkIds.length === 0) {
       return NextResponse.json({ error: 'bookmarkIds must be a non-empty array' }, { status: 400 });
@@ -15,7 +28,8 @@ export async function POST(req: Request) {
       return { bookmarkId: id, suggestedTags, confidenceScores };
     });
 
-    // Persist to DB or queue job here
+    // Persist to DB (placeholder) or queue job here
+    // await prisma.smartTagItem.createMany(...)
 
     return NextResponse.json({ suggestions });
   } catch (error) {
