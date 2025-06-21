@@ -42,33 +42,42 @@ export function CommentSection({
 }: CommentSectionProps) {
   const {
     threads,
-    currentUser,
-    users,
-    isLoading,
+    loading,
     error,
-    uiState,
     createComment,
     deleteComment,
-    toggleResolveThread,
+    resolveThread,
     addReaction,
-    toggleThreadExpansion,
-    setReplyingTo,
-    setEditingComment,
-    setShowResolved,
-    setSortBy
-  } = useComments(entityType, entityId);
+    refresh,
+    getUnreadCount
+  } = useComments({ entityType, entityId });
 
   const [showNewCommentForm, setShowNewCommentForm] = React.useState(false);
-  const totalComments = threads.reduce((sum, thread) => sum + thread.replies.length + 1, 0);
-  const unresolvedCount = threads.filter(thread => !thread.isResolved).length;
-  const unreadCount = threads.reduce((sum, thread) => sum + thread.unreadCount, 0);
+  const [uiState, setUiState] = React.useState({
+    showResolved: true,
+    sortBy: 'newest' as 'newest' | 'oldest' | 'mostActive',
+    replyingTo: null as string | null,
+    editingComment: null as string | null,
+    expandedThreads: new Set<string>()
+  });
+
+  // Mock current user and users for now
+  const currentUser = { id: '1', name: 'Current User', avatar: '/avatars/placeholder.svg' };
+  const users = [
+    { id: '2', name: 'User 2', avatar: '/avatars/placeholder.svg' },
+    { id: '3', name: 'User 3', avatar: '/avatars/placeholder.svg' }
+  ];
+
+  const totalComments = threads.reduce((sum, thread) => sum + (thread.reply_count || 0) + 1, 0);
+  const unresolvedCount = threads.filter(thread => !thread.is_resolved).length;
+  const unreadCount = getUnreadCount();
 
   const handleCreateComment = async (content: string, mentions: string[]) => {
     try {
       await createComment({
         content,
-        entityType,
-        entityId,
+        entity_type: entityType,
+        entity_id: entityId,
         mentions
       });
       setShowNewCommentForm(false);
@@ -80,16 +89,16 @@ export function CommentSection({
   const handleReply = (threadId: string, content: string, mentions: string[]) => {
     createComment({
       content,
-      entityType,
-      entityId,
-      parentId: threadId,
+      entity_type: entityType,
+      entity_id: entityId,
+      parent_id: threadId,
       mentions
     });
-    setReplyingTo(null);
+    setUiState(prev => ({ ...prev, replyingTo: null }));
   };
 
   const handleEdit = (commentId: string) => {
-    setEditingComment(commentId);
+    setUiState(prev => ({ ...prev, editingComment: commentId }));
     // In a real app, you'd open an edit form
     console.log('Edit comment:', commentId);
   };
@@ -109,15 +118,34 @@ export function CommentSection({
     
     switch (uiState.sortBy) {
       case 'newest':
-        return sorted.sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+        return sorted.sort((a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime());
       case 'oldest':
-        return sorted.sort((a, b) => a.rootComment.createdAt.getTime() - b.rootComment.createdAt.getTime());
+        return sorted.sort((a, b) => new Date(a.root_comment.created_at).getTime() - new Date(b.root_comment.created_at).getTime());
       case 'mostActive':
-        return sorted.sort((a, b) => b.replies.length - a.replies.length);
+        return sorted.sort((a, b) => b.reply_count - a.reply_count);
       default:
         return sorted;
     }
   }, [threads, uiState.sortBy]);
+
+  const toggleThreadExpansion = (threadId: string) => {
+    setUiState(prev => {
+      const newExpandedThreads = new Set(prev.expandedThreads);
+      if (newExpandedThreads.has(threadId)) {
+        newExpandedThreads.delete(threadId);
+      } else {
+        newExpandedThreads.add(threadId);
+      }
+      return { ...prev, expandedThreads: newExpandedThreads };
+    });
+  };
+
+  const handleResolveThread = async (threadId: string) => {
+    const thread = threads.find(t => t.id === threadId);
+    if (thread) {
+      await resolveThread(threadId, !thread.is_resolved);
+    }
+  };
 
   if (error) {
     return (
@@ -171,15 +199,15 @@ export function CommentSection({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setSortBy('newest')}>
+                  <DropdownMenuItem onClick={() => setUiState(prev => ({ ...prev, sortBy: 'newest' }))}>
                     <SortDesc className="h-4 w-4 mr-2" />
                     Newest first
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSortBy('oldest')}>
+                  <DropdownMenuItem onClick={() => setUiState(prev => ({ ...prev, sortBy: 'oldest' }))}>
                     <SortAsc className="h-4 w-4 mr-2" />
                     Oldest first
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSortBy('mostActive')}>
+                  <DropdownMenuItem onClick={() => setUiState(prev => ({ ...prev, sortBy: 'mostActive' }))}>
                     <Filter className="h-4 w-4 mr-2" />
                     Most active
                   </DropdownMenuItem>
@@ -190,7 +218,7 @@ export function CommentSection({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowResolved(!uiState.showResolved)}
+                onClick={() => setUiState(prev => ({ ...prev, showResolved: !prev.showResolved }))}
               >
                 {uiState.showResolved ? (
                   <>
@@ -237,7 +265,7 @@ export function CommentSection({
         )}
 
         {/* Comment Threads */}
-        {isLoading ? (
+        {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="text-gray-500 mt-2">Loading comments...</p>
@@ -263,11 +291,11 @@ export function CommentSection({
                 isReplying={uiState.replyingTo === thread.id}
                 currentUserId={currentUser?.id || ''}
                 onToggleExpansion={() => toggleThreadExpansion(thread.id)}
-                onReply={() => setReplyingTo(thread.id)}
-                onCancelReply={() => setReplyingTo(null)}
+                onReply={() => setUiState(prev => ({ ...prev, replyingTo: thread.id }))}
+                onCancelReply={() => setUiState(prev => ({ ...prev, replyingTo: null }))}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onResolve={() => toggleResolveThread(thread.id)}
+                onResolve={() => handleResolveThread(thread.id)}
                 onReaction={addReaction}
                 onSubmitReply={(content, mentions) => handleReply(thread.id, content, mentions)}
               />

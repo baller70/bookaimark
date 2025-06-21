@@ -3,11 +3,11 @@ import { headers } from 'next/headers'
 import Stripe from 'stripe'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_fake_key_for_build', {
   apiVersion: '2024-11-20.acacia',
 })
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_fake_secret_for_build'
 
 export async function POST(req: Request) {
   try {

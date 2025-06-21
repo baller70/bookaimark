@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 // Initialize Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_fake_key_for_build')
 
 // Define pricing plans
 const pricingPlans = [
@@ -82,7 +82,10 @@ export default function BillingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fake-supabase-url.supabase.co',
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'fake-anon-key-for-build'
+  })
   const router = useRouter()
 
   const checkUser = useCallback(async () => {

@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MentionSuggestion } from '../types';
 import { MentionsService } from '../services/MentionsService';

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,6 +53,7 @@ import {
   Pause,
   MessageSquare,
   ArrowLeft,
+  ChevronRight,
   BookmarkIcon as BookmarkIconLucide
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -79,8 +81,25 @@ import { CSS } from '@dnd-kit/utilities'
 import { NotificationTab } from '@/src/features/notifications'
 import { TimerTab } from '@/src/features/pomodoro'
 import { MediaHub } from '@/src/features/media'
+import { SimpleBoardCanvas } from '@/src/features/simpleBoard/SimpleBoardCanvas'
+
+// Client-only wrapper to prevent hydration mismatches
+function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  if (!isClient) {
+    return <>{children}</>
+  }
+
+  return <>{children}</>
+}
 
 export default function Dashboard() {
+  const [isClient, setIsClient] = useState(false)
   const [viewMode, setViewMode] = useState('grid')
   const [showAddBookmark, setShowAddBookmark] = useState(false)
   const [selectedBookmarks, setSelectedBookmarks] = useState<number[]>([])
@@ -110,13 +129,18 @@ export default function Dashboard() {
   const [compactViewMode, setCompactViewMode] = useState<'folders' | 'bookmarks'>('folders')
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
 
-  // Reset compact view mode when switching away from compact view
+  // Reset compact view mode when switching away from compact/list view
   useEffect(() => {
-    if (viewMode !== 'compact') {
+    if (viewMode !== 'compact' && viewMode !== 'list') {
       setCompactViewMode('folders')
       setSelectedFolder(null)
     }
   }, [viewMode])
+
+  // Client-side only effect
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Load user profile picture as default logo from localStorage
   useEffect(() => {
@@ -641,32 +665,43 @@ export default function Dashboard() {
     return colors[category] || 'text-gray-600'
   }
 
+  // Get percentage color based on usage level
+  const getPercentageColor = (percentage: number) => {
+    if (percentage < 25) return '#dc2626' // red-600
+    if (percentage < 50) return '#2563eb' // blue-600
+    if (percentage < 75) return '#ea580c' // orange-600
+    return '#16a34a' // green-600
+  }
+
   // Hexagon component for displaying usage percentage
-  const UsageHexagon = ({ percentage }: { percentage: number }) => (
-    <div className="absolute bottom-2 right-2 flex items-center justify-center">
-      <svg width="80" height="70" viewBox="0 0 80 70" className="drop-shadow-sm">
-        {/* Hexagon shape */}
-        <path
-          d="M40 5 L65 18 L65 47 L40 60 L15 47 L15 18 Z"
-          fill="white"
-          stroke="#b3ab69"
-          strokeWidth="2"
-        />
-        {/* Percentage text */}
-        <text
-          x="40"
-          y="35"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#b3ab69"
-          fontSize="18"
-          fontWeight="bold"
-        >
-          {percentage}%
-        </text>
-      </svg>
-    </div>
-  )
+  const UsageHexagon = ({ percentage }: { percentage: number }) => {
+    const color = getPercentageColor(percentage)
+    return (
+      <div className="absolute bottom-2 right-2 flex items-center justify-center">
+        <svg width="80" height="70" viewBox="0 0 80 70" className="drop-shadow-sm">
+          {/* Hexagon shape */}
+          <path
+            d="M40 5 L65 18 L65 47 L40 60 L15 47 L15 18 Z"
+            fill="white"
+            stroke={color}
+            strokeWidth="2"
+          />
+          {/* Percentage text */}
+          <text
+            x="40"
+            y="35"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill={color}
+            fontSize="18"
+            fontWeight="bold"
+          >
+            {percentage}%
+          </text>
+        </svg>
+      </div>
+    )
+  }
 
   // Action icons component for top right corner
   const BookmarkActionIcons = ({ bookmark }: { bookmark: any }) => (
@@ -865,7 +900,7 @@ export default function Dashboard() {
               <path
                 d="M35 4 L55 15 L55 40 L35 51 L15 40 L15 15 Z"
                 fill="white"
-                stroke="#b3ab69"
+                stroke={getPercentageColor(getUsagePercentage(bookmark.visits))}
                 strokeWidth="2"
               />
               <text
@@ -873,7 +908,7 @@ export default function Dashboard() {
                 y="30"
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fill="#b3ab69"
+                fill={getPercentageColor(getUsagePercentage(bookmark.visits))}
                 fontSize="16"
                 fontWeight="bold"
               >
@@ -887,20 +922,20 @@ export default function Dashboard() {
         <div className="border-t border-gray-200/60 pt-3 mt-2">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{bookmark.project?.name || "PROJECT"}</span>
             </div>
             <span className="text-xs text-gray-500 font-medium">{bookmark.project?.status || "Active"}</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
-              className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+              className="bg-black h-2 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${bookmark.project?.progress || 0}%` }}
             ></div>
           </div>
           <div className="flex justify-between items-center mt-1">
             <span className="text-xs text-gray-500">Progress</span>
-            <span className="text-xs font-semibold text-blue-600">{bookmark.project?.progress || 0}%</span>
+            <span className="text-xs font-semibold text-green-600">{bookmark.project?.progress || 0}%</span>
           </div>
         </div>
       </CardContent>
@@ -928,62 +963,105 @@ export default function Dashboard() {
     }
 
     return (
-      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
-        {/* Drag Handle - Bottom Center */}
-        <div 
-          {...listeners} 
-          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
-        >
-          <GripVertical className="h-4 w-4 text-gray-700" />
-        </div>
+      <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative group">
         <CompactBookmarkCard bookmark={bookmark} />
       </div>
     )
   }
 
   const CompactBookmarkCard = ({ bookmark }: { bookmark: any }) => (
-    <Card 
-      className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
+    <div 
+      className="group cursor-pointer"
       onClick={() => handleBookmarkClick(bookmark)}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
-      <CardContent className="p-4 relative z-10">
-        <div className="flex items-center space-x-4">
-          <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center text-white font-bold ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
-            {bookmark.favicon}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 truncate font-audiowide uppercase group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h3>
-            </div>
-            <p className="text-xs text-blue-600 truncate font-medium mt-1">{bookmark.url}</p>
-            <div className="flex items-center space-x-3 mt-2">
-              <Badge className={`text-xs border shadow-sm ${getPriorityColor(bookmark.priority)}`}>
-                {bookmark.priority}
-              </Badge>
-              <div className="flex items-center space-x-1 bg-gray-50/80 rounded-full px-2 py-1">
-                <Eye className="h-3 w-3 text-gray-500" />
-                <span className="text-xs text-gray-600 font-medium">{bookmark.visits} VISITS</span>
+      {/* Square Box Design matching folder cards - SAME SIZE */}
+      <div className="aspect-square w-full bg-white border border-black relative overflow-hidden rounded-lg">
+        {/* Background Default Logo with 5% opacity */}
+        {userDefaultLogo && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${userDefaultLogo})`,
+              opacity: 0.05
+            }}
+          />
+        )}
+        <div className="p-2 h-full flex flex-col justify-between relative z-10">
+          {/* Top section with favicon and title */}
+          <div>
+            <div className="mb-1">
+              <div className="w-12 h-12">
+                <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center text-white font-bold text-sm ring-1 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm m-1">
+                  {bookmark.favicon}
+                </div>
               </div>
             </div>
+            <h3 className="font-bold text-gray-900 font-audiowide uppercase text-base leading-tight ml-1 truncate">
+              {bookmark.title}
+            </h3>
+            <p className="text-xs text-blue-600 truncate ml-1 mt-1">{bookmark.url}</p>
           </div>
-          {/* Circular Image */}
-          <div className="flex-shrink-0">
+          
+          {/* Middle section with badges */}
+          <div className="flex flex-col space-y-1 ml-1">
+            <Badge className={`text-xs border shadow-sm w-fit ${getPriorityColor(bookmark.priority)}`}>
+              {bookmark.priority}
+            </Badge>
+          </div>
+          
+          {/* Bottom section with visits and profile image */}
+          <div className="flex justify-between items-end">
+            <div className="flex items-center space-x-1.5">
+              <Eye className="h-4 w-4 text-gray-600" />
+              <p className="text-sm text-gray-600 font-semibold">
+                {bookmark.visits}
+              </p>
+              <span className="text-sm text-gray-500 font-medium uppercase">Visits</span>
+            </div>
             <img 
-              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"} 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=64&width=64"} 
               alt={`${bookmark.title} image`}
-              className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300"
+              className="w-16 h-16 object-cover rounded-full border border-gray-300"
             />
           </div>
         </div>
-      </CardContent>
-      
-      {/* Action Icons */}
-      <BookmarkActionIcons bookmark={bookmark} />
-      
-      {/* Usage Percentage Hexagon */}
-      <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
-    </Card>
+        
+        {/* Drag Icon - positioned at top right corner next to border */}
+        <div className="absolute top-0.5 right-0.5">
+          <div className="opacity-50 hover:opacity-100 transition-opacity duration-200">
+            <GripVertical className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+          </div>
+        </div>
+        
+        {/* Usage Percentage Hexagon - positioned diagonally (Much Bigger) */}
+        <div className="absolute top-2 right-2">
+          <svg width="70" height="60" viewBox="0 0 70 60" className="drop-shadow-lg">
+            <path
+              d="M35 5 L55 15 L55 38 L35 48 L15 38 L15 15 Z"
+              fill="white"
+              stroke={getPercentageColor(getUsagePercentage(bookmark.visits))}
+              strokeWidth="3"
+            />
+            <text
+              x="35"
+              y="26"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill={getPercentageColor(getUsagePercentage(bookmark.visits))}
+              fontSize="16"
+              fontWeight="bold"
+            >
+              {getUsagePercentage(bookmark.visits)}%
+            </text>
+          </svg>
+        </div>
+        
+        {/* Action Icons - positioned at bottom right corner */}
+        <div className="absolute bottom-1 right-1">
+          <BookmarkActionIcons bookmark={bookmark} />
+        </div>
+      </div>
+    </div>
   )
 
     const CompactFolderCard = ({ category, bookmarkCount }: { category: string, bookmarkCount: number }) => (
@@ -995,7 +1073,7 @@ export default function Dashboard() {
       }}
     >
       {/* Simple Square Box Design */}
-      <div className="aspect-square w-full bg-white border-2 border-gray-300 relative overflow-hidden rounded-lg">
+      <div className="aspect-square w-full bg-white border border-black relative overflow-hidden rounded-lg">
         {/* Background Default Logo with 5% opacity */}
         {userDefaultLogo && (
           <div 
@@ -1038,6 +1116,59 @@ export default function Dashboard() {
     </div>
   )
 
+  const ListFolderCard = ({ category, bookmarkCount }: { category: string, bookmarkCount: number }) => (
+    <div 
+      className="group cursor-pointer"
+      onClick={() => {
+        setSelectedFolder(category)
+        setCompactViewMode('bookmarks')
+      }}
+    >
+      {/* Horizontal List Design */}
+      <div className="w-full bg-white border border-black relative overflow-hidden rounded-lg hover:shadow-lg transition-all duration-300">
+        {/* Background Default Logo with 5% opacity */}
+        {userDefaultLogo && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${userDefaultLogo})`,
+              opacity: 0.05
+            }}
+          />
+        )}
+        <div className="p-4 flex items-center justify-between relative z-10">
+          {/* Left section with folder icon and title */}
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16">
+              <Folder className={`h-12 w-12 ${getCategoryColor(category)} m-2`} />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 font-audiowide uppercase text-xl leading-tight">
+                {category}
+              </h3>
+              <div className="flex items-center space-x-2 mt-1">
+                <Bookmark className="h-4 w-4 text-gray-600" />
+                <p className="text-sm text-gray-600">
+                  {bookmarkCount} BOOKMARKS
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Right section with profile image */}
+          <div className="flex items-center space-x-4">
+            <img 
+              src={userDefaultLogo || "/placeholder.svg?height=64&width=64"} 
+              alt={`${category} owner`}
+              className="w-16 h-16 object-cover rounded-full border border-gray-300"
+            />
+            <ArrowLeft className="h-6 w-6 text-gray-400 rotate-180" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   const SortableListBookmarkCard = ({ bookmark }: { bookmark: any }) => {
     const {
       attributes,
@@ -1071,199 +1202,91 @@ export default function Dashboard() {
 
   const ListBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
-      className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
+      className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-white border border-black hover:border-blue-600 backdrop-blur-sm relative overflow-hidden rounded-lg"
       onClick={() => handleBookmarkClick(bookmark)}
     >
+      {/* Background Default Logo with 5% opacity */}
+      {userDefaultLogo && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url(${userDefaultLogo})`,
+            opacity: 0.05
+          }}
+        />
+      )}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
+      
       <CardContent className="p-6 relative z-10">
-        <div className="flex items-start space-x-5">
-          <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
-            {bookmark.favicon}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 pr-4">
-                <div className="flex items-center space-x-2">
-                  <h3 className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h3>
-                </div>
-                <p className="text-sm text-blue-600 hover:underline font-medium mt-1">{bookmark.url}</p>
-                <p className="text-sm text-gray-600 mt-2 leading-relaxed">{bookmark.description}</p>
+        {/* Top Section: Title and Category */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <div className="flex items-center space-x-4 mb-2">
+              <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
+                {bookmark.favicon}
               </div>
-              <div className="flex flex-col items-end space-y-3">
-                <Badge className={`text-xs border shadow-sm ${getPriorityColor(bookmark.priority)}`}>
-                  {bookmark.priority}
-                </Badge>
-                <Badge variant="secondary" className="text-xs bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 border border-gray-200/50 hover:from-blue-50 hover:to-blue-100 hover:text-blue-700 transition-all duration-300">
-                  {bookmark.category}
-                </Badge>
-                <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
-                  <Eye className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600 font-medium">{bookmark.visits} VISITS</span>
+              <div className="flex-1">
+                <div className="flex items-center space-x-4 mb-1">
+                  <h3 className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h3>
+                  <Badge className={`text-sm border-2 shadow-sm px-3 py-1 ${getPriorityColor(bookmark.priority)}`}>
+                    {bookmark.priority}
+                  </Badge>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Folder className={`h-4 w-4 ${getCategoryColor(bookmark.category)}`} />
+                  <span className={`text-sm font-bold uppercase ${getCategoryColor(bookmark.category)}`}>
+                    {bookmark.category}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-          {/* Circular Image */}
+          
+          {/* Top Right: Profile Image */}
           <div className="flex-shrink-0">
             <img 
-              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=60&width=60"} 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=70&width=70"} 
               alt={`${bookmark.title} image`}
               className="w-16 h-16 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300 shadow-md"
             />
           </div>
         </div>
+        
+        {/* Middle Section: URL and Description */}
+        <div className="mb-4">
+          <p className="text-sm text-blue-600 hover:underline font-medium mb-2">{bookmark.url}</p>
+          <p className="text-sm text-gray-600 leading-relaxed">{bookmark.description}</p>
+        </div>
+        
+        {/* Bottom Section: Visits and Usage */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
+              <Bookmark className="h-4 w-4 text-gray-500" />
+              <span className="text-sm text-gray-600 font-medium uppercase">{bookmark.visits} VISITS</span>
+            </div>
+          </div>
+          
+          {/* Bottom Right: Usage Hexagon */}
+          <div className="flex items-center space-x-4">
+            <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
+          </div>
+        </div>
       </CardContent>
       
-      {/* Action Icons */}
-      <BookmarkActionIcons bookmark={bookmark} />
+      {/* Drag Icon - Positioned at top right corner */}
+      <div className="absolute top-2 right-2">
+        <div className="opacity-50 hover:opacity-100 transition-opacity duration-200">
+          <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+        </div>
+      </div>
       
-      {/* Usage Percentage Hexagon */}
-      <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
+      {/* Action Icons - Positioned at bottom right corner */}
+      <div className="absolute bottom-4 right-4">
+        <BookmarkActionIcons bookmark={bookmark} />
+      </div>
     </Card>
   )
-
-  const SortableTimelineBookmarkCard = ({ bookmark }: { bookmark: any }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: bookmark.id })
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-      zIndex: isDragging ? 1000 : 1,
-    }
-
-    return (
-      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
-        {/* Drag Handle - Bottom Center */}
-        <div 
-          {...listeners} 
-          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
-        >
-          <GripVertical className="h-4 w-4 text-gray-700" />
-        </div>
-        <TimelineBookmarkCard bookmark={bookmark} />
-      </div>
-    )
-  }
-
-  const TimelineBookmarkCard = ({ bookmark }: { bookmark: any }) => (
-    <div className="relative pl-10">
-      <div className="absolute left-0 top-0 w-3 h-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full ring-4 ring-blue-100 shadow-sm"></div>
-      <div className="absolute left-1.5 top-3 w-0.5 h-full bg-gradient-to-b from-blue-200 to-gray-200"></div>
-      <Card 
-        className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm ml-6 relative overflow-hidden"
-        onClick={() => handleBookmarkClick(bookmark)}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
-        <CardContent className="p-5 relative z-10">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center text-white font-bold ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
-                {bookmark.favicon}
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 font-audiowide uppercase group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h3>
-                <p className="text-xs text-gray-500 font-medium mt-1 bg-gray-50/80 rounded-full px-2 py-1">Added {bookmark.dateAdded}</p>
-              </div>
-            </div>
-            {/* Circular Image */}
-            <div className="flex-shrink-0">
-              <img 
-                src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"} 
-                alt={`${bookmark.title} image`}
-                className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300"
-              />
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mb-3 leading-relaxed">{bookmark.description}</p>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Badge className={`text-xs border shadow-sm ${getPriorityColor(bookmark.priority)}`}>
-                {bookmark.priority}
-              </Badge>
-              <Badge variant="secondary" className="text-xs bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 border border-gray-200/50 hover:from-blue-50 hover:to-blue-100 hover:text-blue-700 transition-all duration-300">
-                {bookmark.category}
-              </Badge>
-            </div>
-            <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1">
-              <Eye className="h-3 w-3 text-gray-500" />
-              <span className="text-xs text-gray-600 font-medium">{bookmark.visits} VISITS</span>
-            </div>
-          </div>
-        </CardContent>
-        
-        {/* Action Icons */}
-        <BookmarkActionIcons bookmark={bookmark} />
-        
-        {/* Usage Percentage Hexagon */}
-        <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
-      </Card>
-    </div>
-  )
-
-  const SortableHierarchyCard = ({ bookmark }: { bookmark: any }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: bookmark.id })
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-      zIndex: isDragging ? 1000 : 1,
-    }
-
-    return (
-      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
-        {/* Drag Handle - Bottom Center */}
-        <div 
-          {...listeners} 
-          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
-        >
-          <GripVertical className="h-4 w-4 text-gray-700" />
-        </div>
-        <div className="flex items-center space-x-5 p-4 hover:bg-gradient-to-r hover:from-gray-50/80 hover:to-blue-50/30 rounded-xl cursor-pointer relative transition-all duration-300 border border-gray-300 hover:border-blue-600" onClick={() => handleBookmarkClick(bookmark)}>
-          <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 border-l-3 border-b-3 border-gray-400 group-hover:border-blue-400 transition-colors duration-300"></div>
-            <div className="h-10 w-10 bg-gradient-to-br from-gray-100 to-gray-50 rounded-xl flex items-center justify-center ring-2 ring-gray-100/50 group-hover:ring-blue-200 transition-all duration-300 shadow-sm">
-              <span className="text-sm font-bold text-gray-700">{bookmark.favicon}</span>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h4 className="font-bold font-audiowide uppercase text-gray-900 group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h4>
-            <p className="text-sm text-gray-600 mt-1 leading-relaxed">{bookmark.description}</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Badge variant="outline" className={`text-xs shadow-sm bg-white/50 border-gray-300/50 hover:bg-blue-50/50 hover:border-blue-300/50 transition-all duration-300 ${getPriorityColor(bookmark.priority)}`}>
-              {bookmark.priority}
-            </Badge>
-            <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
-              <Eye className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-600 font-medium">{bookmark.visits} VISITS</span>
-            </div>
-          </div>
-          
-          {/* Action Icons */}
-          <BookmarkActionIcons bookmark={bookmark} />
-          
-          {/* Usage Percentage Hexagon */}
-          <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
-        </div>
-      </div>
-    )
-  }
 
   const SortableKanbanCard = ({ bookmark }: { bookmark: any }) => {
     const {
@@ -1417,6 +1440,63 @@ export default function Dashboard() {
     )
   }
 
+  const SortableHierarchyCard = ({ bookmark }: { bookmark: any }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: bookmark.id })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      zIndex: isDragging ? 1000 : 1,
+    }
+
+    return (
+      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
+        {/* Drag Handle - Left Side */}
+        <div 
+          {...listeners} 
+          className="absolute left-2 top-1/2 transform -translate-y-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
+        >
+          <GripVertical className="h-4 w-4 text-gray-700" />
+        </div>
+        <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-200 hover:border-blue-600 bg-white" onClick={() => handleBookmarkClick(bookmark)}>
+          <div className="flex items-center space-x-4 ml-8">
+            <div className="h-12 w-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
+              {bookmark.logo ? (
+                <img src={bookmark.logo} alt={bookmark.title} className="h-8 w-8 object-contain" />
+              ) : (
+                <GitBranch className="h-6 w-6 text-blue-600" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-lg truncate text-gray-900">{bookmark.title}</h3>
+              <p className="text-sm text-gray-500 truncate">{bookmark.description}</p>
+              <div className="flex items-center space-x-4 mt-2">
+                <Badge className={`${getCategoryColor(bookmark.category)} text-xs`}>
+                  {bookmark.category}
+                </Badge>
+                <span className="text-xs text-gray-400">{bookmark.visits} visits</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Action Icons */}
+          <BookmarkActionIcons bookmark={bookmark} />
+          
+          {/* Usage Percentage Hexagon */}
+          <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
+        </Card>
+      </div>
+    )
+  }
+
   const renderBookmarks = () => {
     const bookmarkIds = filteredBookmarks.map(bookmark => bookmark.id)
     
@@ -1469,85 +1549,123 @@ export default function Dashboard() {
               </div>
               
               {/* Bookmarks Grid */}
+              <ClientOnlyDndProvider>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext items={folderBookmarkIds} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                      {folderBookmarks.map((bookmark) => (
+                        <SortableCompactBookmarkCard key={bookmark.id} bookmark={bookmark} />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </ClientOnlyDndProvider>
+            </div>
+          )
+        }
+      case 'list':
+        if (compactViewMode === 'folders') {
+          // Show folder view for list - group bookmarks by category
+          const categories = [...new Set(bookmarks.map(bookmark => bookmark.category))]
+          return (
+            <div className="space-y-4">
+              {categories.map((category) => {
+                const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
+                return (
+                  <ListFolderCard 
+                    key={category} 
+                    category={category} 
+                    bookmarkCount={categoryBookmarks.length} 
+                  />
+                )
+              })}
+            </div>
+          )
+        }
+        
+        // Show individual bookmarks in selected folder or all bookmarks
+        const bookmarksToShow = selectedFolder 
+          ? filteredBookmarks.filter(bookmark => bookmark.category === selectedFolder)
+          : filteredBookmarks
+        const listBookmarkIds = bookmarksToShow.map(bookmark => bookmark.id)
+        
+        return (
+          <div>
+            {selectedFolder && (
+              <div className="mb-6 flex items-center space-x-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedFolder(null)
+                    setCompactViewMode('folders')
+                  }}
+                  className="flex items-center space-x-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back to Folders</span>
+                </Button>
+                <h2 className="text-xl font-bold text-gray-900 font-audiowide uppercase">
+                  {selectedFolder} ({bookmarksToShow.length} Bookmarks)
+                </h2>
+              </div>
+            )}
+            <ClientOnlyDndProvider>
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <SortableContext items={folderBookmarkIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {folderBookmarks.map((bookmark) => (
-                      <SortableCompactBookmarkCard key={bookmark.id} bookmark={bookmark} />
+                <SortableContext items={listBookmarkIds} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-4">
+                    {bookmarksToShow.map((bookmark) => (
+                      <SortableListBookmarkCard key={bookmark.id} bookmark={bookmark} />
                     ))}
                   </div>
                 </SortableContext>
               </DndContext>
-            </div>
-          )
-        }
-      case 'list':
-        return (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={bookmarkIds} strategy={verticalListSortingStrategy}>
-              <div className="space-y-4">
-                {filteredBookmarks.map((bookmark) => (
-                  <SortableListBookmarkCard key={bookmark.id} bookmark={bookmark} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )
-      case 'timeline':
-        return (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={bookmarkIds} strategy={verticalListSortingStrategy}>
-              <div className="space-y-6">
-                {filteredBookmarks.map((bookmark) => (
-                  <SortableTimelineBookmarkCard key={bookmark.id} bookmark={bookmark} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+            </ClientOnlyDndProvider>
+          </div>
         )
       case 'folder':
         return (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {filteredBookmarks.map((bookmark) => (
-                  <SortableFolderCard key={bookmark.id} bookmark={bookmark} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+          <ClientOnlyDndProvider>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {filteredBookmarks.map((bookmark) => (
+                    <SortableFolderCard key={bookmark.id} bookmark={bookmark} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </ClientOnlyDndProvider>
         )
       case 'goals':
         return (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredBookmarks.map((bookmark) => (
-                  <SortableGoalsCard key={bookmark.id} bookmark={bookmark} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+          <ClientOnlyDndProvider>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredBookmarks.map((bookmark) => (
+                    <SortableGoalsCard key={bookmark.id} bookmark={bookmark} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </ClientOnlyDndProvider>
         )
       case 'kanban':
         return (
@@ -1562,19 +1680,21 @@ export default function Dashboard() {
                     <Kanban className="h-6 w-6 mr-3 text-gray-700" />
                     {category}
                   </h3>
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext items={categoryBookmarkIds} strategy={verticalListSortingStrategy}>
-                      <div className="space-y-4">
-                        {categoryBookmarks.map((bookmark) => (
-                          <SortableKanbanCard key={bookmark.id} bookmark={bookmark} />
-                        ))}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
+                  <ClientOnlyDndProvider>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext items={categoryBookmarkIds} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-4">
+                          {categoryBookmarks.map((bookmark) => (
+                            <SortableKanbanCard key={bookmark.id} bookmark={bookmark} />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </ClientOnlyDndProvider>
                 </div>
               )
             })}
@@ -1593,39 +1713,49 @@ export default function Dashboard() {
                     <GitBranch className="h-7 w-7 mr-4 text-gray-700" />
                     {category}
                   </h3>
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext items={categoryBookmarkIds} strategy={verticalListSortingStrategy}>
-                      <div className="ml-11 space-y-4">
-                        {categoryBookmarks.map((bookmark, index) => (
-                          <SortableHierarchyCard key={bookmark.id} bookmark={bookmark} />
-                        ))}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
+                  <ClientOnlyDndProvider>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext items={categoryBookmarkIds} strategy={verticalListSortingStrategy}>
+                        <div className="ml-11 space-y-4">
+                          {categoryBookmarks.map((bookmark, index) => (
+                            <SortableHierarchyCard key={bookmark.id} bookmark={bookmark} />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </ClientOnlyDndProvider>
                 </div>
               )
             })}
           </div>
         )
+      case 'timeline':
+        return (
+          <div className="w-full h-screen">
+            <SimpleBoardCanvas />
+          </div>
+        )
       default: // grid
         return (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredBookmarks.map((bookmark) => (
-                  <SortableGridBookmarkCard key={bookmark.id} bookmark={bookmark} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+          <ClientOnlyDndProvider>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredBookmarks.map((bookmark) => (
+                    <SortableGridBookmarkCard key={bookmark.id} bookmark={bookmark} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </ClientOnlyDndProvider>
         )
     }
   }
@@ -2046,15 +2176,7 @@ export default function Dashboard() {
             <List className="h-5 w-5" />
             <span className="font-medium">LIST</span>
           </Button>
-          <Button
-            size="lg"
-            variant={viewMode === 'timeline' ? 'default' : 'ghost'}
-            onClick={() => setViewMode('timeline')}
-            className="h-12 px-4 flex items-center space-x-2"
-          >
-            <Clock className="h-5 w-5" />
-            <span className="font-medium">TIMELINE</span>
-          </Button>
+
           <Button
             size="lg"
             variant={viewMode === 'folder' ? 'default' : 'ghost'}
@@ -2090,6 +2212,15 @@ export default function Dashboard() {
           >
             <GitBranch className="h-5 w-5" />
             <span className="font-medium">HIERARCHY</span>
+          </Button>
+          <Button
+            size="lg"
+            variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+            onClick={() => setViewMode('timeline')}
+            className="h-12 px-4 flex items-center space-x-2"
+          >
+            <Clock className="h-5 w-5" />
+            <span className="font-medium">TIMELINE</span>
           </Button>
         </div>
       </div>
@@ -2426,75 +2557,77 @@ export default function Dashboard() {
                     </div>
 
                     {/* Related Bookmarks Grid with Drag and Drop */}
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={(event) => {
-                        // Handle drag end for related bookmarks
-                        const { active, over } = event
-                        if (active.id !== over?.id) {
-                          showNotification('Related bookmark reordered!')
-                        }
-                      }}
-                    >
-                      <SortableContext items={filteredBookmarks.slice(0, 4).map(b => `related-${b.id}`)} strategy={rectSortingStrategy}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {filteredBookmarks.slice(0, 4).map((bookmark) => (
-                            <div key={`related-${bookmark.id}`} className="relative group">
-                              {/* Drag Handle for Related Bookmarks */}
-                              <div className="absolute top-2 left-2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105">
-                                <GripVertical className="h-4 w-4 text-gray-700" />
-                              </div>
-                              
-                              <Card className="p-4 hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-300 hover:border-blue-400 bg-gradient-to-br from-white via-gray-50/20 to-white backdrop-blur-sm shadow-sm hover:shadow-blue-500/10">
-                                <div className="flex items-start space-x-3">
-                                  {/* Circular Image */}
-                                  <div className="flex-shrink-0">
-                                    <img
-                                      src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"}
-                                      alt={`${bookmark.title} image`}
-                                      className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50"
-                                    />
-                                  </div>
-                                  
-                                  {/* Content */}
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-sm text-gray-900 truncate font-audiowide uppercase mb-1">
-                                      {bookmark.title}
-                                    </h4>
-                                    <p className="text-xs text-gray-600 truncate mb-2">
-                                      {bookmark.description}
-                                    </p>
-                                    <div className="flex items-center justify-between">
-                                      <Badge variant="outline" className="text-xs bg-white/50 border-gray-300/50">
-                                        {bookmark.category}
-                                      </Badge>
-                                      <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                        <Eye className="h-3 w-3" />
-                                        <span>{bookmark.visits}</span>
+                    <ClientOnlyDndProvider>
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(event) => {
+                          // Handle drag end for related bookmarks
+                          const { active, over } = event
+                          if (active.id !== over?.id) {
+                            showNotification('Related bookmark reordered!')
+                          }
+                        }}
+                      >
+                        <SortableContext items={filteredBookmarks.slice(0, 4).map(b => `related-${b.id}`)} strategy={rectSortingStrategy}>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {filteredBookmarks.slice(0, 4).map((bookmark) => (
+                              <div key={`related-${bookmark.id}`} className="relative group">
+                                {/* Drag Handle for Related Bookmarks */}
+                                <div className="absolute top-2 left-2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105">
+                                  <GripVertical className="h-4 w-4 text-gray-700" />
+                                </div>
+                                
+                                <Card className="p-4 hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-300 hover:border-blue-400 bg-gradient-to-br from-white via-gray-50/20 to-white backdrop-blur-sm shadow-sm hover:shadow-blue-500/10">
+                                  <div className="flex items-start space-x-3">
+                                    {/* Circular Image */}
+                                    <div className="flex-shrink-0">
+                                      <img
+                                        src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"}
+                                        alt={`${bookmark.title} image`}
+                                        className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50"
+                                      />
+                                    </div>
+                                    
+                                    {/* Content */}
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="font-semibold text-sm text-gray-900 truncate font-audiowide uppercase mb-1">
+                                        {bookmark.title}
+                                      </h4>
+                                      <p className="text-xs text-gray-600 truncate mb-2">
+                                        {bookmark.description}
+                                      </p>
+                                      <div className="flex items-center justify-between">
+                                        <Badge variant="outline" className="text-xs bg-white/50 border-gray-300/50">
+                                          {bookmark.category}
+                                        </Badge>
+                                        <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                          <Eye className="h-3 w-3" />
+                                          <span>{bookmark.visits}</span>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
 
-                                  {/* Remove Button */}
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-600"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      showNotification('Related bookmark removed!')
-                                    }}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </Card>
-                            </div>
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
+                                    {/* Remove Button */}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-600"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        showNotification('Related bookmark removed!')
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </Card>
+                              </div>
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    </ClientOnlyDndProvider>
 
                     {/* Add More Related Bookmarks */}
                     <div className="mt-4 text-center">

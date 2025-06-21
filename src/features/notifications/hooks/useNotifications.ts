@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useCallback } from 'react'
 import { NotificationSettings, NotificationHistory, UserNotificationPreferences } from '../types'
 

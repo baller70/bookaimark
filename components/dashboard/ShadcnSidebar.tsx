@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -16,18 +18,23 @@ import {
   Grid3X3,
   TrendingUp,
   Users,
-  FolderOpen
+  FolderOpen,
+  Dna,
+  Bot,
+  ShoppingCart
 } from 'lucide-react'
 
 export function ShadcnSidebar() {
   const [selectedItem, setSelectedItem] = useState('Dashboard')
   const [isCollapsed, setIsCollapsed] = useState(false) // Start expanded
+  const pathname = usePathname()
 
   const navigationItems = [
-    { id: 'Dashboard', name: 'Dashboard', icon: LayoutDashboard, isSelected: true },
-    { id: 'Analytics', name: 'Analytics', icon: BarChart3 },
-    { id: 'Favorites', name: 'Favorites', icon: Star, badge: '3' },
-    { id: 'Settings', name: 'Settings', icon: Settings }
+    { id: 'Dashboard', name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+    { id: 'DNA Profile', name: 'DNA Profile', icon: Dna, href: '/dna-profile' },
+    { id: 'AI-Copolit', name: 'AI-Copolit', icon: Bot, badge: 'New', href: '/ai-copolit' },
+    { id: 'Marketplace', name: 'Marketplace', icon: ShoppingCart, href: '/marketplace' },
+    { id: 'Setting', name: 'Setting', icon: Settings, href: '/settings' }
   ]
 
   const categoryItems = [
@@ -107,49 +114,49 @@ export function ShadcnSidebar() {
                   <div className={cn("space-y-1", isCollapsed && "space-y-2")}>
                     {navigationItems.map((item) => {
                       const Icon = item.icon
-                      const isSelected = selectedItem === item.id
+                      const isSelected = pathname === item.href
                       
                       return (
-                        <button
-                          key={item.id}
-                          onClick={() => handleItemClick(item.id)}
-                          className={cn(
-                            "flex items-center rounded-md transition-colors group",
-                            isCollapsed 
-                              ? "w-12 h-12 justify-center relative" 
-                              : "w-full justify-between px-3 py-2 text-sm",
-                            isSelected 
-                              ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100" 
-                              : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                          )}
-                          title={isCollapsed ? item.name : undefined}
-                        >
-                          {isCollapsed ? (
-                            <>
-                              <Icon className="h-5 w-5" />
-                              {item.badge && (
-                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-slate-400 rounded-full"></div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex items-center gap-3">
-                                <Icon className="h-4 w-4" />
-                                <span>{item.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
+                        <Link key={item.id} href={item.href}>
+                          <button
+                            className={cn(
+                              "flex items-center rounded-md transition-colors group",
+                              isCollapsed 
+                                ? "w-12 h-12 justify-center relative" 
+                                : "w-full justify-between px-3 py-2 text-sm",
+                              isSelected 
+                                ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100" 
+                                : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            )}
+                            title={isCollapsed ? item.name : undefined}
+                          >
+                            {isCollapsed ? (
+                              <>
+                                <Icon className="h-5 w-5" />
                                 {item.badge && (
-                                  <Badge 
-                                    variant="secondary" 
-                                    className="text-xs px-2 py-0.5 text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800"
-                                  >
-                                    {item.badge}
-                                  </Badge>
+                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-slate-400 rounded-full"></div>
                                 )}
-                              </div>
-                            </>
-                          )}
-                        </button>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-3">
+                                  <Icon className="h-4 w-4" />
+                                  <span>{item.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {item.badge && (
+                                    <Badge 
+                                      variant="secondary" 
+                                      className="text-xs px-2 py-0.5 text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800"
+                                    >
+                                      {item.badge}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </button>
+                        </Link>
                       )
                     })}
                                     </div>

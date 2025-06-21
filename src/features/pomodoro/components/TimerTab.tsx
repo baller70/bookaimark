@@ -71,6 +71,12 @@ export default function TimerTab() {
       canSnooze: pomodoroHook.snoozeCount < 3,
       maxSnoozeCount: 3,
       addTask: pomodoroHook.createTask, // Map createTask to addTask
+      completeTask: (taskId: string) => {
+        pomodoroHook.updateTask(taskId, { 
+          isCompleted: true, 
+          completedAt: new Date() 
+        });
+      },
       defaultSettings: {
         workDuration: 25,
         shortBreakDuration: 5,

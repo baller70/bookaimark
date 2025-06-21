@@ -56,9 +56,17 @@ export function CommentThread({
   onReaction,
   onSubmitReply
 }: CommentThreadProps) {
-  const { rootComment, replies, participantNames, isResolved, unreadCount } = thread;
+  const rootComment = thread.root_comment;
+  const replies = thread.replies || [];
+  const isResolved = thread.is_resolved;
+  const replyCount = thread.reply_count;
+  
   const hasReplies = replies.length > 0;
-  const canResolve = rootComment.authorId === currentUserId || currentUserId === 'user-1'; // Admin check
+  const canResolve = rootComment.user_id === currentUserId || currentUserId === 'user-1'; // Admin check
+  
+  // Mock participant names for now
+  const participantNames = ['User 1', 'User 2'];
+  const unreadCount = 0; // Mock for now
 
   return (
     <Card className={`${isResolved ? 'opacity-75 border-green-200' : ''}`}>
@@ -132,12 +140,13 @@ export function CommentThread({
         {/* Root Comment */}
         <CommentItem
           comment={rootComment}
-          currentUserId={currentUserId}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onReaction={onReaction}
-          onReply={onReply}
-          isRootComment
+          isThreadRoot
+          isResolved={isResolved}
+          onEdit={async (content: string) => onEdit(rootComment.id)}
+          onDelete={async () => onDelete(rootComment.id)}
+          onReact={async (emoji: string) => onReaction(rootComment.id, emoji)}
+          onReply={async (content: string) => onReply()}
+          onResolve={async (resolved: boolean) => onResolve()}
         />
 
         {/* Replies */}
@@ -147,11 +156,11 @@ export function CommentThread({
               <CommentItem
                 key={reply.id}
                 comment={reply}
-                currentUserId={currentUserId}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onReaction={onReaction}
-                onReply={onReply}
+                isReply
+                onEdit={async (content: string) => onEdit(reply.id)}
+                onDelete={async () => onDelete(reply.id)}
+                onReact={async (emoji: string) => onReaction(reply.id, emoji)}
+                onReply={async (content: string) => onReply()}
               />
             ))}
           </div>

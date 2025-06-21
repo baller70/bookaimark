@@ -10,7 +10,7 @@ const UpdateCommentSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
@@ -20,6 +20,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const commentId = params.id;
     const data = await request.json();
     const validatedData = UpdateCommentSchema.parse(data);
@@ -118,7 +119,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
@@ -128,6 +129,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const commentId = params.id;
 
     // First, check if the comment exists and user has permission to delete it
@@ -208,4 +210,4 @@ export async function DELETE(
     console.error('Error in DELETE /api/comments/[id]:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+  } 

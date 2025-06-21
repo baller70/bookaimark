@@ -1,19 +1,17 @@
+'use client'
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Comment,
   CommentThread,
-  CommentNotification,
-  User,
-  CreateCommentData,
-  UpdateCommentData,
-  CommentFilters,
-  CommentUIState,
-  CommentReaction,
-  CreateCommentInput,
-  UpdateCommentInput,
-  CommentsResponse,
   CommentStats,
   CommentPermissions,
+  CommentNotification,
+  User,
+  CreateCommentInput,
+  UpdateCommentInput,
+  CommentFilters,
+  CommentUIState,
   CommentEvent
 } from '../types';
 import { CommentsService } from '../services/CommentsService';

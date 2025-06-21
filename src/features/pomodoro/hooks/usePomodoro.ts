@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS: PomodoroSettings = {
   shortBreakDuration: 5,
   longBreakDuration: 15,
   longBreakInterval: 4,
-  autoStartBreaks: false,
+  autoStartBreaks: true,
   autoStartWork: false,
   soundEnabled: true,
   notificationsEnabled: true,

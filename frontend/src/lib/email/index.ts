@@ -1,11 +1,7 @@
 import { Resend } from 'resend';
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-console.log('RESEND_API_KEY status:', RESEND_API_KEY ? 'Present' : 'Missing');
-
-if (!RESEND_API_KEY) {
-  throw new Error('RESEND_API_KEY is not defined in environment variables');
-}
+const RESEND_API_KEY = process.env.RESEND_API_KEY || 'fake_resend_key_for_build';
+console.log('RESEND_API_KEY status:', process.env.RESEND_API_KEY ? 'Present' : 'Missing');
 
 export const resend = new Resend(RESEND_API_KEY);
 

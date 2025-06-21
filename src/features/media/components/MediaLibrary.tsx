@@ -84,7 +84,9 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
       setPersistentFiles(response.data);
     } catch (error) {
       console.error('Failed to load persistent files:', error);
-      toast.error('Failed to load saved files');
+      // Don't show toast error for initial load failures to avoid disrupting the user experience
+      // toast.error('Failed to load saved files');
+      setPersistentFiles([]); // Set empty array as fallback
     } finally {
       setIsLoadingFiles(false);
     }

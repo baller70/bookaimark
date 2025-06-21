@@ -83,7 +83,6 @@ const upcomingFeatures = [
     features: [
       "Team Workspaces",
       "Role Management",
-      "Activity Timeline",
       "Team Chat Integration",
       "Document Collaboration",
     ]

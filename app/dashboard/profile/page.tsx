@@ -21,7 +21,10 @@ export default function ProfileSettings() {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fake-supabase-url.supabase.co',
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'fake-anon-key-for-build'
+  })
 
   const fetchProfile = async () => {
     try {

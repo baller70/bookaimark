@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { RichTextEditor } from './RichTextEditor';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
-import { CommentSection } from '../../comments';
+// import { CommentSection } from '../../comments';
 import { RichDocument, DocumentCollaborator } from '../types';
 import { formatDate } from '../utils';
 
@@ -288,6 +288,7 @@ export function DocumentEditor({ documentId, onBack }: DocumentEditorProps) {
       {/* Comments Sidebar */}
       <div className="w-96 border-l border-gray-200 flex flex-col">
         <div className="flex-1 overflow-hidden">
+          {/* Temporarily disabled CommentSection
           <CommentSection
             entityType="document"
             entityId={document.id}
@@ -295,6 +296,10 @@ export function DocumentEditor({ documentId, onBack }: DocumentEditorProps) {
             showHeader={true}
             allowNewComments={true}
           />
+          */}
+          <div className="p-4 text-center text-gray-500">
+            Comments temporarily disabled
+          </div>
         </div>
       </div>
     </div>

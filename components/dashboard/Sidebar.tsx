@@ -16,26 +16,26 @@ const navigationItems = [
     badge: null
   },
   {
-    title: 'Analytics',
-    href: '/dashboard/analytics',
-    icon: '📈',
+    title: 'DNA Profile',
+    href: '/dna-profile',
+    icon: '🧬',
+    badge: null
+  },
+  {
+    title: 'AI-Copolit',
+    href: '/ai-copolit',
+    icon: '🤖',
     badge: 'New'
   },
   {
-    title: 'Profile',
-    href: '/dashboard/profile',
-    icon: '👤',
+    title: 'Marketplace',
+    href: '/marketplace',
+    icon: '🛒',
     badge: null
   },
   {
-    title: 'Billing',
-    href: '/dashboard/billing',
-    icon: '💳',
-    badge: null
-  },
-  {
-    title: 'Settings',
-    href: '/dashboard/settings',
+    title: 'Setting',
+    href: '/settings',
     icon: '⚙️',
     badge: null
   }
