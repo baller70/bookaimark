@@ -54,7 +54,9 @@ import {
   MessageSquare,
   ArrowLeft,
   ChevronRight,
-  BookmarkIcon as BookmarkIconLucide
+  BookmarkIcon as BookmarkIconLucide,
+  Building,
+  Columns
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -82,6 +84,132 @@ import { NotificationTab } from '@/src/features/notifications'
 import { TimerTab } from '@/src/features/pomodoro'
 import { MediaHub } from '@/src/features/media'
 import { SimpleBoardCanvas } from '@/src/features/simpleBoard/SimpleBoardCanvas'
+import { FolderHierarchyManager, FolderHierarchyAssignment } from '@/src/components/hierarchy/Hierarchy'
+import { FolderOrgChartView } from '@/src/components/ui/folder-org-chart-view'
+
+// Import React Flow components for custom background
+import ReactFlow, {
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+
+// Custom Infinity Board Background Component (no nodes, just background)
+const InfinityBoardBackground = () => {
+  const [nodes] = useNodesState([]);
+  const [edges] = useEdgesState([]);
+
+  return (
+    <ReactFlowProvider>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        fitView
+        attributionPosition="bottom-left"
+        className="bg-gray-50"
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        panOnDrag={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        zoomOnDoubleClick={true}
+      >
+        <Background gap={12} color="#e5e7eb" />
+        <MiniMap position="bottom-left" />
+        <Controls position="bottom-right" />
+      </ReactFlow>
+    </ReactFlowProvider>
+  );
+};
+
+// HIERARCHY Infinity Board with Full Editing Capabilities - DEFINITIVE SOLUTION
+const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, onOpenDetail }: {
+  folders: any[];
+  bookmarks: any[];
+  onCreateFolder: () => void;
+  onAddBookmark: () => void;
+  onOpenDetail: (bookmark: any) => void;
+}) => {
+  const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 });
+  
+  return (
+    <div className="relative w-full min-h-screen overflow-auto">
+      {/* Background Layer: React Flow for infinity board only */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none">
+        <ReactFlowProvider>
+          <ReactFlow
+            nodes={[]}
+            edges={[]}
+            fitView
+            attributionPosition="bottom-left"
+            className="bg-gray-50"
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            panOnDrag={true}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            zoomOnDoubleClick={true}
+            minZoom={0.1}
+            maxZoom={4}
+            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+            onMove={(_, viewport) => {
+              setTransform({
+                x: viewport.x,
+                y: viewport.y,
+                zoom: viewport.zoom
+              });
+            }}
+          >
+            <Background gap={12} color="#e5e7eb" />
+            <Controls position="bottom-right" />
+            <MiniMap position="bottom-left" />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </div>
+      
+      {/* Foreground Layer: Fully Interactive Components */}
+      <div 
+        className="relative w-full pointer-events-auto z-10"
+        style={{
+          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
+          transformOrigin: '0 0',
+          transition: 'none', // Disable transitions for smooth interaction
+          paddingTop: '40px',
+          paddingLeft: '40px',
+          paddingBottom: '40px',
+          minHeight: 'calc(100vh + 80px)' // Ensure there's room to scroll
+        }}
+      >
+        <div className="w-full max-w-[92vw]">
+          <div className="bg-white/95 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-gray-200/60 w-full min-h-[80vh]">
+            <FolderOrgChartView
+              folders={folders}
+              bookmarks={bookmarks}
+              onCreateFolder={onCreateFolder}
+              onEditFolder={() => {}}
+              onDeleteFolder={() => {}}
+              onAddBookmarkToFolder={() => {}}
+              onDropBookmarkToFolder={() => {}}
+              onBookmarkUpdated={() => {}}
+              onBookmarkDeleted={() => {}}
+              onOpenDetail={onOpenDetail}
+              currentFolderId={null}
+              onFolderNavigate={() => {}}
+              selectedFolder={null}
+              onAddBookmark={onAddBookmark}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Client-only wrapper to prevent hydration mismatches
 function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
@@ -92,7 +220,7 @@ function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   if (!isClient) {
-    return <>{children}</>
+    return <div suppressHydrationWarning>{children}</div>
   }
 
   return <>{children}</>
@@ -128,6 +256,23 @@ export default function Dashboard() {
   // New states for folder-based compact view
   const [compactViewMode, setCompactViewMode] = useState<'folders' | 'bookmarks'>('folders')
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  // near top state declarations after other states
+  const [folderAssignments, setFolderAssignments] = useState<FolderHierarchyAssignment[]>([]);
+  // Folder creation states
+  const [showAddFolder, setShowAddFolder] = useState(false);
+  const [newFolder, setNewFolder] = useState({
+    name: '',
+    color: '#3b82f6', // Default blue color
+    description: ''
+  });
+
+  // Add Bookmark modal states
+  const [addBookmarkTab, setAddBookmarkTab] = useState<'new' | 'existing'>('new');
+  const [selectedExistingBookmarks, setSelectedExistingBookmarks] = useState<number[]>([]);
+  const [existingBookmarksSearch, setExistingBookmarksSearch] = useState('');
+
+  // HIERARCHY view mode state
+  const [khV1ViewMode, setKhV1ViewMode] = useState<'chart' | 'timeline'>('chart');
 
   // Reset compact view mode when switching away from compact/list view
   useEffect(() => {
@@ -206,8 +351,8 @@ export default function Dashboard() {
       lastVisited: "2024-01-15",
       dateAdded: "2024-01-10",
       favicon: "G",
-      screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: "/placeholder.svg?height=120&width=120",
+      screenshot: "/placeholder.svg",
+      circularImage: "/placeholder.svg",
       logo: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png", // Background logo
       notes: "Main repository hosting platform for all projects. Contains personal and work repositories.",
       timeSpent: "2h 30m",
@@ -232,8 +377,8 @@ export default function Dashboard() {
       lastVisited: "2024-01-14",
       dateAdded: "2024-01-08",
       favicon: "F",
-      screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: "/placeholder.svg?height=120&width=120",
+      screenshot: "/placeholder.svg",
+      circularImage: "/placeholder.svg",
       logo: "https://cdn.sanity.io/images/599r6htc/localized/46a76c802176eb17b04e12108de7e7e0f3736dc6-1024x1024.png?w=804&h=804&q=75&fit=max&auto=format", // Background logo
       notes: "Primary design tool for creating wireframes, prototypes, and design systems.",
       timeSpent: "1h 45m",
@@ -258,8 +403,8 @@ export default function Dashboard() {
       lastVisited: "2024-01-13",
       dateAdded: "2024-01-05",
       favicon: "SO",
-      screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: "/placeholder.svg?height=120&width=120",
+      screenshot: "/placeholder.svg",
+      circularImage: "/placeholder.svg",
       logo: "https://cdn.sstatic.net/Sites/stackoverflow/Img/apple-touch-icon.png", // Background logo
       notes: "Go-to resource for programming questions and solutions. Excellent community support.",
       timeSpent: "3h 15m",
@@ -284,8 +429,8 @@ export default function Dashboard() {
       lastVisited: "2024-01-16",
       dateAdded: "2024-01-02",
       favicon: "N",
-      screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: "/placeholder.svg?height=120&width=120",
+      screenshot: "/placeholder.svg",
+      circularImage: "/placeholder.svg",
       logo: "https://upload.wikimedia.org/wikipedia/commons/4/45/Notion_app_logo.png", // Background logo
       notes: "Central hub for project documentation, meeting notes, and task management.",
       timeSpent: "4h 20m",
@@ -310,8 +455,8 @@ export default function Dashboard() {
       lastVisited: "2024-01-12",
       dateAdded: "2024-01-07",
       favicon: "D",
-      screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: "/placeholder.svg?height=120&width=120",
+      screenshot: "/placeholder.svg",
+      circularImage: "/placeholder.svg",
       logo: "https://cdn.dribbble.com/assets/dribbble-ball-mark-2bd45f09c2fb58dbbfb44766d5d1d07c5a12972d602ef8b32204d28fa3dda554.svg", // Background logo
       notes: "Source of design inspiration and trends. Great for discovering new design patterns.",
       timeSpent: "45m",
@@ -336,8 +481,8 @@ export default function Dashboard() {
       lastVisited: "2024-01-11",
       dateAdded: "2024-01-04",
       favicon: "L",
-      screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: "/placeholder.svg?height=120&width=120",
+      screenshot: "/placeholder.svg",
+      circularImage: "/placeholder.svg",
       logo: "https://asset.brandfetch.io/idZAyF9rlg/idkmvDNPVH.png", // Background logo
       notes: "Issue tracking for development projects. Clean interface and fast performance.",
       timeSpent: "1h 30m",
@@ -351,10 +496,113 @@ export default function Dashboard() {
     }
   ])
 
+  // Available bookmarks that can be added to the workspace
+  const availableBookmarks = [
+    {
+      id: 101,
+      title: "YOUTUBE",
+      url: "https://youtube.com",
+      description: "Video sharing and streaming platform",
+      category: "Entertainment",
+      tags: ["VIDEO", "STREAMING", "CONTENT"],
+      priority: "medium",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Youtube_logo.png",
+      circularImage: "/placeholder.svg"
+    },
+    {
+      id: 102,
+      title: "TWITTER",
+      url: "https://twitter.com",
+      description: "Social media and microblogging platform",
+      category: "Social",
+      tags: ["SOCIAL", "NEWS", "NETWORKING"],
+      priority: "low",
+      logo: "https://abs.twimg.com/icons/apple-touch-icon-192x192.png",
+      circularImage: "/placeholder.svg"
+    },
+    {
+      id: 103,
+      title: "LINKEDIN",
+      url: "https://linkedin.com",
+      description: "Professional networking platform",
+      category: "Professional",
+      tags: ["NETWORKING", "CAREER", "BUSINESS"],
+      priority: "medium",
+      logo: "https://static.licdn.com/sc/h/al2o9zrvru7aqj8e1x2rzsrca",
+      circularImage: "/placeholder.svg"
+    },
+    {
+      id: 104,
+      title: "CODEPEN",
+      url: "https://codepen.io",
+      description: "Online code editor and frontend showcase",
+      category: "Development",
+      tags: ["CODE", "FRONTEND", "DEMO"],
+      priority: "medium",
+      logo: "https://cpwebassets.codepen.io/assets/favicon/apple-touch-icon-5ae1a0698dcc2402e9712f7d01ed509a57814f994c660df9f7a952f3060705ee.png",
+      circularImage: "/placeholder.svg"
+    },
+    {
+      id: 105,
+      title: "MEDIUM",
+      url: "https://medium.com",
+      description: "Online publishing platform for articles and blogs",
+      category: "Learning",
+      tags: ["BLOG", "ARTICLES", "WRITING"],
+      priority: "low",
+      logo: "https://miro.medium.com/v2/resize:fill:152:152/1*sHhtYhaCe2Uc3IU0IgKwIQ.png",
+      circularImage: "/placeholder.svg"
+    },
+    {
+      id: 106,
+      title: "BEHANCE",
+      url: "https://behance.net",
+      description: "Creative portfolio showcase platform",
+      category: "Design",
+      tags: ["PORTFOLIO", "CREATIVE", "SHOWCASE"],
+      priority: "medium",
+      logo: "https://a5.behance.net/2acd763a-9c19-4ac0-9c1e-6d2b2c0e5e0a/img/site/apple-touch-icon.png",
+      circularImage: "/placeholder.svg"
+    },
+    {
+      id: 107,
+      title: "SLACK",
+      url: "https://slack.com",
+      description: "Team collaboration and messaging platform",
+      category: "Productivity",
+      tags: ["TEAM", "COMMUNICATION", "WORKSPACE"],
+      priority: "high",
+      logo: "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png",
+      circularImage: "/placeholder.svg"
+    },
+    {
+      id: 108,
+      title: "TRELLO",
+      url: "https://trello.com",
+      description: "Visual project management with boards and cards",
+      category: "Productivity",
+      tags: ["PROJECT", "KANBAN", "ORGANIZATION"],
+      priority: "medium",
+      logo: "https://d2k1ftgv7pobq7.cloudfront.net/meta/c/p/res/images/trello-meta-logo.png",
+      circularImage: "/placeholder.svg"
+    }
+  ];
+
   // Ensure any legacy bookmark objects that may still contain tags don't render them on the cards
   useEffect(() => {
     setBookmarks(prev => prev.map(b => ({ ...b, tags: Array.isArray(b.tags) ? b.tags : [] })))
   }, [])
+
+  // Create folders for hierarchy after bookmarks are loaded
+  const foldersForHierarchyV1 = useMemo(() => {
+    const categories = [...new Set(bookmarks.map((b) => b.category))];
+    return categories.map((cat) => ({
+      id: cat,
+      name: cat,
+      color: '#6b7280',
+      bookmark_count: bookmarks.filter((b) => b.category === cat).length,
+    }));
+  }, [bookmarks]);
 
   const filteredBookmarks = bookmarks.filter(bookmark => {
     const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -400,8 +648,8 @@ export default function Dashboard() {
       lastVisited: new Date().toLocaleDateString(),
       dateAdded: new Date().toLocaleDateString(),
       favicon: newBookmark.title.charAt(0).toUpperCase(), // Use first letter as fallback
-      screenshot: "/placeholder.svg?height=200&width=300",
-      circularImage: newBookmark.circularImage || userDefaultLogo || "/placeholder.svg?height=120&width=120",
+      screenshot: "/placeholder.svg",
+      circularImage: newBookmark.circularImage || userDefaultLogo || "/placeholder.svg",
       logo: newBookmark.logo || "", // Background logo
       notes: newBookmark.notes || 'No notes added',
       timeSpent: '0m',
@@ -437,6 +685,94 @@ export default function Dashboard() {
       logo: ''
     })
   }
+
+  const handleAddFolder = () => {
+    if (newFolder.name.trim()) {
+      // For now, we'll just show a notification that the folder was created
+      // In a real app, this would save to a database
+      showNotification(`Folder "${newFolder.name}" created successfully!`)
+      
+      // Reset the form
+      setNewFolder({
+        name: '',
+        color: '#3b82f6',
+        description: ''
+      })
+      
+      // Close the modal
+      setShowAddFolder(false)
+    }
+  }
+
+  const resetAddFolderForm = () => {
+    setNewFolder({
+      name: '',
+      color: '#3b82f6',
+      description: ''
+    })
+  }
+
+  // Existing bookmarks handlers
+  const handleExistingBookmarkSelect = (bookmarkId: number) => {
+    setSelectedExistingBookmarks(prev => 
+      prev.includes(bookmarkId) 
+        ? prev.filter(id => id !== bookmarkId)
+        : [...prev, bookmarkId]
+    )
+  }
+
+  const handleAddExistingBookmarks = () => {
+    if (selectedExistingBookmarks.length === 0) {
+      showNotification('Please select at least one bookmark to add')
+      return
+    }
+
+    const bookmarksToAdd = availableBookmarks.filter(bookmark => 
+      selectedExistingBookmarks.includes(bookmark.id)
+    ).map(bookmark => ({
+      ...bookmark,
+      id: bookmarks.length + bookmark.id, // Ensure unique IDs
+      isFavorite: false,
+      visits: 0,
+      lastVisited: new Date().toLocaleDateString(),
+      dateAdded: new Date().toLocaleDateString(),
+      favicon: bookmark.title.charAt(0).toUpperCase(),
+      screenshot: "/placeholder.svg",
+      notes: 'Added from available bookmarks',
+      timeSpent: '0m',
+      weeklyVisits: 0,
+      siteHealth: 'good',
+      project: {
+        name: "IMPORTED",
+        progress: 0,
+        status: "New"
+      }
+    }))
+
+    setBookmarks(prev => [...prev, ...bookmarksToAdd])
+    setSelectedExistingBookmarks([])
+    setShowAddBookmark(false)
+    showNotification(`Added ${bookmarksToAdd.length} bookmark(s) successfully!`)
+  }
+
+  const resetAddBookmarkModal = () => {
+    setAddBookmarkTab('new')
+    setSelectedExistingBookmarks([])
+    setExistingBookmarksSearch('')
+    resetAddBookmarkForm()
+  }
+
+  // Filter available bookmarks for search
+  const filteredAvailableBookmarks = availableBookmarks.filter(bookmark => {
+    const searchLower = existingBookmarksSearch.toLowerCase()
+    return bookmark.title.toLowerCase().includes(searchLower) ||
+           bookmark.description.toLowerCase().includes(searchLower) ||
+           bookmark.category.toLowerCase().includes(searchLower) ||
+           bookmark.tags.some((tag: string) => tag.toLowerCase().includes(searchLower))
+  }).filter(availableBookmark => 
+    // Only show bookmarks that aren't already added to the workspace
+    !bookmarks.some(existingBookmark => existingBookmark.url === availableBookmark.url)
+  )
 
   const handleBookmarkSelect = (bookmarkId: number) => {
     setSelectedBookmarks(prev => 
@@ -870,7 +1206,7 @@ export default function Dashboard() {
         <div className="mb-4 flex justify-center">
           <div className="relative">
             <img 
-              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=120&width=120"} 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg"} 
               alt={`${bookmark.title} image`}
               className="w-24 h-24 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300 shadow-md group-hover:shadow-lg"
             />
@@ -1019,7 +1355,7 @@ export default function Dashboard() {
               <span className="text-sm text-gray-500 font-medium uppercase">Visits</span>
             </div>
             <img 
-              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=64&width=64"} 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg"} 
               alt={`${bookmark.title} image`}
               className="w-16 h-16 object-cover rounded-full border border-gray-300"
             />
@@ -1106,7 +1442,7 @@ export default function Dashboard() {
               </p>
             </div>
             <img 
-              src={userDefaultLogo || "/placeholder.svg?height=64&width=64"} 
+              src={userDefaultLogo || "/placeholder.svg"} 
               alt={`${category} owner`}
               className="w-16 h-16 object-cover rounded-full border border-gray-300"
             />
@@ -1158,7 +1494,7 @@ export default function Dashboard() {
           {/* Right section with profile image */}
           <div className="flex items-center space-x-4">
             <img 
-              src={userDefaultLogo || "/placeholder.svg?height=64&width=64"} 
+              src={userDefaultLogo || "/placeholder.svg"} 
               alt={`${category} owner`}
               className="w-16 h-16 object-cover rounded-full border border-gray-300"
             />
@@ -1245,7 +1581,7 @@ export default function Dashboard() {
           {/* Top Right: Profile Image */}
           <div className="flex-shrink-0">
             <img 
-              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=70&width=70"} 
+              src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg"} 
               alt={`${bookmark.title} image`}
               className="w-16 h-16 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300 shadow-md"
             />
@@ -1736,8 +2072,68 @@ export default function Dashboard() {
       case 'timeline':
         return (
           <div className="w-full h-screen">
-            <SimpleBoardCanvas />
+            <SimpleBoardCanvas onBookmarkClick={handleBookmarkClick} />
           </div>
+        )
+      case 'hierarchyV1':
+        return (
+          <div className="space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Hierarchy V1 - Simple View</h2>
+              <p className="text-gray-600">Basic hierarchical organization of your bookmarks</p>
+            </div>
+            {['Development', 'Design', 'Productivity'].map((category) => {
+              const categoryBookmarks = filteredBookmarks.filter((bookmark) => bookmark.category === category)
+              const categoryBookmarkIds = categoryBookmarks.map(bookmark => bookmark.id)
+              
+              return (
+                <div key={category} className="border border-gray-200/60 rounded-xl p-8 bg-gradient-to-br from-white via-gray-50/20 to-white shadow-sm hover:shadow-lg transition-all duration-300">
+                  <h3 className="font-bold text-2xl mb-6 flex items-center text-gray-900">
+                    <GitBranch className="h-7 w-7 mr-4 text-gray-700" />
+                    {category}
+                    <Badge className="ml-3 bg-blue-50 text-blue-700 border-blue-200">
+                      {categoryBookmarks.length} bookmarks
+                    </Badge>
+                  </h3>
+                  <ClientOnlyDndProvider>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext items={categoryBookmarkIds} strategy={verticalListSortingStrategy}>
+                        <div className="ml-11 space-y-4">
+                          {categoryBookmarks.map((bookmark, index) => (
+                            <SortableHierarchyCard key={bookmark.id} bookmark={bookmark} />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </ClientOnlyDndProvider>
+                </div>
+              )
+            })}
+          </div>
+        )
+      case 'khV1':
+        return (
+          <ClientOnlyDndProvider>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="w-full h-screen">
+                <KHV1InfinityBoard 
+                  folders={foldersForHierarchyV1}
+                  bookmarks={bookmarks}
+                  onCreateFolder={() => setShowAddFolder(true)}
+                  onAddBookmark={() => setShowAddBookmark(true)}
+                  onOpenDetail={handleBookmarkClick}
+                />
+              </div>
+            </DndContext>
+          </ClientOnlyDndProvider>
         )
       default: // grid
         return (
@@ -2201,17 +2597,8 @@ export default function Dashboard() {
             onClick={() => setViewMode('kanban')}
             className="h-12 px-4 flex items-center space-x-2"
           >
-            <Kanban className="h-5 w-5" />
+            <Columns className="h-5 w-5" />
             <span className="font-medium">KANBAN</span>
-          </Button>
-          <Button
-            size="lg"
-            variant={viewMode === 'hierarchy' ? 'default' : 'ghost'}
-            onClick={() => setViewMode('hierarchy')}
-            className="h-12 px-4 flex items-center space-x-2"
-          >
-            <GitBranch className="h-5 w-5" />
-            <span className="font-medium">HIERARCHY</span>
           </Button>
           <Button
             size="lg"
@@ -2221,6 +2608,15 @@ export default function Dashboard() {
           >
             <Clock className="h-5 w-5" />
             <span className="font-medium">TIMELINE</span>
+          </Button>
+          <Button
+            size="lg"
+            variant={viewMode === 'khV1' ? 'default' : 'ghost'}
+            onClick={() => setViewMode('khV1')}
+            className="h-12 px-4 flex items-center space-x-2"
+          >
+            <Building className="h-5 w-5" />
+            <span className="font-medium">HIERARCHY</span>
           </Button>
         </div>
       </div>
@@ -2301,7 +2697,7 @@ export default function Dashboard() {
                       <div className="flex justify-center">
                         <div className="relative">
                           <img
-                            src={userDefaultLogo || selectedBookmark.circularImage || "/placeholder.svg?height=120&width=120"}
+                            src={userDefaultLogo || selectedBookmark.circularImage || "/placeholder.svg"}
                             alt={`${selectedBookmark.title} image`}
                             className="w-32 h-32 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 shadow-lg"
                           />
@@ -2583,7 +2979,7 @@ export default function Dashboard() {
                                     {/* Circular Image */}
                                     <div className="flex-shrink-0">
                                       <img
-                                        src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg?height=40&width=40"}
+                                        src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg"}
                                         alt={`${bookmark.title} image`}
                                         className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50"
                                       />
@@ -2728,146 +3124,354 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Add Bookmark Modal */}
-      <Dialog open={showAddBookmark} onOpenChange={setShowAddBookmark}>
+      <Dialog open={showAddBookmark} onOpenChange={(open) => {
+        setShowAddBookmark(open)
+        if (!open) resetAddBookmarkModal()
+      }}>
+        <DialogContent className="max-w-2xl bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle>ADD BOOKMARKS</DialogTitle>
+          </DialogHeader>
+          
+          {/* Tab Navigation */}
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <Button
+              variant={addBookmarkTab === 'new' ? 'default' : 'ghost'}
+              onClick={() => setAddBookmarkTab('new')}
+              className="flex-1"
+            >
+              New Bookmark
+            </Button>
+            <Button
+              variant={addBookmarkTab === 'existing' ? 'default' : 'ghost'}
+              onClick={() => setAddBookmarkTab('existing')}
+              className="flex-1"
+            >
+              Existing Bookmarks
+            </Button>
+          </div>
+
+          {/* Tab Content */}
+          {addBookmarkTab === 'new' ? (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">TITLE</label>
+                <Input
+                  placeholder="Enter Bookmark Title"
+                  value={newBookmark.title}
+                  onChange={(e) => setNewBookmark({ ...newBookmark, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">URL</label>
+                <Input
+                  placeholder="https://example.com"
+                  value={newBookmark.url}
+                  onChange={(e) => setNewBookmark({ ...newBookmark, url: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">DESCRIPTION</label>
+                <Textarea
+                  placeholder="Enter Description"
+                  value={newBookmark.description}
+                  onChange={(e) => setNewBookmark({ ...newBookmark, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">CATEGORY</label>
+                <Select value={newBookmark.category} onValueChange={(value) => setNewBookmark({ ...newBookmark, category: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Development">Development</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="Productivity">Productivity</SelectItem>
+                    <SelectItem value="Learning">Learning</SelectItem>
+                    <SelectItem value="Entertainment">Entertainment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">TAGS</label>
+                <Input
+                  placeholder="Enter Tags Separated By Commas"
+                  value={newBookmark.tags}
+                  onChange={(e) => setNewBookmark({ ...newBookmark, tags: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">PRIORITY</label>
+                <Select value={newBookmark.priority} onValueChange={(value) => setNewBookmark({ ...newBookmark, priority: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">IMAGE</label>
+                <div className="space-y-3">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Validate file size (max 5MB)
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert('File size must be less than 5MB');
+                          e.target.value = ''; // Clear the input
+                          return;
+                        }
+                        
+                        // Validate file type
+                        if (!file.type.startsWith('image/')) {
+                          alert('Please select a valid image file');
+                          e.target.value = ''; // Clear the input
+                          return;
+                        }
+                        
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setNewBookmark({ ...newBookmark, circularImage: event.target?.result as string });
+                        };
+                        reader.onerror = () => {
+                          alert('Error reading file. Please try again.');
+                          e.target.value = ''; // Clear the input
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  {newBookmark.circularImage && (
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={newBookmark.circularImage}
+                        alt="Preview"
+                        className="w-16 h-16 object-cover rounded-full border-2 border-gray-200"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-green-600">✓ Image uploaded successfully</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setNewBookmark({ ...newBookmark, circularImage: '' })}
+                          className="mt-1 h-7 text-xs"
+                        >
+                          Remove Image
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">Upload a circular image for this bookmark (optional - will auto-fetch from website if not provided). Max file size: 5MB</p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">NOTES</label>
+                <Textarea
+                  placeholder="Enter Any Notes"
+                  value={newBookmark.notes}
+                  onChange={(e) => setNewBookmark({ ...newBookmark, notes: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowAddBookmark(false)}>
+                  CANCEL
+                </Button>
+                <Button onClick={handleAddBookmark}>
+                  ADD BOOKMARK
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div>
+                <label className="text-sm font-medium">SEARCH AVAILABLE BOOKMARKS</label>
+                <Input
+                  placeholder="Search by name, description, or category..."
+                  value={existingBookmarksSearch}
+                  onChange={(e) => setExistingBookmarksSearch(e.target.value)}
+                />
+              </div>
+              
+              {/* Available Bookmarks List */}
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {filteredAvailableBookmarks.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    {existingBookmarksSearch ? 'No bookmarks match your search' : 'All available bookmarks have been added'}
+                  </div>
+                ) : (
+                  filteredAvailableBookmarks.map((bookmark) => (
+                    <div
+                      key={bookmark.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedExistingBookmarks.includes(bookmark.id)
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleExistingBookmarkSelect(bookmark.id)}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">
+                          {bookmark.logo ? (
+                            <img
+                              src={bookmark.logo}
+                              alt={bookmark.title}
+                              className="w-10 h-10 rounded-lg object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                              }}
+                            />
+                          ) : null}
+                          <div className={`w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-sm font-medium text-blue-600 ${bookmark.logo ? 'hidden' : ''}`}>
+                            {bookmark.title.charAt(0)}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-medium text-sm">{bookmark.title}</h3>
+                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                              {bookmark.category}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{bookmark.description}</p>
+                          <div className="flex items-center space-x-2 mt-2">
+                            {bookmark.tags.slice(0, 3).map((tag, index) => (
+                              <span key={index} className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <div className={`w-5 h-5 rounded border-2 ${
+                            selectedExistingBookmarks.includes(bookmark.id)
+                              ? 'bg-blue-600 border-blue-600'
+                              : 'border-gray-300'
+                          } flex items-center justify-center`}>
+                            {selectedExistingBookmarks.includes(bookmark.id) && (
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-500">
+                  {selectedExistingBookmarks.length} bookmark(s) selected
+                </div>
+                <div className="flex space-x-2">
+                  <Button variant="outline" onClick={() => setShowAddBookmark(false)}>
+                    CANCEL
+                  </Button>
+                  <Button 
+                    onClick={handleAddExistingBookmarks}
+                    disabled={selectedExistingBookmarks.length === 0}
+                  >
+                    ADD SELECTED ({selectedExistingBookmarks.length})
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Folder Modal */}
+      <Dialog open={showAddFolder} onOpenChange={setShowAddFolder}>
         <DialogContent className="max-w-md bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
           <DialogHeader>
-            <DialogTitle>ADD NEW BOOKMARK</DialogTitle>
+            <DialogTitle>ADD NEW FOLDER</DialogTitle>
+            <DialogDescription>
+              Create a new folder to organize your bookmarks.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">TITLE</label>
+              <label className="text-sm font-medium">FOLDER NAME</label>
               <Input
-                placeholder="Enter Bookmark Title"
-                value={newBookmark.title}
-                onChange={(e) => setNewBookmark({ ...newBookmark, title: e.target.value })}
+                placeholder="Enter folder name"
+                value={newFolder.name}
+                onChange={(e) => setNewFolder({ ...newFolder, name: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddFolder()}
+                autoFocus
               />
             </div>
             <div>
-              <label className="text-sm font-medium">URL</label>
-              <Input
-                placeholder="https://example.com"
-                value={newBookmark.url}
-                onChange={(e) => setNewBookmark({ ...newBookmark, url: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">DESCRIPTION</label>
-              <Textarea
-                placeholder="Enter Description"
-                value={newBookmark.description}
-                onChange={(e) => setNewBookmark({ ...newBookmark, description: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">CATEGORY</label>
-              <Select value={newBookmark.category} onValueChange={(value) => setNewBookmark({ ...newBookmark, category: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Development">Development</SelectItem>
-                  <SelectItem value="Design">Design</SelectItem>
-                  <SelectItem value="Productivity">Productivity</SelectItem>
-                  <SelectItem value="Learning">Learning</SelectItem>
-                  <SelectItem value="Entertainment">Entertainment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">TAGS</label>
-              <Input
-                placeholder="Enter Tags Separated By Commas"
-                value={newBookmark.tags}
-                onChange={(e) => setNewBookmark({ ...newBookmark, tags: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">PRIORITY</label>
-              <Select value={newBookmark.priority} onValueChange={(value) => setNewBookmark({ ...newBookmark, priority: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">IMAGE</label>
-              <div className="space-y-3">
+              <label className="text-sm font-medium">FOLDER COLOR</label>
+              <div className="flex items-center space-x-3">
                 <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      // Validate file size (max 5MB)
-                      if (file.size > 5 * 1024 * 1024) {
-                        alert('File size must be less than 5MB');
-                        e.target.value = ''; // Clear the input
-                        return;
-                      }
-                      
-                      // Validate file type
-                      if (!file.type.startsWith('image/')) {
-                        alert('Please select a valid image file');
-                        e.target.value = ''; // Clear the input
-                        return;
-                      }
-                      
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        setNewBookmark({ ...newBookmark, circularImage: event.target?.result as string });
-                      };
-                      reader.onerror = () => {
-                        alert('Error reading file. Please try again.');
-                        e.target.value = ''; // Clear the input
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  type="color"
+                  value={newFolder.color}
+                  onChange={(e) => setNewFolder({ ...newFolder, color: e.target.value })}
+                  className="w-16 h-10 p-1 rounded-lg"
                 />
-                {newBookmark.circularImage && (
-                  <div className="flex items-center space-x-3">
-                    <img
-                      src={newBookmark.circularImage}
-                      alt="Preview"
-                      className="w-16 h-16 object-cover rounded-full border-2 border-gray-200"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-green-600">✓ Image uploaded successfully</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setNewBookmark({ ...newBookmark, circularImage: '' })}
-                        className="mt-1 h-7 text-xs"
-                      >
-                        Remove Image
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                <p className="text-xs text-gray-500">Upload a circular image for this bookmark (optional - will auto-fetch from website if not provided). Max file size: 5MB</p>
+                <div className="flex-1">
+                  <Input
+                    placeholder="#3b82f6"
+                    value={newFolder.color}
+                    onChange={(e) => setNewFolder({ ...newFolder, color: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium">NOTES</label>
+              <label className="text-sm font-medium">DESCRIPTION (OPTIONAL)</label>
               <Textarea
-                placeholder="Enter Any Notes"
-                value={newBookmark.notes}
-                onChange={(e) => setNewBookmark({ ...newBookmark, notes: e.target.value })}
+                placeholder="Enter folder description"
+                value={newFolder.description}
+                onChange={(e) => setNewFolder({ ...newFolder, description: e.target.value })}
+                rows={3}
               />
             </div>
+            
+            {/* Preview */}
+            {newFolder.name && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">PREVIEW</label>
+                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                  <div 
+                    className="h-12 w-12 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: newFolder.color + '20' }}
+                  >
+                    <Folder className="h-6 w-6" style={{ color: newFolder.color }} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{newFolder.name}</p>
+                    {newFolder.description && (
+                      <p className="text-xs text-gray-500">{newFolder.description}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowAddBookmark(false)}>
+              <Button variant="outline" onClick={() => {
+                setShowAddFolder(false)
+                resetAddFolderForm()
+              }}>
                 CANCEL
               </Button>
-              <Button onClick={handleAddBookmark}>
-                ADD BOOKMARK
+              <Button onClick={handleAddFolder} disabled={!newFolder.name.trim()}>
+                CREATE FOLDER
               </Button>
             </div>
           </div>

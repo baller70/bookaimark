@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MarketplaceService } from '../services/MarketplaceService';
 import { CreateListingDTO, MARKETPLACE_CONFIG } from '../models';
 
-// Mock fetch
-global.fetch = vi.fn();
+// Mock the global fetch function
+beforeEach(() => {
+  global.fetch = vi.fn() as any;
+});
 
 describe('MarketplaceService', () => {
   let service: MarketplaceService;

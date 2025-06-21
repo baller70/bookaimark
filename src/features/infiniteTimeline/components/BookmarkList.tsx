@@ -1,9 +1,22 @@
-// Bookmark List - Scrollable list of bookmarks within a board
+// Bookmark List - Container for draggable bookmark items
 'use client';
 
 import React, { useCallback } from 'react';
 import { BookmarkData } from '../models/timeline.models';
 import { BookmarkListItem } from './BookmarkListItem';
+import {
+  DndContext,
+  closestCenter,
+  useSensor,
+  PointerSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
 interface BookmarkListProps {
   boardId: string;
@@ -16,11 +29,41 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({
   bookmarks,
   isConnectorMode
 }) => {
+  // Configure drag sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
   // Handle bookmark reordering within the same board
-  const handleBookmarkReorder = useCallback((draggedId: string, targetId: string, position: 'before' | 'after') => {
-    // This will be handled by the parent component or a drag-and-drop library
-    console.log('Reorder bookmark:', { draggedId, targetId, position, boardId });
-  }, [boardId]);
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id && over?.id) {
+      const oldIndex = bookmarks.findIndex(bookmark => bookmark.id === active.id);
+      const newIndex = bookmarks.findIndex(bookmark => bookmark.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // Reorder bookmarks array
+        const reorderedBookmarks = arrayMove(bookmarks, oldIndex, newIndex);
+        
+        // Here you would typically update the backend/state
+        // For now, just log the reordering
+        console.log('Reorder bookmarks:', { 
+          boardId, 
+          from: oldIndex, 
+          to: newIndex,
+          reorderedBookmarks: reorderedBookmarks.map(b => ({ id: b.id, title: b.title }))
+        });
+        
+        // TODO: Implement actual bookmark reordering in the backend
+        // await updateBookmarkOrder(boardId, reorderedBookmarks);
+      }
+    }
+  }, [boardId, bookmarks]);
 
   if (bookmarks.length === 0) {
     return (
@@ -36,14 +79,24 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-2 space-y-2">
-        {bookmarks.map((bookmark, index) => (
-          <BookmarkListItem
-            key={bookmark.id}
-            bookmark={bookmark}
-            isConnectorMode={isConnectorMode}
-            onReorder={handleBookmarkReorder}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext 
+            items={bookmarks.map(b => b.id)} 
+            strategy={verticalListSortingStrategy}
+          >
+            {bookmarks.map((bookmark) => (
+              <BookmarkListItem
+                key={bookmark.id}
+                bookmark={bookmark}
+                isConnectorMode={isConnectorMode}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );

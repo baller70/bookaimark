@@ -404,7 +404,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({ className = '' }
       {/* Main Canvas */}
       <TransformWrapper
         ref={transformRef}
-        initialScale={1}
+        initialScale={0.5}
         minScale={0.1}
         maxScale={3}
         limitToBounds={false}

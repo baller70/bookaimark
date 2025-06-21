@@ -1,2 +1,3 @@
 # userinput.py
-user_input = input("prompt: ") 
+user_input = input("prompt: ")
+print(user_input) 

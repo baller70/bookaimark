@@ -15,25 +15,44 @@ import {
 } from 'lucide-react';
 import { BookmarkData } from '../models/timeline.models';
 import { useTimelineData } from '../hooks/useTimelineData';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface BookmarkListItemProps {
   bookmark: BookmarkData;
   isConnectorMode: boolean;
-  onReorder: (draggedId: string, targetId: string, position: 'before' | 'after') => void;
 }
 
 export const BookmarkListItem: React.FC<BookmarkListItemProps> = ({
   bookmark,
-  isConnectorMode,
-  onReorder
+  isConnectorMode
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [tempTitle, setTempTitle] = useState(bookmark.title);
   const [tempUrl, setTempUrl] = useState(bookmark.url || '');
-  const [isDragging, setIsDragging] = useState(false);
 
   const { updateBookmark, deleteBookmark } = useTimelineData();
+
+  // Use @dnd-kit sortable for consistency with rest of the site
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: bookmark.id,
+    disabled: isConnectorMode || isEditingTitle || isEditingUrl
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 1,
+  };
 
   // Handle title editing
   const handleTitleSubmit = useCallback(async () => {
@@ -100,45 +119,6 @@ export const BookmarkListItem: React.FC<BookmarkListItemProps> = ({
     }
   }, [bookmark.url]);
 
-  // Handle drag start
-  const handleDragStart = useCallback((event: React.DragEvent) => {
-    if (isConnectorMode) {
-      event.preventDefault();
-      return;
-    }
-    
-    setIsDragging(true);
-    event.dataTransfer.setData('text/plain', bookmark.id);
-    event.dataTransfer.effectAllowed = 'move';
-  }, [bookmark.id, isConnectorMode]);
-
-  const handleDragEnd = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  // Handle drop
-  const handleDragOver = useCallback((event: React.DragEvent) => {
-    if (isConnectorMode) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, [isConnectorMode]);
-
-  const handleDrop = useCallback((event: React.DragEvent) => {
-    if (isConnectorMode) return;
-    
-    event.preventDefault();
-    const draggedId = event.dataTransfer.getData('text/plain');
-    
-    if (draggedId !== bookmark.id) {
-      // Determine drop position based on mouse position
-      const rect = event.currentTarget.getBoundingClientRect();
-      const midY = rect.top + rect.height / 2;
-      const position = event.clientY < midY ? 'before' : 'after';
-      
-      onReorder(draggedId, bookmark.id, position);
-    }
-  }, [bookmark.id, onReorder, isConnectorMode]);
-
   const getIconForUrl = (url?: string) => {
     if (!url) return <Bookmark className="h-4 w-4" />;
     
@@ -162,22 +142,23 @@ export const BookmarkListItem: React.FC<BookmarkListItemProps> = ({
 
   return (
     <Card
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
       className={`
-        p-3 cursor-pointer transition-all duration-200
+        p-3 cursor-pointer transition-all duration-200 group
         ${isDragging ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}
         ${isConnectorMode ? 'cursor-default' : 'hover:shadow-md'}
         border border-gray-200 hover:border-gray-300
       `}
-      draggable={!isConnectorMode && !isEditingTitle && !isEditingUrl}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
     >
       <div className="flex items-start space-x-3">
         {/* Drag Handle */}
         {!isConnectorMode && (
-          <div className="cursor-move mt-1 p-1 rounded hover:bg-gray-100">
+          <div 
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing mt-1 p-1 rounded hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all duration-200"
+          >
             <GripVertical className="h-3 w-3 text-gray-400" />
           </div>
         )}

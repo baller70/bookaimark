@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 interface BookmarkItem {
   id: string;
   title: string;
+  url?: string;
 }
 
 export interface BookmarkBoardData {
@@ -27,9 +28,10 @@ export interface BookmarkBoardData {
   bookmarks: BookmarkItem[];
   logo?: string; // optional background logo url
   updateBookmarks?: (items: BookmarkItem[]) => void;
+  onBookmarkClick?: (bookmark: any) => void;
 }
 
-const SortableBookmarkRow: React.FC<{ item: BookmarkItem }> = ({ item }) => {
+const SortableBookmarkRow: React.FC<{ item: BookmarkItem; onBookmarkClick?: (bookmark: any) => void }> = ({ item, onBookmarkClick }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
 
@@ -39,17 +41,37 @@ const SortableBookmarkRow: React.FC<{ item: BookmarkItem }> = ({ item }) => {
     opacity: isDragging ? 0.5 : 1,
   } as React.CSSProperties;
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Only trigger click if not dragging and not clicking the drag handle
+    if (!isDragging && onBookmarkClick) {
+      e.stopPropagation();
+      onBookmarkClick(item);
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Only stop propagation if we're actually dragging via the grip handle
+    // This allows React Flow to handle node dragging when clicking elsewhere
+    const target = e.target as HTMLElement;
+    const isGripHandle = target.closest('[data-grip-handle]');
+    if (isGripHandle) {
+      e.stopPropagation();
+    }
+  };
+
   return (
     <li
       ref={setNodeRef}
       style={style}
       {...attributes}
       className="flex items-center space-x-2 py-1 px-2 rounded-lg hover:bg-gray-100 cursor-pointer"
-      onPointerDown={(e)=>e.stopPropagation()}
+      onPointerDown={handlePointerDown}
+      onClick={handleClick}
     >
       {/* drag handle */}
       <GripVertical
         {...listeners}
+        data-grip-handle="true"
         className="h-4 w-4 text-gray-500 flex-shrink-0 cursor-grab active:cursor-grabbing" />
 
       {/* favicon letter box */}
@@ -66,9 +88,16 @@ const SortableBookmarkRow: React.FC<{ item: BookmarkItem }> = ({ item }) => {
 };
 
 export const BoardNode: React.FC<NodeProps<BookmarkBoardData>> = ({ data, selected }) => {
-  const { label, bookmarks, logo, updateBookmarks } = data;
+  const { label, bookmarks, logo, updateBookmarks, onBookmarkClick } = data;
 
-  const sensors = useSensors(useSensor(PointerSensor));
+  // Configure sensors with activation distance to reduce conflicts
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before activating drag
+      },
+    })
+  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -115,7 +144,7 @@ export const BoardNode: React.FC<NodeProps<BookmarkBoardData>> = ({ data, select
               <SortableContext items={bookmarks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 <ul className="space-y-1">
                   {bookmarks.slice(0, 10).map((item) => (
-                    <SortableBookmarkRow key={item.id} item={item} />
+                    <SortableBookmarkRow key={item.id} item={item} onBookmarkClick={onBookmarkClick} />
                   ))}
                 </ul>
               </SortableContext>
@@ -124,9 +153,19 @@ export const BoardNode: React.FC<NodeProps<BookmarkBoardData>> = ({ data, select
         </div>
       </div>
 
-      {/* React Flow handles */}
-      <Handle type="target" position={Position.Top} className="w-6 h-6 bg-blue-500 border-2 border-white rounded-full z-20" />
-      <Handle type="source" position={Position.Bottom} className="w-6 h-6 bg-blue-500 border-2 border-white rounded-full z-20" />
+      {/* React Flow handles - Made bigger and more visible */}
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        className="w-10 h-10 bg-blue-500 border-4 border-white rounded-full z-20 shadow-lg hover:bg-blue-600 hover:scale-110 transition-all duration-200" 
+        style={{ top: -20 }}
+      />
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        className="w-10 h-10 bg-blue-500 border-4 border-white rounded-full z-20 shadow-lg hover:bg-blue-600 hover:scale-110 transition-all duration-200" 
+        style={{ bottom: -20 }}
+      />
     </div>
   );
 }; 
