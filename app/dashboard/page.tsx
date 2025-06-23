@@ -37,7 +37,7 @@ import {
   Trash2,
   Copy,
   Activity,
-  Folder,
+  Folder as FolderIcon,
   Target,
   Kanban,
   GitBranch,
@@ -86,6 +86,9 @@ import { MediaHub } from '@/src/features/media'
 import { SimpleBoardCanvas } from '@/src/features/simpleBoard/SimpleBoardCanvas'
 import { FolderHierarchyManager, FolderHierarchyAssignment } from '@/src/components/hierarchy/Hierarchy'
 import { FolderOrgChartView } from '@/src/components/ui/folder-org-chart-view'
+import { FolderCard, type BookmarkWithRelations } from '@/src/components/ui/FolderCard'
+import { FolderFormDialog, type Folder } from '@/src/components/ui/FolderFormDialog'
+import { KanbanView } from '@/src/components/ui/BookmarkKanban'
 
 // Import React Flow components for custom background
 import ReactFlow, {
@@ -258,6 +261,8 @@ export default function Dashboard() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   // near top state declarations after other states
   const [folderAssignments, setFolderAssignments] = useState<FolderHierarchyAssignment[]>([]);
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+  const [selectedGoalFolder, setSelectedGoalFolder] = useState<Folder | null>(null);
   // Folder creation states
   const [showAddFolder, setShowAddFolder] = useState(false);
   const [newFolder, setNewFolder] = useState({
@@ -1425,7 +1430,7 @@ export default function Dashboard() {
           <div>
             <div className="mb-2">
               <div className="w-20 h-20">
-                <Folder className={`h-16 w-16 ${getCategoryColor(category)} m-2`} />
+                <FolderIcon className={`h-16 w-16 ${getCategoryColor(category)} m-2`} />
               </div>
             </div>
             <h3 className="font-bold text-gray-900 font-audiowide uppercase text-lg leading-tight ml-2">
@@ -1476,7 +1481,7 @@ export default function Dashboard() {
           {/* Left section with folder icon and title */}
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16">
-              <Folder className={`h-12 w-12 ${getCategoryColor(category)} m-2`} />
+              <FolderIcon className={`h-12 w-12 ${getCategoryColor(category)} m-2`} />
             </div>
             <div>
               <h3 className="font-bold text-gray-900 font-audiowide uppercase text-xl leading-tight">
@@ -1569,7 +1574,7 @@ export default function Dashboard() {
                   </Badge>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Folder className={`h-4 w-4 ${getCategoryColor(bookmark.category)}`} />
+                  <FolderIcon className={`h-4 w-4 ${getCategoryColor(bookmark.category)}`} />
                   <span className={`text-sm font-bold uppercase ${getCategoryColor(bookmark.category)}`}>
                     {bookmark.category}
                   </span>
@@ -1624,110 +1629,7 @@ export default function Dashboard() {
     </Card>
   )
 
-  const SortableKanbanCard = ({ bookmark }: { bookmark: any }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: bookmark.id })
 
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-      zIndex: isDragging ? 1000 : 1,
-    }
-
-    return (
-      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
-        {/* Drag Handle - Bottom Center */}
-        <div 
-          {...listeners} 
-          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
-        >
-          <GripVertical className="h-4 w-4 text-gray-700" />
-        </div>
-        <Card className="p-4 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-400 cursor-pointer bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden" onClick={() => handleBookmarkClick(bookmark)}>
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
-          <div className="relative z-10">
-            <h4 className="font-bold text-sm mb-2 font-audiowide uppercase text-gray-900 hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h4>
-            <p className="text-xs text-gray-600 mb-3 leading-relaxed">{bookmark.description}</p>
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary" className="text-xs bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 border border-gray-200/50 hover:from-blue-50 hover:to-blue-100 hover:text-blue-700 transition-all duration-300">{bookmark.priority}</Badge>
-              <div className="flex items-center space-x-1 bg-gray-50/80 rounded-full px-2 py-1">
-                <Eye className="h-3 w-3 text-gray-500" />
-                <span className="text-xs text-gray-600 font-medium">{bookmark.visits} VISITS</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Action Icons */}
-          <BookmarkActionIcons bookmark={bookmark} />
-          
-          {/* Usage Percentage Hexagon */}
-          <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
-        </Card>
-      </div>
-    )
-  }
-
-  const SortableGoalsCard = ({ bookmark }: { bookmark: any }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: bookmark.id })
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-      zIndex: isDragging ? 1000 : 1,
-    }
-
-    return (
-      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
-        {/* Drag Handle - Bottom Center */}
-        <div 
-          {...listeners} 
-          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
-        >
-          <GripVertical className="h-4 w-4 text-gray-700" />
-        </div>
-        <Card className="p-8 hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 cursor-pointer bg-gradient-to-br from-white via-green-50/10 to-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden" onClick={() => handleBookmarkClick(bookmark)}>
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/3 via-transparent to-blue-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="flex items-start space-x-5 relative z-10">
-            <div className="h-14 w-14 bg-gradient-to-br from-green-100 to-green-50 rounded-full flex items-center justify-center ring-2 ring-green-100/50 hover:ring-green-200 transition-all duration-300 shadow-sm">
-              <Target className="h-7 w-7 text-green-700" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-xl mb-3 font-audiowide uppercase text-gray-900 hover:text-green-900 transition-colors duration-300">{bookmark.title}</h3>
-              <p className="text-gray-600 text-sm mb-4 leading-relaxed">{bookmark.description}</p>
-              <div className="flex items-center justify-between">
-                <Badge variant="outline" className="text-xs bg-white/50 border-gray-300/50 hover:bg-green-50/50 hover:border-green-300/50 transition-all duration-300">{bookmark.category}</Badge>
-                <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
-                  <Eye className="h-4 w-4 text-gray-500" />
-                  <span className="text-xs text-gray-600 font-medium">{bookmark.visits} VISITS</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Action Icons */}
-          <BookmarkActionIcons bookmark={bookmark} />
-          
-          {/* Usage Percentage Hexagon */}
-          <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
-        </Card>
-      </div>
-    )
-  }
 
   const SortableFolderCard = ({ bookmark }: { bookmark: any }) => {
     const {
@@ -1758,7 +1660,7 @@ export default function Dashboard() {
         <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-300 hover:border-blue-600" onClick={() => handleBookmarkClick(bookmark)}>
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Folder className="h-5 w-5 text-blue-600" />
+              <FolderIcon className="h-5 w-5 text-blue-600" />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-medium text-sm truncate font-audiowide uppercase">{bookmark.title}</h3>
@@ -1876,7 +1778,7 @@ export default function Dashboard() {
                   <span>Back to Folders</span>
                 </Button>
                 <div className="flex items-center space-x-2">
-                  <Folder className="h-5 w-5 text-blue-600" />
+                  <FolderIcon className="h-5 w-5 text-blue-600" />
                   <h2 className="text-xl font-bold text-gray-900 font-audiowide uppercase">{selectedFolder}</h2>
                   <Badge className="bg-blue-50 text-blue-700 border-blue-200">
                     {folderBookmarks.length} bookmarks
@@ -1967,75 +1869,8 @@ export default function Dashboard() {
             </ClientOnlyDndProvider>
           </div>
         )
-      case 'folder':
-        return (
-          <ClientOnlyDndProvider>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {filteredBookmarks.map((bookmark) => (
-                    <SortableFolderCard key={bookmark.id} bookmark={bookmark} />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </ClientOnlyDndProvider>
-        )
-      case 'goals':
-        return (
-          <ClientOnlyDndProvider>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredBookmarks.map((bookmark) => (
-                    <SortableGoalsCard key={bookmark.id} bookmark={bookmark} />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </ClientOnlyDndProvider>
-        )
-      case 'kanban':
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {['Development', 'Design', 'Productivity'].map((category) => {
-              const categoryBookmarks = filteredBookmarks.filter((bookmark) => bookmark.category === category)
-              const categoryBookmarkIds = categoryBookmarks.map(bookmark => bookmark.id)
-              
-              return (
-                <div key={category} className="bg-gradient-to-br from-gray-50 via-white to-gray-50/50 rounded-xl p-6 ring-1 ring-gray-200/50 shadow-sm">
-                  <h3 className="font-bold text-xl mb-6 flex items-center text-gray-900">
-                    <Kanban className="h-6 w-6 mr-3 text-gray-700" />
-                    {category}
-                  </h3>
-                  <ClientOnlyDndProvider>
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext items={categoryBookmarkIds} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-4">
-                          {categoryBookmarks.map((bookmark) => (
-                            <SortableKanbanCard key={bookmark.id} bookmark={bookmark} />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
-                  </ClientOnlyDndProvider>
-                </div>
-              )
-            })}
-          </div>
-        )
+
+
       case 'hierarchy':
         return (
           <div className="space-y-8">
@@ -2134,6 +1969,318 @@ export default function Dashboard() {
               </div>
             </DndContext>
           </ClientOnlyDndProvider>
+        )
+      case 'folder2':
+        // Create mock folders for demonstration
+        const mockFolders: Folder[] = [
+          {
+            id: '1',
+            name: 'Development',
+            description: 'All development related bookmarks and resources',
+            color: '#3b82f6'
+          },
+          {
+            id: '2', 
+            name: 'Design',
+            description: 'Design tools, inspiration, and creative resources',
+            color: '#ef4444'
+          },
+          {
+            id: '3',
+            name: 'Productivity',
+            description: 'Tools and apps to boost productivity',
+            color: '#10b981'
+          },
+          {
+            id: '4',
+            name: 'Learning',
+            description: 'Educational content and learning platforms',
+            color: '#f59e0b'
+          }
+        ];
+
+        const handleFolderEdit = (folder: Folder) => {
+          console.log('Edit folder:', folder);
+          showNotification(`Edit folder: ${folder.name}`);
+        };
+
+        const handleFolderDelete = (folderId: string) => {
+          console.log('Delete folder:', folderId);
+          showNotification(`Delete folder: ${folderId}`);
+        };
+
+        const handleFolderAddBookmark = (folderId: string) => {
+          console.log('Add bookmark to folder:', folderId);
+          showNotification(`Add bookmark to folder: ${folderId}`);
+        };
+
+        const handleFolderDrop = (folderId: string, bookmark: BookmarkWithRelations) => {
+          console.log('Drop bookmark to folder:', folderId, bookmark);
+          showNotification(`Moved "${bookmark.title}" to folder`);
+        };
+
+        const handleFolderDragOver = (event: React.DragEvent) => {
+          event.preventDefault();
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Folder 2.0</h2>
+              <p className="text-gray-600">Advanced folder management with drag-and-drop functionality</p>
+            </div>
+            
+            <ClientOnlyDndProvider>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {mockFolders.map((folder) => {
+                    const folderBookmarks = bookmarks.filter(bookmark => 
+                      bookmark.category.toLowerCase() === folder.name.toLowerCase()
+                    );
+                    
+                    return (
+                      <FolderCard
+                        key={folder.id}
+                        folder={folder}
+                        bookmarkCount={folderBookmarks.length}
+                        onEdit={handleFolderEdit}
+                        onDelete={handleFolderDelete}
+                        onAddBookmark={handleFolderAddBookmark}
+                        onDrop={handleFolderDrop}
+                        onDragOver={handleFolderDragOver}
+                        disableLink={true}
+                        onClick={() => {
+                          console.log('Folder clicked:', folder);
+                          showNotification(`Opened folder: ${folder.name}`);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </DndContext>
+            </ClientOnlyDndProvider>
+          </div>
+        )
+      case 'goal2':
+        // Create mock goal folders for demonstration
+        const mockGoalFolders: Folder[] = [
+          {
+            id: '1',
+            name: 'Q1 Learning Goals',
+            description: 'Complete React and TypeScript courses',
+            color: '#3b82f6',
+            deadline_date: '2024-03-31',
+            goal_type: 'learn_category',
+            goal_description: 'Master React hooks and TypeScript fundamentals',
+            goal_status: 'in_progress',
+            goal_priority: 'high',
+            goal_progress: 65,
+            goal_notes: 'Making good progress on React hooks'
+          },
+          {
+            id: '2',
+            name: 'Project Organization',
+            description: 'Organize all development resources',
+            color: '#10b981',
+            deadline_date: '2024-02-15',
+            goal_type: 'organize',
+            goal_description: 'Create a systematic approach to project management',
+            goal_status: 'pending',
+            goal_priority: 'medium',
+            goal_progress: 25,
+            goal_notes: 'Need to start organizing soon'
+          },
+          {
+            id: '3',
+            name: 'Research New Technologies',
+            description: 'Explore emerging web technologies',
+            color: '#f59e0b',
+            deadline_date: '2024-04-30',
+            goal_type: 'research_topic',
+            goal_description: 'Research and evaluate new frameworks and tools',
+            goal_status: 'in_progress',
+            goal_priority: 'low',
+            goal_progress: 40,
+            goal_notes: 'Focusing on Next.js 14 and React Server Components'
+          }
+        ];
+
+        const handleGoalSubmit = (data: { name: string; description?: string; color?: string; reminder_at?: string | null }) => {
+          console.log('Goal folder submitted:', data);
+          showNotification(`Goal folder "${data.name}" ${selectedGoalFolder ? 'updated' : 'created'} successfully!`);
+          setSelectedGoalFolder(null);
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Goal 2.0</h2>
+              <p className="text-gray-600">Advanced goal management with deadline tracking and progress monitoring</p>
+            </div>
+            
+            <div className="flex justify-end mb-6">
+              <Button
+                onClick={() => {
+                  setSelectedGoalFolder(null);
+                  setGoalDialogOpen(true);
+                }}
+                className="flex items-center space-x-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create New Goal</span>
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {mockGoalFolders.map((folder) => {
+                const folderBookmarks = bookmarks.filter(bookmark => 
+                  bookmark.category.toLowerCase().includes(folder.name.toLowerCase().split(' ')[0])
+                );
+                
+                return (
+                  <div key={folder.id} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: folder.color }}
+                        >
+                          <Target className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{folder.name}</h3>
+                          <p className="text-sm text-gray-600">{folder.description}</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedGoalFolder(folder);
+                          setGoalDialogOpen(true);
+                        }}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Progress</span>
+                        <span className="font-medium">{folder.goal_progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${folder.goal_progress}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Deadline</span>
+                        <span className="font-medium">
+                          {folder.deadline_date ? new Date(folder.deadline_date).toLocaleDateString() : 'No deadline'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Priority</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          folder.goal_priority === 'high' ? 'bg-red-100 text-red-800' :
+                          folder.goal_priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {folder.goal_priority}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Status</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          folder.goal_status === 'completed' ? 'bg-green-100 text-green-800' :
+                          folder.goal_status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                          folder.goal_status === 'overdue' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {folder.goal_status?.replace('_', ' ')}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Bookmarks</span>
+                        <span className="font-medium">{folderBookmarks.length}</span>
+                      </div>
+                    </div>
+                    
+                    {folder.goal_notes && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600">{folder.goal_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            <FolderFormDialog
+              open={goalDialogOpen}
+              onOpenChange={setGoalDialogOpen}
+              folder={selectedGoalFolder}
+              onSubmit={handleGoalSubmit}
+            />
+          </div>
+        )
+      case 'kanban2':
+        // Create mock folders for kanban demo
+        const kanbanFolders: Folder[] = [
+          {
+            id: '1',
+            name: 'Development',
+            description: 'All development related bookmarks and resources',
+            color: '#3b82f6'
+          },
+          {
+            id: '2', 
+            name: 'Design',
+            description: 'Design tools, inspiration, and creative resources',
+            color: '#ef4444'
+          },
+          {
+            id: '3',
+            name: 'Productivity',
+            description: 'Tools and apps to boost productivity',
+            color: '#10b981'
+          }
+        ];
+
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Kanban 2.0</h2>
+              <p className="text-gray-600">Advanced drag-and-drop kanban board for bookmark organization</p>
+            </div>
+            
+            <KanbanView
+              bookmarks={filteredBookmarks as any}
+              onBookmarkClick={(bookmark) => {
+                setSelectedBookmark(bookmark as any);
+                setIsModalOpen(true);
+              }}
+              onFavorite={(bookmark) => {
+                const updatedBookmark = { ...bookmark };
+                setBookmarks(prev => prev.map(b => b.id === (bookmark as any).id ? updatedBookmark as any : b));
+                showNotification('Bookmark updated successfully!');
+              }}
+              loading={false}
+              selectedCategory={undefined}
+              selectedFolder={undefined}
+              onCategoryChange={undefined}
+            />
+          </div>
         )
       default: // grid
         return (
@@ -2573,33 +2720,8 @@ export default function Dashboard() {
             <span className="font-medium">LIST</span>
           </Button>
 
-          <Button
-            size="lg"
-            variant={viewMode === 'folder' ? 'default' : 'ghost'}
-            onClick={() => setViewMode('folder')}
-            className="h-12 px-4 flex items-center space-x-2"
-          >
-            <Folder className="h-5 w-5" />
-            <span className="font-medium">FOLDER</span>
-          </Button>
-          <Button
-            size="lg"
-            variant={viewMode === 'goals' ? 'default' : 'ghost'}
-            onClick={() => setViewMode('goals')}
-            className="h-12 px-4 flex items-center space-x-2"
-          >
-            <Target className="h-5 w-5" />
-            <span className="font-medium">GOALS</span>
-          </Button>
-          <Button
-            size="lg"
-            variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-            onClick={() => setViewMode('kanban')}
-            className="h-12 px-4 flex items-center space-x-2"
-          >
-            <Columns className="h-5 w-5" />
-            <span className="font-medium">KANBAN</span>
-          </Button>
+
+
           <Button
             size="lg"
             variant={viewMode === 'timeline' ? 'default' : 'ghost'}
@@ -2617,6 +2739,33 @@ export default function Dashboard() {
           >
             <Building className="h-5 w-5" />
             <span className="font-medium">HIERARCHY</span>
+          </Button>
+          <Button
+            size="lg"
+            variant={viewMode === 'folder2' ? 'default' : 'ghost'}
+            onClick={() => setViewMode('folder2')}
+            className="h-12 px-4 flex items-center space-x-2"
+          >
+            <FolderIcon className="h-5 w-5" />
+            <span className="font-medium">FOLDER 2.0</span>
+          </Button>
+          <Button
+            size="lg"
+            variant={viewMode === 'goal2' ? 'default' : 'ghost'}
+            onClick={() => setViewMode('goal2')}
+            className="h-12 px-4 flex items-center space-x-2"
+          >
+            <Target className="h-5 w-5" />
+            <span className="font-medium">GOAL 2.0</span>
+          </Button>
+          <Button
+            size="lg"
+            variant={viewMode === 'kanban2' ? 'default' : 'ghost'}
+            onClick={() => setViewMode('kanban2')}
+            className="h-12 px-4 flex items-center space-x-2"
+          >
+            <Columns className="h-5 w-5" />
+            <span className="font-medium">KANBAN 2.0</span>
           </Button>
         </div>
       </div>
@@ -3451,7 +3600,7 @@ export default function Dashboard() {
                     className="h-12 w-12 rounded-lg flex items-center justify-center"
                     style={{ backgroundColor: newFolder.color + '20' }}
                   >
-                    <Folder className="h-6 w-6" style={{ color: newFolder.color }} />
+                    <FolderIcon className="h-6 w-6" style={{ color: newFolder.color }} />
                   </div>
                   <div>
                     <p className="text-sm font-medium">{newFolder.name}</p>

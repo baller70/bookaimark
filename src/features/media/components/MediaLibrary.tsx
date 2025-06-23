@@ -18,7 +18,7 @@ import {
   Video,
   Music,
   FileIcon,
-  Folder,
+  Folder as FolderIcon,
   MoreVertical,
   Download,
   Trash2,
@@ -418,7 +418,7 @@ function FolderCard({ folder, viewMode, onSelect }: FolderCardProps) {
             className="h-8 w-8 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: folder.color + '20' }}
           >
-            <Folder className="h-4 w-4" style={{ color: folder.color }} />
+            <FolderIcon className="h-4 w-4" style={{ color: folder.color }} />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-sm truncate">{folder.name}</h3>
@@ -436,7 +436,7 @@ function FolderCard({ folder, viewMode, onSelect }: FolderCardProps) {
           className="h-12 w-12 mx-auto rounded-lg flex items-center justify-center mb-2"
           style={{ backgroundColor: folder.color + '20' }}
         >
-          <Folder className="h-6 w-6" style={{ color: folder.color }} />
+          <FolderIcon className="h-6 w-6" style={{ color: folder.color }} />
         </div>
         <h3 className="font-medium text-sm truncate">{folder.name}</h3>
         <p className="text-xs text-gray-500">{formatDate(folder.createdAt)}</p>

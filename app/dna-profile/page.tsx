@@ -1,170 +1,176 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { Dna, User, FileText, BarChart3, Shield, Download, Upload } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
+import { useState } from 'react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { 
+  User, 
+  Heart, 
+  Music, 
+  Search, 
+  BarChart3, 
+  Clock,
+  Sparkles,
+  Crown,
+  Zap
+} from 'lucide-react'
 
-export default function DNAProfilePage() {
+// Import all DNA Profile components
+import { DNAProfileOverview } from '@/src/components/dna-profile/dna-profile-overview'
+import DnaFavorites from '@/src/components/dna-profile/dna-favorites'
+import DnaPlaylists from '@/src/components/dna-profile/dna-playlists'
+import DnaSearch from '@/src/components/dna-profile/dna-search'
+import DnaAnalytics from '@/src/components/dna-profile/dna-analytics'
+import DnaTimeCapsule from '@/src/components/dna-profile/dna-time-capsule'
+
+// Default profile data
+const defaultProfileData = {
+  name: 'John Doe',
+  business: 'Software Engineer',
+  bio: 'Passionate about technology and innovation',
+  avatar: '/avatars/default.png',
+  tier: 'Pro' as const
+}
+
+// Wrapper component for DNAProfileOverview
+const DnaProfileOverviewWrapper = () => <DNAProfileOverview profileData={defaultProfileData} />
+
+const dnaProfileTabs = [
+  {
+    id: 'profile',
+    label: 'DNA Profile',
+    icon: User,
+    description: 'Personal info & interests',
+    component: DnaProfileOverviewWrapper,
+    badge: null
+  },
+  {
+    id: 'favorites',
+    label: 'Favorites',
+    icon: Heart,
+    description: 'Bookmarked content',
+    component: DnaFavorites,
+    badge: '1.2K'
+  },
+  {
+    id: 'playlists',
+    label: 'Playlists',
+    icon: Music,
+    description: 'Curated collections',
+    component: DnaPlaylists,
+    badge: '12'
+  },
+  {
+    id: 'search',
+    label: 'Search',
+    icon: Search,
+    description: 'AI-enhanced search',
+    component: DnaSearch,
+    badge: null
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    icon: BarChart3,
+    description: 'Usage insights',
+    component: DnaAnalytics,
+    badge: null
+  },
+  {
+    id: 'time-capsule',
+    label: 'Time Capsule',
+    icon: Clock,
+    description: 'Versioned snapshots',
+    component: DnaTimeCapsule,
+    badge: '8'
+  }
+]
+
+export default function DnaProfilePage() {
+  const [activeTab, setActiveTab] = useState('profile')
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-4">
-            <Dna className="h-12 w-12 text-green-600 mr-3" />
-            <h1 className="text-4xl font-bold text-gray-900">DNA Profile</h1>
+        <div className="mb-8">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                DNA Profile
+              </h1>
+              <p className="text-gray-600">Your personalized bookmark intelligence center</p>
+            </div>
+            <div className="flex items-center space-x-2 ml-auto">
+              <Badge variant="outline" className="text-purple-600 border-purple-200">
+                <Crown className="h-3 w-3 mr-1" />
+                Pro Plan
+              </Badge>
+              <Badge variant="outline" className="text-blue-600 border-blue-200">
+                <Zap className="h-3 w-3 mr-1" />
+                AI Enhanced
+              </Badge>
+            </div>
           </div>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Manage and analyze your genetic information with advanced DNA profiling tools and insights.
+        </div>
+
+        {/* Main Content */}
+        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-0">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              {/* Tab Navigation */}
+              <div className="border-b bg-gray-50/50">
+                <TabsList className="w-full h-auto p-2 bg-transparent justify-start overflow-x-auto">
+                  {dnaProfileTabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className="flex items-center space-x-2 px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg transition-all duration-200 min-w-fit"
+                    >
+                      <tab.icon className="h-4 w-4" />
+                      <span className="font-medium">{tab.label}</span>
+                      {tab.badge && (
+                        <Badge variant="secondary" className="text-xs">
+                          {tab.badge}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-6">
+                {dnaProfileTabs.map((tab) => (
+                  <TabsContent key={tab.id} value={tab.id} className="mt-0">
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <tab.icon className="h-5 w-5 text-gray-600" />
+                        <h2 className="text-xl font-semibold text-gray-900">{tab.label}</h2>
+                      </div>
+                      <p className="text-gray-600 text-sm">{tab.description}</p>
+                    </div>
+                    <div className="min-h-[600px]">
+                      <tab.component />
+                    </div>
+                  </TabsContent>
+                ))}
+              </div>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-500">
+            Your DNA Profile is continuously learning and adapting to provide better recommendations
           </p>
-        </div>
-
-        {/* Profile Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 text-green-600 mr-2" />
-                Profile Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Analysis Progress</span>
-                  <Badge className="bg-green-500">Complete</Badge>
-                </div>
-                <Progress value={100} className="w-full" />
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">23,456</div>
-                    <div className="text-sm text-gray-600">SNPs Analyzed</div>
-                  </div>
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">98.7%</div>
-                    <div className="text-sm text-gray-600">Call Rate</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="h-5 w-5 text-blue-600 mr-2" />
-                Privacy & Security
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Data Encryption</span>
-                  <Badge className="bg-green-500">Active</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Access Control</span>
-                  <Badge className="bg-green-500">Enabled</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Sharing</span>
-                  <Badge variant="outline">Private</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="h-5 w-5 text-green-600 mr-2" />
-                Ancestry Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-4">
-                Discover your ethnic background and ancestral origins with detailed regional breakdowns.
-              </p>
-              <Button className="w-full">View Ancestry</Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="h-5 w-5 text-blue-600 mr-2" />
-                Health Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-4">
-                Get personalized health insights based on your genetic markers and predispositions.
-              </p>
-              <Button className="w-full">View Health Report</Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 text-purple-600 mr-2" />
-                Trait Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-4">
-                Explore genetic traits including physical characteristics and behavioral tendencies.
-              </p>
-              <Button className="w-full">Explore Traits</Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Upload className="h-5 w-5 text-green-600 mr-2" />
-                Upload DNA Data
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-4">
-                Upload your raw DNA data from 23andMe, AncestryDNA, or other providers for analysis.
-              </p>
-              <Button className="w-full">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Download className="h-5 w-5 text-blue-600 mr-2" />
-                Export Reports
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-4">
-                Download comprehensive reports and analysis results in various formats.
-              </p>
-              <Button className="w-full" variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Download Reports
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
-  );
+  )
 } 

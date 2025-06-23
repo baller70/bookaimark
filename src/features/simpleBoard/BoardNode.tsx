@@ -1,6 +1,6 @@
 import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Folder, GripVertical } from 'lucide-react';
+import { Folder as FolderIcon, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -129,7 +129,7 @@ export const BoardNode: React.FC<NodeProps<BookmarkBoardData>> = ({ data, select
       <div className="p-3 h-full flex flex-col justify-between relative z-10">
         {/* top icon + title */}
         <div>
-          <Folder className="h-12 w-12 text-blue-600 mb-2" />
+          <FolderIcon className="h-12 w-12 text-blue-600 mb-2" />
           <h3 className="font-bold text-gray-900 uppercase text-sm truncate">
             {label}
           </h3>

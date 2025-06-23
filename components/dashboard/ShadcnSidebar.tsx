@@ -21,7 +21,8 @@ import {
   FolderOpen,
   Dna,
   Bot,
-  ShoppingCart
+  ShoppingCart,
+  Sparkles
 } from 'lucide-react'
 
 export function ShadcnSidebar() {
@@ -34,7 +35,9 @@ export function ShadcnSidebar() {
     { id: 'DNA Profile', name: 'DNA Profile', icon: Dna, href: '/dna-profile' },
     { id: 'AI-Copolit', name: 'AI-Copolit', icon: Bot, badge: 'New', href: '/ai-copolit' },
     { id: 'Marketplace', name: 'Marketplace', icon: ShoppingCart, href: '/marketplace' },
-    { id: 'Setting', name: 'Setting', icon: Settings, href: '/settings' }
+    { id: 'Setting', name: 'Setting', icon: Settings, href: '/settings' },
+    { id: 'Bookmark Marketplace 2.0', name: 'Bookmark Marketplace 2.0', icon: ShoppingCart, badge: 'Pro', href: '/marketplace-2' },
+    { id: 'AI-Copilot 3.0', name: 'AI-Copilot 3.0', icon: Sparkles, badge: 'Ultimate', href: '/ai-copilot-3' }
   ]
 
   const categoryItems = [
