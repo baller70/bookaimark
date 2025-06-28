@@ -216,14 +216,16 @@ const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, 
 
 // Client-only wrapper to prevent hydration mismatches
 function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
-  const [isClient, setIsClient] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setIsClient(true)
+    // Only run on the client after hydration
+    setMounted(true)
   }, [])
 
-  if (!isClient) {
-    return <div suppressHydrationWarning>{children}</div>
+  // During SSR (and the first client render) render nothing to avoid mismatches
+  if (!mounted) {
+    return null
   }
 
   return <>{children}</>
