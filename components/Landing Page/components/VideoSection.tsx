@@ -1,8 +1,26 @@
 import { SafariDemo } from '../../../components/Safari Window/src/components/SafariDemo';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
+
+function InlineThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <button
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/10 dark:bg-black/20 backdrop-blur border border-slate-200 dark:border-slate-700 transition-all duration-300 hover:scale-110 shadow-md"
+      aria-label="Toggle theme"
+    >
+      <Sun className="h-6 w-6 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-yellow-500" />
+      <Moon className="absolute h-6 w-6 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-500" />
+    </button>
+  );
+}
 
 function AnimatedCard({ children }: { children: React.ReactNode }) {
   return (
     <div className="card-wrapper">
+      {/* Dark/Light mode toggle specific to Safari window */}
+      <InlineThemeToggle />
       {/* Sticky note */}
       <div
         className="sticky-note"
@@ -159,6 +177,25 @@ export default function VideoSection() {
             top: -75px;
             left: -75px;
           }
+        }
+
+        /* Gradient halo around the card */
+        .card-wrapper::before {
+          content: '';
+          position: absolute;
+          inset: -8px; /* extend slightly beyond card edges */
+          border-radius: 20px;
+          background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #ec4899 100%);
+          filter: blur(30px);
+          opacity: 0.6;
+          z-index: 5; /* behind .card (z-index 10) but above page background */
+          pointer-events: none;
+        }
+
+        /* Slightly different hue for dark mode for better contrast */
+        .dark .card-wrapper::before {
+          background: linear-gradient(135deg, #a855f7 0%, #c084fc 50%, #f472b6 100%);
+          opacity: 0.8;
         }
       `}</style>
     </section>
