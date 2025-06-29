@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars */
 import { Safari } from "./magicui/safari";
 import { useState, useEffect } from "react";
 import {
