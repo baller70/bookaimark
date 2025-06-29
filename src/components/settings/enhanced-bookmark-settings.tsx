@@ -1,6 +1,8 @@
+/* eslint-disable react/no-unescaped-entities, @typescript-eslint/no-explicit-any */
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import tinycolor from 'tinycolor2';
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card'
 import { Button } from '@/src/components/ui/button'
@@ -15,9 +17,9 @@ import { Label } from '@/src/components/ui/label'
 import { Progress } from '@/src/components/ui/progress'
 import { toast } from 'sonner'
 import { 
-  Settings, 
-  Palette, 
-  Shield, 
+  Settings,
+  Palette,
+  Shield,
   Database,
   Bell,
   Download,
@@ -25,7 +27,6 @@ import {
   Trash2,
   RefreshCw,
   Eye,
-  EyeOff,
   Lock,
   Globe,
   Smartphone,
@@ -35,96 +36,53 @@ import {
   Zap,
   Save,
   RotateCcw,
-  User,
   ArrowLeft,
-  Clock,
-  Keyboard,
-  Wifi,
-  HardDrive,
   Volume2,
   Key,
   FileText,
-  Image,
-  Link,
   Search,
-  Filter,
   Grid,
   List,
   BarChart3,
   PieChart,
   TrendingUp,
-  Calendar,
-  Tag,
-  Folder,
   Star,
   Heart,
-  Bookmark,
-  Archive,
-  Share2,
-  ExternalLink,
-  Copy,
   Check,
-  X,
   Plus,
-  Minus,
   Cloud,
   CreditCard,
-  AlertTriangle,
-  Info,
-  ChevronRight,
   QrCode,
-  MessageSquare,
-  Headphones,
-  Mic,
-  MicOff,
-  Activity,
-  Timer,
   Target,
-  TestTube,
-  Code,
-  Webhook,
-  Terminal,
-  Layers,
-  Paintbrush,
-  Type,
-  MousePointer,
-  SlidersHorizontal,
-  Contrast,
-  Accessibility,
-  Languages,
-  Mail,
-  Phone,
-  ShieldCheck,
-  LogOut,
-  Download as DownloadIcon,
-  CloudDownload,
-  Server,
-  Cpu,
-  MemoryStick,
-  WifiOff,
-  MousePointer2,
-  Focus,
-  Palette as PaletteIcon,
   Store,
-  ShoppingCart,
-  Edit3,
-  Play,
-  MessageCircle,
-  DollarSign,
-  ThumbsUp,
-  ChevronLeft
+  Mail,
+  ShieldCheck,
+  LogOut
 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/src/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/src/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@/src/components/ui/radio-group'
 
-interface EnhancedSettingsProps {
-  userId?: string;
-}
-
-export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSettingsProps) {
+export default function EnhancedBookmarkSettings() {
   const router = useRouter();
   
+  // Apply theme selection to document
+  const applyTheme = (theme: string) => {
+    if (typeof window === 'undefined') return;
+    const root = window.document.documentElement;
+    if (theme === 'system') {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    } else if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  };
+
   const [settings, setSettings] = useState({
     // Appearance
     appearance: {
@@ -282,7 +240,6 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
   const [activeSection, setActiveSection] = useState('appearance');
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [show2FADialog, setShow2FADialog] = useState(false);
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [testNotificationSent, setTestNotificationSent] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -291,14 +248,25 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
     loadSettings();
   }, []);
 
+  // Apply theme on settings.appearance.theme change
+  useEffect(() => {
+    if (mounted) applyTheme(settings.appearance.theme);
+  }, [settings.appearance.theme, mounted]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
       if (typeof window !== 'undefined') {
         const savedSettings = localStorage.getItem('userSettings');
         if (savedSettings) {
-          const parsed = JSON.parse(savedSettings);
-          setSettings(prev => ({ ...prev, ...parsed }));
+          try {
+            const parsed = JSON.parse(savedSettings);
+            setSettings(prev => ({ ...prev, ...parsed }));
+          } catch (parseError) {
+            console.error('Invalid JSON in localStorage, clearing:', parseError);
+            localStorage.removeItem('userSettings');
+            // Keep default settings
+          }
         }
       }
     } catch (error) {
@@ -316,6 +284,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
         localStorage.setItem('userSettings', JSON.stringify(settings));
         setHasChanges(false);
         toast.success('Settings saved successfully');
+        applyTheme(settings.appearance.theme);
       }
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -325,7 +294,8 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
     }
   };
 
-  const updateSetting = (path: string, value: any) => {
+  const updateSetting = (path: string, value: unknown) => {
+    console.log('Updating setting:', path, 'to:', value);
     setSettings(prev => {
       const newSettings = { ...prev };
       const keys = path.split('.');
@@ -340,6 +310,8 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
       return newSettings;
     });
     setHasChanges(true);
+    // If changing theme, apply immediately
+    if (path === 'appearance.theme') applyTheme(value as string);
   };
 
   const sendTestNotification = (channel: string) => {
@@ -388,6 +360,52 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
     { name: 'Geometric', value: 'geometric' }
   ];
 
+  // Compute selected accent color directly
+  const selectedPalette = colorPalettes.find(p => p.value === settings.appearance.accentColor);
+  const selectedAccentColor = selectedPalette?.color ?? settings.appearance.customColor;
+
+  useEffect(() => {
+    if (!mounted) return;
+    console.log('Accent color effect triggered:', selectedAccentColor);
+    const root = window.document.documentElement;
+    const base = selectedAccentColor;
+    const tc = tinycolor(base);
+    const variations = [
+      tc.clone().lighten(40).toHexString(),
+      tc.clone().lighten(30).toHexString(),
+      tc.clone().lighten(20).toHexString(),
+      tc.clone().lighten(10).toHexString(),
+      base,
+      tc.clone().darken(10).toHexString(),
+      tc.clone().darken(20).toHexString(),
+      tc.clone().darken(30).toHexString(),
+      tc.clone().darken(40).toHexString(),
+      tc.clone().darken(50).toHexString(),
+    ];
+    variations.forEach((color, idx) => {
+      root.style.setProperty(`--accent-${idx + 1}`, color);
+    });
+    root.style.setProperty('--accent', base);
+    const fg = tinycolor(base).isLight() ? '#000000' : '#FFFFFF';
+    root.style.setProperty('--accent-foreground', fg);
+    
+    // Also update primary colors to match accent for broader theme application
+    const hsl = tc.toHsl();
+    const primaryHsl = `${Math.round(hsl.h)} ${Math.round(hsl.s * 100)}% ${Math.round(hsl.l * 100)}%`;
+    const primaryFgHsl = tinycolor(base).isLight() ? '0 0% 0%' : '0 0% 100%';
+    
+    root.style.setProperty('--primary', primaryHsl);
+    root.style.setProperty('--primary-foreground', primaryFgHsl);
+    
+    // Update ring color for focus states
+    root.style.setProperty('--ring', primaryHsl);
+    console.log('CSS variables updated:', {
+      accent: base,
+      primary: primaryHsl,
+      variations: variations.length
+    });
+  }, [selectedAccentColor, mounted]);
+
   if (!mounted || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -397,9 +415,9 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+    <div className="min-h-screen bg-background text-foreground transition-colors">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <div className="sticky top-0 z-50 bg-white/80 dark:bg-card backdrop-blur-sm border-b border-gray-200 dark:border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
@@ -414,8 +432,8 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
               </Button>
               <div className="h-6 w-px bg-gray-300" />
               <div className="flex items-center space-x-2">
-                <Settings className="h-6 w-6 text-gray-700" />
-                <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+                <Settings className="h-6 w-6" />
+                <h1 className="text-xl font-bold">Settings</h1>
               </div>
             </div>
             
@@ -437,7 +455,8 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
               <Button
                 onClick={saveSettings}
                 disabled={loading || !hasChanges}
-                className="bg-blue-600 hover:bg-blue-700"
+                style={{ backgroundColor: selectedAccentColor }}
+                className="text-white hover:opacity-90"
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
@@ -452,7 +471,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-2">
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                 <nav className="space-y-1">
                   {[
                     { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -472,8 +491,8 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                       onClick={() => setActiveSection(id)}
                       className={`w-full flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         activeSection === id
-                          ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-                          : 'text-gray-700 hover:bg-gray-100'
+                          ? 'bg-primary/10 text-primary border-l-2 border-primary'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
                     >
                       <Icon className="h-4 w-4" />
@@ -492,7 +511,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
               <Card>
                 <CardHeader>
                   <div className="flex items-center space-x-2">
-                    <Palette className="h-5 w-5 text-blue-600" />
+                    <Palette className="h-5 w-5 text-primary" />
                     <CardTitle>Appearance</CardTitle>
                   </div>
                   <CardDescription>
@@ -537,7 +556,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label>Auto-schedule themes</Label>
-                        <p className="text-sm text-gray-500">Switch themes on a custom time schedule</p>
+                        <p className="text-sm text-muted-foreground">Switch themes on a custom time schedule</p>
                       </div>
                       <Switch
                         checked={settings.appearance.autoSchedule}
@@ -576,19 +595,22 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                       <div>
                         <Label>Color Palette</Label>
                         <div className="flex space-x-2 mt-2">
-                          {colorPalettes.map((palette) => (
-                            <button
-                              key={palette.value}
-                              onClick={() => updateSetting('appearance.accentColor', palette.value)}
-                              className={`w-12 h-12 rounded-lg border-2 transition-all ${
-                                settings.appearance.accentColor === palette.value
-                                  ? 'border-gray-900 scale-110'
-                                  : 'border-gray-300 hover:border-gray-400'
-                              }`}
-                              style={{ backgroundColor: palette.color }}
-                              title={palette.name}
-                            />
-                          ))}
+                          {colorPalettes.map((palette) => {
+                            const isSelected = settings.appearance.accentColor === palette.value;
+                            return (
+                              <button
+                                key={palette.value}
+                                onClick={() => updateSetting('appearance.accentColor', palette.value)}
+                                className="w-12 h-12 rounded-lg border-2 border-gray-300 transition-all hover:border-gray-400"
+                                style={{
+                                  backgroundColor: palette.color,
+                                  borderColor: isSelected ? selectedAccentColor : undefined,
+                                  transform: isSelected ? 'scale(1.1)' : undefined
+                                }}
+                                title={palette.name}
+                              />
+                            );
+                          })}
                           <div className="flex flex-col items-center space-y-1">
                             <Input
                               type="color"
@@ -631,7 +653,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                           <Label>Dyslexia-friendly font</Label>
-                          <p className="text-sm text-gray-500">Use OpenDyslexic font for better readability</p>
+                          <p className="text-sm text-muted-foreground">Use OpenDyslexic font for better readability</p>
                         </div>
                         <Switch
                           checked={settings.appearance.dyslexiaFont}
@@ -775,28 +797,28 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                       onValueChange={(value) => updateSetting('behavior.linkOpening', value)}
                     >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="new-tab" id="new-tab" />
-                        <Label htmlFor="new-tab">Open in new tab</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
                         <RadioGroupItem value="same-tab" id="same-tab" />
-                        <Label htmlFor="same-tab">Open in same tab</Label>
+                        <Label htmlFor="same-tab">Same tab</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="overlay" id="overlay" />
-                        <Label htmlFor="overlay">Open in app overlay/webview</Label>
+                        <RadioGroupItem value="new-tab" id="new-tab" />
+                        <Label htmlFor="new-tab">New tab</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="new-window" id="new-window" />
+                        <Label htmlFor="new-window">New window</Label>
                       </div>
                     </RadioGroup>
                   </div>
 
                   <Separator />
 
-                  {/* Drag-and-Drop Sensitivity */}
+                  {/* Drag & Drop */}
                   <div className="space-y-3">
-                    <Label className="text-base font-medium">Drag-and-Drop Sensitivity</Label>
+                    <Label className="text-base font-medium">Drag & Drop</Label>
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <Label>Drag Threshold</Label>
+                        <Label>Drag Sensitivity</Label>
                         <span className="text-sm text-gray-500">{settings.behavior.dragSensitivity}%</span>
                       </div>
                       <Slider
@@ -808,61 +830,86 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                         className="w-full"
                       />
                       <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>Easy</span>
-                        <span>Firm</span>
+                        <span>Low</span>
+                        <span>High</span>
                       </div>
                     </div>
                   </div>
 
                   <Separator />
 
-                  {/* Auto-Save & Drafts */}
+                  {/* Auto-save */}
                   <div className="space-y-3">
-                    <Label className="text-base font-medium">Auto-Save & Drafts</Label>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Auto-save</Label>
-                          <p className="text-sm text-gray-500">Automatically save notes, playlists, and profile edits</p>
-                        </div>
-                        <Switch
-                          checked={settings.behavior.autoSave}
-                          onCheckedChange={(checked) => updateSetting('behavior.autoSave', checked)}
-                        />
+                    <Label className="text-base font-medium">Auto-save</Label>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Enable auto-save</Label>
+                        <p className="text-sm text-gray-500">Automatically save changes as you make them</p>
                       </div>
-                      
-                      <div>
+                      <Switch
+                        checked={settings.behavior.autoSave}
+                        onCheckedChange={(checked) => updateSetting('behavior.autoSave', checked)}
+                      />
+                    </div>
+                    
+                    {settings.behavior.autoSave && (
+                      <div className="pl-4 border-l-2 border-gray-200">
                         <Label>Draft Expiration</Label>
                         <Select value={settings.behavior.draftExpiration} onValueChange={(value) => updateSetting('behavior.draftExpiration', value)}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="never">Never expire</SelectItem>
-                            <SelectItem value="1day">1 day</SelectItem>
-                            <SelectItem value="7days">7 days</SelectItem>
-                            <SelectItem value="30days">30 days</SelectItem>
+                            <SelectItem value="1day">1 Day</SelectItem>
+                            <SelectItem value="7days">7 Days</SelectItem>
+                            <SelectItem value="30days">30 Days</SelectItem>
+                            <SelectItem value="never">Never</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <Separator />
 
-                  {/* Confirmation Prompts */}
+                  {/* Confirmations */}
                   <div className="space-y-3">
-                    <Label className="text-base font-medium">Confirmation Prompts</Label>
+                    <Label className="text-base font-medium">Confirmations</Label>
+                    <RadioGroup
+                      value={settings.behavior.confirmations}
+                      onValueChange={(value) => updateSetting('behavior.confirmations', value)}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="none" id="none" />
+                        <Label htmlFor="none">None - No confirmation dialogs</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="simple" id="simple" />
+                        <Label htmlFor="simple">Simple - Only for destructive actions</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="detailed" id="detailed" />
+                        <Label htmlFor="detailed">Detailed - All important actions</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <Separator />
+
+                  {/* AI Suggestions */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">AI Suggestions</Label>
                     <div>
-                      <Label>Confirmation Level</Label>
-                      <Select value={settings.behavior.confirmations} onValueChange={(value) => updateSetting('behavior.confirmations', value)}>
+                      <Label>Suggestion Frequency</Label>
+                      <Select value={settings.behavior.aiSuggestionFrequency} onValueChange={(value) => updateSetting('behavior.aiSuggestionFrequency', value)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="off">Off - No confirmations</SelectItem>
-                          <SelectItem value="simple">Simple - Basic confirmations</SelectItem>
-                          <SelectItem value="detailed">Detailed - Full confirmation dialogs</SelectItem>
+                          <SelectItem value="never">Never</SelectItem>
+                          <SelectItem value="on-save">On Save</SelectItem>
+                          <SelectItem value="real-time">Real-time</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -870,47 +917,18 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
 
                   <Separator />
 
-                  {/* AI Suggestion Frequency */}
+                  {/* Default Sort */}
                   <div className="space-y-3">
-                    <Label className="text-base font-medium">AI Suggestion Frequency</Label>
-                    <RadioGroup
-                      value={settings.behavior.aiSuggestionFrequency}
-                      onValueChange={(value) => updateSetting('behavior.aiSuggestionFrequency', value)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="never" id="never" />
-                        <Label htmlFor="never">Never</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="on-save" id="on-save" />
-                        <Label htmlFor="on-save">On Save</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="on-demand" id="on-demand" />
-                        <Label htmlFor="on-demand">On Demand</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="always" id="always" />
-                        <Label htmlFor="always">Always (live suggestions)</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <Separator />
-
-                  {/* Default Sort Order */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Default Sort Order</Label>
+                    <Label className="text-base font-medium">Default Sort</Label>
                     <Select value={settings.behavior.defaultSort} onValueChange={(value) => updateSetting('behavior.defaultSort', value)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="date-added">Date Added</SelectItem>
-                        <SelectItem value="last-visited">Last Visited</SelectItem>
-                        <SelectItem value="ai-score">AI Score</SelectItem>
-                        <SelectItem value="manual">Manual Order</SelectItem>
                         <SelectItem value="alphabetical">Alphabetical</SelectItem>
+                        <SelectItem value="most-visited">Most Visited</SelectItem>
+                        <SelectItem value="manual">Manual</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -923,7 +941,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
               <Card>
                 <CardHeader>
                   <div className="flex items-center space-x-2">
-                    <Bell className="h-5 w-5 text-blue-600" />
+                    <Bell className="h-5 w-5 text-primary" />
                     <CardTitle>Notifications</CardTitle>
                   </div>
                   <CardDescription>
@@ -1323,7 +1341,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                     <Label className="text-base font-medium">Privacy Policy & Data Export</Label>
                     <div className="space-y-2">
                       <Button variant="outline" onClick={() => exportData('json')}>
-                        <DownloadIcon className="h-4 w-4 mr-2" />
+                        <Download className="h-4 w-4 mr-2" />
                         Download My Data (JSON)
                       </Button>
                       <Button variant="outline" className="text-red-600 hover:text-red-700">
@@ -1623,7 +1641,7 @@ export default function EnhancedBookmarkSettings({ userId: _userId }: EnhancedSe
                       <div className="flex items-center justify-between">
                         <div>
                           <Label>Dyslexia-friendly font</Label>
-                          <p className="text-sm text-gray-500">Use OpenDyslexic font for better readability</p>
+                          <p className="text-sm text-muted-foreground">Use OpenDyslexic font for better readability</p>
                         </div>
                         <Switch
                           checked={settings.accessibility.dyslexiaFont}
