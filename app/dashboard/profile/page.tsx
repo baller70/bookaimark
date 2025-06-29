@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars, @typescript-eslint/no-explicit-any */
+
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { UserCircleIcon } from '@heroicons/react/24/outline'

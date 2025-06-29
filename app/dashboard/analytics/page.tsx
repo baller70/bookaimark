@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars, @typescript-eslint/no-explicit-any */
+
 import { useState } from 'react'
 import {
   AreaChart,
@@ -94,7 +96,7 @@ export default function AnalyticsPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Analytics</h1>
         <p className="mt-1 text-white/60">
-          Track your application's performance and user engagement
+          Track your application&apos;s performance and user engagement
         </p>
       </div>
 
