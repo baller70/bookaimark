@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
-  BarChart3,
   Star,
   Settings,
   Bookmark,

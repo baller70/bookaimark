@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/exhaustive-deps */
+
 import React, { useState, useRef, useCallback } from 'react';
 import {
   Dialog,
@@ -22,12 +24,10 @@ import {
   Link2, 
   Plus, 
   Trash2, 
-  Download, 
   CheckCircle, 
   XCircle, 
   AlertTriangle,
   Globe,
-  Copy,
   Clipboard,
   FileUp
 } from 'lucide-react';
@@ -60,7 +60,7 @@ export function BulkURLCreatorModal({ isOpen, onClose }: BulkURLCreatorModalProp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  // Handle file upload
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleFileUpload = useCallback(async (files: FileList) => {
     setIsProcessing(true);
     setProgress(0);

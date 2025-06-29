@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+/* eslint-disable @next/next/no-img-element */
+
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -325,7 +327,7 @@ export function URLCheckerModal({ isOpen, onClose }: URLCheckerModalProps) {
             URL Checker - Validate Bookmarks
           </DialogTitle>
           <DialogDescription>
-            Validate your bookmarks to ensure they're still accessible and working properly.
+            Validate your bookmarks to ensure they&apos;re still accessible and working properly.
           </DialogDescription>
         </DialogHeader>
 
