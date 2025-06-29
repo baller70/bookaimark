@@ -10,7 +10,7 @@ import {
 const API_BASE = '/api/timeline';
 
 // Mock data for development
-let mockTimelineData: TimelineData = {
+const mockTimelineData: TimelineData = {
   boards: [
     {
       id: 'board-1',

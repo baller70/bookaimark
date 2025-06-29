@@ -409,7 +409,7 @@ export const usePomodoro = () => {
     // Calculate streak (simplified)
     let streakDays = 0;
     let bestStreak = 0;
-    let currentStreak = 0;
+    const currentStreak = 0;
     
     // This would need more complex logic for accurate streak calculation
     const recentSessions = completedSessions.slice(0, 7);

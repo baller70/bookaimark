@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     // Handle form data for file attachments
     const contentType = request.headers.get('content-type');
     let data;
-    let attachments: File[] = [];
+    const attachments: File[] = [];
 
     if (contentType?.includes('multipart/form-data')) {
       const formData = await request.formData();

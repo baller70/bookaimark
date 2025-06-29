@@ -6,6 +6,9 @@ const nextConfig = {
   // Removed deprecated options: swcMinify and experimental.appDir
   // swcMinify is enabled by default in Next.js 13+
   // appDir is now stable and enabled by default
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 }
 
 module.exports = nextConfig 

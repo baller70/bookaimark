@@ -17,10 +17,16 @@ export default function AnswerYesSection() {
     <span
       style={{
         background: '#ffe600',
-        padding: '2px 8px',
+        padding: '4px 12px',
         transform: 'rotate(-2deg)',
         display: 'inline-block',
-        fontWeight: 'bold',
+        fontFamily: 'Marker Felt, Comic Sans MS, cursive',
+        fontSize: '2rem',
+        fontWeight: 900,
+        letterSpacing: '1px',
+        color: '#111',
+        textTransform: 'uppercase',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
       }}
     >
       {children}
