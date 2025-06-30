@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities, @typescript-eslint/no-explicit-any */
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import tinycolor from 'tinycolor2';
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card'
@@ -16,10 +16,11 @@ import { Separator } from '@/src/components/ui/separator'
 import { Label } from '@/src/components/ui/label'
 import { Progress } from '@/src/components/ui/progress'
 import { toast } from 'sonner'
+import * as Sentry from '@sentry/nextjs'
 import { 
-  Settings,
-  Palette,
-  Shield,
+  Settings, 
+  Palette, 
+  Shield, 
   Database,
   Bell,
   Download,
@@ -59,14 +60,36 @@ import {
   ShieldCheck,
   LogOut
 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/src/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@/src/components/ui/radio-group'
+import { supabase } from '@/src/lib/supabase';
 
 export default function EnhancedBookmarkSettings() {
   const router = useRouter();
   
   // Apply theme selection to document
+  // Validate settings structure to prevent corruption
+  const validateSettings = (settings: any): boolean => {
+    try {
+      return !!(
+        settings &&
+        settings.notifications &&
+        settings.notifications.channels &&
+        typeof settings.notifications.channels.email !== 'undefined' &&
+        settings.appearance &&
+        settings.behavior &&
+        settings.privacy
+      );
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { component: 'settings', action: 'validate_settings' },
+        extra: { settings }
+      });
+      return false;
+    }
+  };
+
   const applyTheme = (theme: string) => {
     if (typeof window === 'undefined') return;
     const root = window.document.documentElement;
@@ -82,7 +105,7 @@ export default function EnhancedBookmarkSettings() {
       root.classList.remove('dark');
     }
   };
-
+  
   const [settings, setSettings] = useState({
     // Appearance
     appearance: {
@@ -242,6 +265,17 @@ export default function EnhancedBookmarkSettings() {
   const [show2FADialog, setShow2FADialog] = useState(false);
   const [testNotificationSent, setTestNotificationSent] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [exportTags, setExportTags] = useState('');
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
+  const settingsRef = useRef(settings);
+  const [pendingSection, setPendingSection] = useState<string | null>(null);
+  const [showSwitchPrompt, setShowSwitchPrompt] = useState(false);
+  const autoSaveTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   useEffect(() => {
     setMounted(true);
@@ -253,24 +287,138 @@ export default function EnhancedBookmarkSettings() {
     if (mounted) applyTheme(settings.appearance.theme);
   }, [settings.appearance.theme, mounted]);
 
+  useEffect(() => {
+    if (settings.behavior.autoSave && hasChanges && !loading) {
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
+      autoSaveTimeout.current = setTimeout(() => {
+        saveSettings();
+      }, 1000);
+    }
+    return () => {
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, hasChanges]);
+
+  // Move this function above the useEffect that uses it
+  const applyThemeAndFont = (theme: string, fontSize: number, dyslexiaFont: boolean) => {
+    console.log('[applyThemeAndFont] theme:', theme, 'fontSize:', fontSize, 'dyslexiaFont:', dyslexiaFont);
+    if (typeof window === 'undefined') return;
+    const root = window.document.documentElement;
+    // Theme
+    if (theme === 'system') {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    } else if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    // Font size
+    root.style.setProperty('--user-font-size', fontSize + 'px');
+    // Dyslexia font
+    if (dyslexiaFont) {
+      root.classList.add('dyslexia-font');
+    } else {
+      root.classList.remove('dyslexia-font');
+    }
+    // Debug: log computed style and classList
+    console.log('[applyThemeAndFont] computed --user-font-size:', getComputedStyle(root).getPropertyValue('--user-font-size'));
+    console.log('[applyThemeAndFont] root classList:', root.classList.value);
+    // Check if font is loaded
+    if (document.fonts) {
+      document.fonts.load('1em OpenDyslexic').then(fonts => {
+        if (!fonts || fonts.length === 0) {
+          console.warn('OpenDyslexic font did not load!');
+        } else {
+          console.log('OpenDyslexic font loaded:', fonts);
+        }
+      });
+    }
+  };
+
+  // Place this useEffect near the top of the component, after useState/useRef declarations, before any conditional returns
+  useEffect(() => {
+    if (mounted) {
+      const dyslexiaFont = settings.appearance.dyslexiaFont || settings.accessibility.dyslexiaFont;
+      applyThemeAndFont(settings.appearance.theme, settings.appearance.fontSize, dyslexiaFont);
+    }
+  }, [settings.appearance.theme, settings.appearance.fontSize, settings.appearance.dyslexiaFont, settings.accessibility.dyslexiaFont, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const root = window.document.documentElement;
+    root.classList.remove('density-compact', 'density-comfortable', 'density-spacious');
+    const density = settings.appearance.layoutDensity || 'comfortable';
+    root.classList.add(`density-${density}`);
+  }, [settings.appearance.layoutDensity, mounted]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
+      let userId: string | null = null;
+      // Try to get user from Supabase Auth
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        userId = user?.id || null;
+      } catch (e) {
+        userId = null;
+      }
+      if (userId) {
+        // Try to load settings from Supabase
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+        if (error) {
+          Sentry.captureException(error, { tags: { component: 'settings', action: 'load_settings_supabase' } });
+          // Fallback to localStorage
+        } else if (data) {
+          setSettings(prev => ({ ...prev, ...data }));
+          // Also sync to localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('userSettings', JSON.stringify(data));
+          }
+          return;
+        }
+      }
+      // Fallback: load from localStorage
       if (typeof window !== 'undefined') {
         const savedSettings = localStorage.getItem('userSettings');
         if (savedSettings) {
           try {
             const parsed = JSON.parse(savedSettings);
+            if (!validateSettings(parsed)) {
+              localStorage.removeItem('userSettings');
+              Sentry.captureMessage('Invalid settings structure detected, clearing localStorage', {
+                tags: { component: 'settings', action: 'validate_settings' },
+                level: 'warning'
+              });
+              window.location.reload();
+              return;
+            }
             setSettings(prev => ({ ...prev, ...parsed }));
           } catch (parseError) {
             console.error('Invalid JSON in localStorage, clearing:', parseError);
+            Sentry.captureException(parseError, {
+              tags: { component: 'settings', action: 'load_settings' },
+              extra: { savedSettings }
+            });
             localStorage.removeItem('userSettings');
-            // Keep default settings
           }
         }
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
+      Sentry.captureException(error, {
+        tags: { component: 'settings', action: 'load_settings' },
+        level: 'error'
+      });
       toast.error('Failed to load settings');
     } finally {
       setLoading(false);
@@ -280,14 +428,44 @@ export default function EnhancedBookmarkSettings() {
   const saveSettings = async () => {
     try {
       setLoading(true);
+      let userId: string | null = null;
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        userId = user?.id || null;
+      } catch (e) {
+        userId = null;
+      }
+      let cloudSuccess = false;
+      if (userId) {
+        // Save to Supabase
+        const { error } = await supabase
+          .from('user_settings')
+          .upsert({ user_id: userId, ...settingsRef.current }, { onConflict: 'user_id' });
+        if (error) {
+          Sentry.captureException(error, { tags: { component: 'settings', action: 'save_settings_supabase' } });
+          toast.error('Failed to save settings to cloud');
+        } else {
+          cloudSuccess = true;
+        }
+      }
+      // Always save to localStorage as well
       if (typeof window !== 'undefined') {
-        localStorage.setItem('userSettings', JSON.stringify(settings));
-        setHasChanges(false);
-        toast.success('Settings saved successfully');
-        applyTheme(settings.appearance.theme);
+        localStorage.setItem('userSettings', JSON.stringify(settingsRef.current));
+      }
+      setHasChanges(false);
+      applyTheme(settingsRef.current.appearance.theme);
+      if (cloudSuccess) {
+        toast.success('Settings saved to cloud');
+      } else {
+        toast.success('Settings saved');
       }
     } catch (error) {
       console.error('Failed to save settings:', error);
+      Sentry.captureException(error, {
+        tags: { component: 'settings', action: 'save_settings' },
+        level: 'error'
+      });
       toast.error('Failed to save settings');
     } finally {
       setLoading(false);
@@ -295,7 +473,8 @@ export default function EnhancedBookmarkSettings() {
   };
 
   const updateSetting = (path: string, value: unknown) => {
-    console.log('Updating setting:', path, 'to:', value);
+    try {
+      console.log('Updating setting:', path, 'to:', value);
     setSettings(prev => {
       const newSettings = { ...prev };
       const keys = path.split('.');
@@ -310,8 +489,16 @@ export default function EnhancedBookmarkSettings() {
       return newSettings;
     });
     setHasChanges(true);
-    // If changing theme, apply immediately
-    if (path === 'appearance.theme') applyTheme(value as string);
+      // If changing theme, apply immediately
+      if (path === 'appearance.theme') applyTheme(value as string);
+    } catch (error) {
+      console.error('Failed to update setting:', path, error);
+      Sentry.captureException(error, {
+        tags: { component: 'settings', action: 'update_setting' },
+        extra: { path, value }
+      });
+      toast.error('Failed to update setting');
+    }
   };
 
   const sendTestNotification = (channel: string) => {
@@ -333,8 +520,19 @@ export default function EnhancedBookmarkSettings() {
 
   const exportData = (format: string) => {
     if (typeof window !== 'undefined') {
-      const data = format === 'json' ? JSON.stringify(settings, null, 2) : 'CSV format not implemented';
-      const blob = new Blob([data], { type: format === 'json' ? 'application/json' : 'text/csv' });
+      let dataStr = '';
+      if (format === 'json') {
+        dataStr = JSON.stringify(settings, null, 2);
+      } else if (format === 'csv') {
+        const rows = [
+          ['Key', 'Value'],
+          ...Object.entries(settings).map(([k, v]) => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)])
+        ];
+        dataStr = rows.map(r => r.join(',')).join('\n');
+      } else if (format === 'html') {
+        dataStr = `<pre>${JSON.stringify(settings, null, 2)}</pre>`;
+      }
+      const blob = new Blob([dataStr], { type: format === 'json' ? 'application/json' : format === 'csv' ? 'text/csv' : 'text/html' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -406,6 +604,69 @@ export default function EnhancedBookmarkSettings() {
     });
   }, [selectedAccentColor, mounted]);
 
+  const handleBackgroundUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleBackgroundFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    let userId: string | null = null;
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) throw error;
+      userId = user?.id || null;
+    } catch (e) {
+      userId = null;
+    }
+    let imageUrl = '';
+    if (userId) {
+      // Upload to Supabase Storage
+      const filePath = `backgrounds/${userId}/${Date.now()}_${file.name}`;
+      const { error } = await supabase.storage.from('user-assets').upload(filePath, file);
+      if (error) {
+        Sentry.captureException(error, { tags: { component: 'settings', action: 'upload_background' } });
+        toast.error('Failed to upload background image');
+        setLoading(false);
+        return;
+      }
+      const { data: publicUrlData } = supabase.storage.from('user-assets').getPublicUrl(filePath);
+      imageUrl = publicUrlData?.publicUrl || '';
+    } else {
+      // Use local object URL
+      imageUrl = URL.createObjectURL(file);
+    }
+    updateSetting('appearance.customBackground', imageUrl);
+    setLoading(false);
+  };
+
+  const handleImportFileClick = () => {
+    importFileInputRef.current?.click();
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // TODO: Implement import logic
+    toast.success('Import from file (stub)');
+  };
+
+  const handleRestoreFromBackup = () => {
+    toast.info('Restore from backup (stub)');
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && hasChanges && !loading) {
+        e.preventDefault();
+        saveSettings();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasChanges, loading]);
+
   if (!mounted || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -413,6 +674,53 @@ export default function EnhancedBookmarkSettings() {
       </div>
     );
   }
+
+  const signOutSession = async () => {
+    // For now, just sign out the current user (Supabase does not support per-session sign-out client-side)
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
+  const signOutAllSessions = async () => {
+    // Supabase does not support sign out all sessions from client, so just sign out current
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
+  const requestAccountDeletion = async () => {
+    if (!window.confirm('Are you sure you want to request account deletion? This action is irreversible.')) return;
+    // TODO: Call backend API to delete user account
+    toast.success('Account deletion requested (stub).');
+  };
+
+  const handleSectionChange = (section: string) => {
+    if (hasChanges) {
+      setPendingSection(section);
+      setShowSwitchPrompt(true);
+    } else {
+      setActiveSection(section);
+    }
+  };
+
+  const handlePromptSave = async () => {
+    await saveSettings();
+    setShowSwitchPrompt(false);
+    if (pendingSection) setActiveSection(pendingSection);
+    setPendingSection(null);
+  };
+
+  const handlePromptDiscard = () => {
+    setShowSwitchPrompt(false);
+    if (pendingSection) setActiveSection(pendingSection);
+    setPendingSection(null);
+    setHasChanges(false);
+    loadSettings(); // reload from persisted
+  };
+
+  const handlePromptCancel = () => {
+    setShowSwitchPrompt(false);
+    setPendingSection(null);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors">
@@ -435,8 +743,8 @@ export default function EnhancedBookmarkSettings() {
                 <Settings className="h-6 w-6" />
                 <h1 className="text-xl font-bold">Settings</h1>
               </div>
-            </div>
-            
+        </div>
+        
             <div className="flex items-center space-x-2">
               {hasChanges && (
                 <Badge variant="secondary" className="animate-pulse">
@@ -456,10 +764,10 @@ export default function EnhancedBookmarkSettings() {
                 onClick={saveSettings}
                 disabled={loading || !hasChanges}
                 style={{ backgroundColor: selectedAccentColor }}
-                className="text-white hover:opacity-90"
+                className="text-white hover:opacity-90 flex items-center"
               >
                 <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                {loading ? 'Saving…' : 'Save Changes'}
               </Button>
             </div>
           </div>
@@ -488,7 +796,7 @@ export default function EnhancedBookmarkSettings() {
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
-                      onClick={() => setActiveSection(id)}
+                      onClick={() => handleSectionChange(id)}
                       className={`w-full flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         activeSection === id
                           ? 'bg-primary/10 text-primary border-l-2 border-primary'
@@ -734,7 +1042,14 @@ export default function EnhancedBookmarkSettings() {
                             value={settings.appearance.customBackground}
                             onChange={(e) => updateSetting('appearance.customBackground', e.target.value)}
                           />
-                          <Button variant="outline" size="sm">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            onChange={handleBackgroundFileChange}
+                          />
+                          <Button variant="outline" size="sm" onClick={handleBackgroundUploadClick}>
                             <Upload className="h-4 w-4" />
                           </Button>
                         </div>
@@ -963,14 +1278,14 @@ export default function EnhancedBookmarkSettings() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Switch
-                            checked={settings.notifications.channels.email}
+                            checked={settings.notifications?.channels?.email ?? false}
                             onCheckedChange={(checked) => updateSetting('notifications.channels.email', checked)}
                           />
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => sendTestNotification('email')}
-                            disabled={!settings.notifications.channels.email}
+                            disabled={!settings.notifications?.channels?.email}
                           >
                             Test
                           </Button>
@@ -1290,14 +1605,14 @@ export default function EnhancedBookmarkSettings() {
                               Safari • 192.168.1.156 • 2 hours ago
                             </div>
                           </div>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={signOutSession}>
                             <LogOut className="h-4 w-4 mr-1" />
                             Sign Out
                           </Button>
                         </div>
                       </div>
                       
-                      <Button variant="destructive" size="sm">
+                      <Button variant="destructive" size="sm" onClick={signOutAllSessions}>
                         <LogOut className="h-4 w-4 mr-2" />
                         Sign Out All Other Sessions
                       </Button>
@@ -1344,7 +1659,7 @@ export default function EnhancedBookmarkSettings() {
                         <Download className="h-4 w-4 mr-2" />
                         Download My Data (JSON)
                       </Button>
-                      <Button variant="outline" className="text-red-600 hover:text-red-700">
+                      <Button variant="outline" className="text-red-600 hover:text-red-700" onClick={requestAccountDeletion}>
                         <Trash2 className="h-4 w-4 mr-2" />
                         Request Account Deletion
                       </Button>
@@ -1388,12 +1703,12 @@ export default function EnhancedBookmarkSettings() {
                     <div className="border rounded-lg p-4 bg-gray-50">
                       <Label className="text-sm font-medium">Select Date Range</Label>
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        <Input type="date" placeholder="Start date" />
-                        <Input type="date" placeholder="End date" />
+                        <Input type="date" placeholder="Start date" value={exportStartDate} onChange={e => setExportStartDate(e.target.value)} />
+                        <Input type="date" placeholder="End date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} />
                       </div>
                       <div className="mt-2">
                         <Label className="text-sm">Filter by tags:</Label>
-                        <Input placeholder="Enter tags separated by commas" className="mt-1" />
+                        <Input placeholder="Enter tags separated by commas" className="mt-1" value={exportTags} onChange={e => setExportTags(e.target.value)} />
                       </div>
                     </div>
                   </div>
@@ -1475,11 +1790,12 @@ export default function EnhancedBookmarkSettings() {
                   <div className="space-y-3">
                     <Label className="text-base font-medium">Import & Restore</Label>
                     <div className="space-y-2">
-                      <Button variant="outline">
+                      <Button variant="outline" onClick={handleImportFileClick}>
                         <Upload className="h-4 w-4 mr-2" />
                         Import from File
                       </Button>
-                      <Button variant="outline">
+                      <input type="file" accept=".json,.csv" ref={importFileInputRef} style={{ display: 'none' }} onChange={handleImportFileChange} />
+                      <Button variant="outline" onClick={handleRestoreFromBackup}>
                         <Cloud className="h-4 w-4 mr-2" />
                         Restore from Backup
                       </Button>
@@ -2902,6 +3218,19 @@ export default function EnhancedBookmarkSettings() {
           </div>
         </div>
       </div>
+      <Dialog open={showSwitchPrompt} onOpenChange={setShowSwitchPrompt}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved Changes</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">You have unsaved changes. Save before switching?</div>
+          <DialogFooter className="flex gap-2">
+            <Button onClick={handlePromptSave} disabled={loading}>Save & Switch</Button>
+            <Button variant="destructive" onClick={handlePromptDiscard}>Discard Changes</Button>
+            <Button variant="outline" onClick={handlePromptCancel}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

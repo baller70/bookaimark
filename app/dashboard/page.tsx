@@ -1877,13 +1877,13 @@ export default function Dashboard() {
 
       case 'hierarchy':
         return (
-          <div className="space-y-8">
+          <div className="density-gap">
             {['Development', 'Design', 'Productivity'].map((category) => {
               const categoryBookmarks = filteredBookmarks.filter((bookmark) => bookmark.category === category)
               const categoryBookmarkIds = categoryBookmarks.map(bookmark => bookmark.id)
               
               return (
-                <div key={category} className="border border-gray-200/60 rounded-xl p-8 bg-gradient-to-br from-white via-gray-50/20 to-white shadow-sm hover:shadow-lg transition-all duration-300">
+                <div key={category} className="border border-gray-200/60 rounded-xl density-p bg-gradient-to-br from-white via-gray-50/20 to-white shadow-sm hover:shadow-lg transition-all duration-300">
                   <h3 className="font-bold text-2xl mb-6 flex items-center text-gray-900">
                     <GitBranch className="h-7 w-7 mr-4 text-gray-700" />
                     {category}
@@ -1916,7 +1916,7 @@ export default function Dashboard() {
         )
       case 'hierarchyV1':
         return (
-          <div className="space-y-8">
+          <div className="density-gap">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Hierarchy V1 - Simple View</h2>
               <p className="text-gray-600">Basic hierarchical organization of your bookmarks</p>
@@ -1926,7 +1926,7 @@ export default function Dashboard() {
               const categoryBookmarkIds = categoryBookmarks.map(bookmark => bookmark.id)
               
               return (
-                <div key={category} className="border border-gray-200/60 rounded-xl p-8 bg-gradient-to-br from-white via-gray-50/20 to-white shadow-sm hover:shadow-lg transition-all duration-300">
+                <div key={category} className="border border-gray-200/60 rounded-xl density-p bg-gradient-to-br from-white via-gray-50/20 to-white shadow-sm hover:shadow-lg transition-all duration-300">
                   <h3 className="font-bold text-2xl mb-6 flex items-center text-gray-900">
                     <GitBranch className="h-7 w-7 mr-4 text-gray-700" />
                     {category}
@@ -2040,7 +2040,7 @@ export default function Dashboard() {
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 density-gap">
                   {mockFolders.map((folder) => {
                     const folderBookmarks = bookmarks.filter(bookmark => 
                       bookmark.category.toLowerCase() === folder.name.toLowerCase()
@@ -2378,10 +2378,10 @@ export default function Dashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 density-gap mb-8">
             {/* Learning Card - Spans 2 columns - Exact copy from screenshot */}
             <Card className="md:col-span-2 relative overflow-hidden bg-gradient-to-br from-white via-blue-50/10 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
-              <CardContent className="p-8 relative">
+              <CardContent className="density-p relative">
                 {/* Decorative elements scattered around */}
                 <div className="absolute top-4 left-8">
                   <div className="w-2 h-2 bg-blue-500 rotate-45"></div>
@@ -2475,7 +2475,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Bookmark Overview Card - Exact copy from screenshot */}
-            <Card className="p-8 bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
+            <Card className="density-p bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
               <CardContent className="p-0">
                 <div className="space-y-6">
                   <div>
@@ -2527,7 +2527,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Project Efficiency Card with Bigger Donut Chart */}
-            <Card className="p-8 bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
+            <Card className="density-p bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
               <CardContent className="p-0">
                 <div className="space-y-6">
                   {/* Header with date range and dropdown */}

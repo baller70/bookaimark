@@ -1,4 +1,5 @@
 // Profile utility functions for consistent profile picture handling across the app
+import * as Sentry from '@sentry/nextjs'
 
 export const getProfilePicture = (): string => {
   if (typeof window === 'undefined') {
@@ -15,6 +16,10 @@ export const getProfilePicture = (): string => {
       }
     } catch (error) {
       console.log('Error loading profile avatar from settings:', error);
+      Sentry.captureException(error, {
+        tags: { component: 'profile-utils', action: 'get_profile_picture' },
+        level: 'warning'
+      });
     }
   }
 
@@ -38,6 +43,10 @@ export const getUserName = (): string => {
       }
     } catch (error) {
       console.log('Error loading user name from settings:', error);
+      Sentry.captureException(error, {
+        tags: { component: 'profile-utils', action: 'get_user_name' },
+        level: 'warning'
+      });
     }
   }
 
