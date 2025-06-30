@@ -16,22 +16,22 @@ export default function DashboardLayout({
 
   return (
     <DashboardProvider>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen bg-transparent">
         <div className="flex h-screen">
           {/* Desktop Sidebar */}
-          <div className="hidden lg:flex lg:flex-col bg-slate-50 dark:bg-slate-900">
+          <div className="hidden lg:flex lg:flex-col bg-transparent">
             <ShadcnSidebar />
           </div>
 
           {/* Mobile Sidebar */}
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-            <SheetContent side="left" className="p-0 bg-slate-50 dark:bg-slate-900">
+            <SheetContent side="left" className="p-0 bg-transparent">
               <ShadcnSidebar />
             </SheetContent>
           </Sheet>
 
           {/* Main Content */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
+          <div className="flex-1 flex flex-col overflow-hidden bg-transparent">
             {/* Mobile Header */}
             <div className="lg:hidden flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
               <div className="flex items-center gap-2">
@@ -62,7 +62,7 @@ export default function DashboardLayout({
             </div>
 
             {/* Page Content */}
-            <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900">
+            <main className="flex-1 overflow-y-auto bg-transparent">
               {children}
             </main>
           </div>

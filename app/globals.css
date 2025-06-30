@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  background-color: var(--background);
+  background-color: transparent !important; /* Force body to be transparent so html background pattern is always visible */
   padding: var(--density-padding);
 }
 
@@ -94,7 +94,8 @@ body {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* Removed bg-background to allow custom background patterns */
   }
 }
 
@@ -146,4 +147,101 @@ body {
 html.dyslexia-font, html.dyslexia-font body, html.dyslexia-font * {
   font-family: 'OpenDyslexic', Arial, sans-serif !important;
   background-color: #fffbe6 !important; /* Debug: pale yellow background */
+}
+
+/* Motion/animation accessibility toggle */
+.motion-disabled *,
+.motion-disabled *:before,
+.motion-disabled *:after {
+  transition: none !important;
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Force background pattern to always show */
+html.bg-pattern-dots {
+  background-color: var(--background, #fff) !important;
+  background-image: radial-gradient(circle, #d1d5db 1.5px, transparent 1.5px) !important;
+  background-size: 24px 24px !important;
+  background-repeat: repeat !important;
+  background-attachment: fixed !important;
+  z-index: 0 !important;
+  animation: polka-fade-in 1.2s ease !important;
+  /* border: 5px solid red !important;  DEBUG: Removed */
+}
+
+/* Also apply to body for better compatibility */
+body.bg-pattern-dots {
+  background-color: var(--background, #fff) !important;
+  background-image: radial-gradient(circle, #d1d5db 1.5px, transparent 1.5px) !important;
+  background-size: 24px 24px !important;
+  background-repeat: repeat !important;
+  background-attachment: fixed !important;
+  min-height: 100vh !important;
+}
+
+/* Default pattern - apply dots by default */
+html {
+  background-color: var(--background, #fff) !important;
+  background-image: radial-gradient(circle, #d1d5db 1.5px, transparent 1.5px) !important;
+  background-size: 24px 24px !important;
+  background-repeat: repeat !important;
+  background-attachment: fixed !important;
+  z-index: 0 !important;
+}
+
+@keyframes polka-fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Content outline that reveals polka dots */
+.polka-outline {
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 0 0 12px rgba(255,255,255,0.95), 0 0 0 16px transparent;
+  position: relative;
+  z-index: 1;
+}
+
+/* Add a mask to allow dots to show through the border */
+.polka-outline::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 24px;
+  background: inherit;
+  z-index: -1;
+  pointer-events: none;
+}
+
+html.bg-pattern-grid, body.bg-pattern-grid {
+  background-color: var(--background, #fff) !important;
+  background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px) !important, linear-gradient(to bottom, #e5e7eb 1px, transparent 1px) !important;
+  background-size: 32px 32px !important;
+  background-repeat: repeat !important;
+  background-attachment: fixed !important;
+  z-index: 0 !important;
+}
+html.bg-pattern-waves, body.bg-pattern-waves {
+  background-color: var(--background, #fff) !important;
+  background-image: repeating-linear-gradient(135deg, #a5b4fc 0 2px, transparent 2px 20px) !important, repeating-linear-gradient(-135deg, #a5b4fc 0 2px, transparent 2px 20px) !important;
+  background-size: 40px 40px !important;
+  background-repeat: repeat !important;
+  background-attachment: fixed !important;
+  z-index: 0 !important;
+}
+html.bg-pattern-geometric, body.bg-pattern-geometric {
+  background-color: var(--background, #f3f4f6) !important;
+  background-image: repeating-linear-gradient(45deg, #fbbf24 0 10px, transparent 10px 20px), repeating-linear-gradient(-45deg, #6366f1 0 10px, transparent 10px 20px) !important;
+  background-size: 48px 48px !important;
+  background-repeat: repeat !important;
+  background-attachment: fixed !important;
+  z-index: 0 !important;
+}
+
+/* Clear pattern option */
+html.bg-pattern-none, body.bg-pattern-none {
+  background-image: none !important;
+  background-color: var(--background, #fff) !important;
 }

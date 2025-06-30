@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-interface BookmarkItem {
+export interface BookmarkItem {
   id: string;
   title: string;
   url?: string;
@@ -28,10 +28,10 @@ export interface BookmarkBoardData {
   bookmarks: BookmarkItem[];
   logo?: string; // optional background logo url
   updateBookmarks?: (items: BookmarkItem[]) => void;
-  onBookmarkClick?: (bookmark: any) => void;
+  onBookmarkClick?: (bookmark: BookmarkItem) => void;
 }
 
-const SortableBookmarkRow: React.FC<{ item: BookmarkItem; onBookmarkClick?: (bookmark: any) => void }> = ({ item, onBookmarkClick }) => {
+const SortableBookmarkRow: React.FC<{ item: BookmarkItem; onBookmarkClick?: (bookmark: BookmarkItem) => void }> = ({ item, onBookmarkClick }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
 

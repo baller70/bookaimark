@@ -14,7 +14,8 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { BoardNode } from './BoardNode';
+import { BoardNode, BookmarkItem } from './BoardNode';
+import * as Sentry from "@sentry/nextjs";
 
 // ROBUST INITIAL DATA - GUARANTEED TO WORK
 const ROBUST_INITIAL_NODES: Node[] = [
@@ -94,7 +95,7 @@ const ROBUST_INITIAL_EDGES: Edge[] = [
 ];
 
 interface SimpleBoardCanvasProps {
-  onBookmarkClick?: (bookmark: any) => void;
+  onBookmarkClick?: (bookmark: BookmarkItem) => void;
 }
 
 /**
@@ -134,7 +135,7 @@ export const SimpleBoardCanvas: React.FC<SimpleBoardCanvasProps> = ({ onBookmark
   }, [nodes, edges, mounted]);
 
   // Update node bookmarks with error handling
-  const updateNodeBookmarks = useCallback((nodeId: string, items: any[]) => {
+  const updateNodeBookmarks = useCallback((nodeId: string, items: BookmarkItem[]) => {
     console.log('🔄 Updating bookmarks for node:', nodeId, 'items:', items.length);
     try {
       setNodes((nds) =>
@@ -156,7 +157,7 @@ export const SimpleBoardCanvas: React.FC<SimpleBoardCanvasProps> = ({ onBookmark
             {...props}
             data={{
               ...props.data,
-              updateBookmarks: (items: any[]) => updateNodeBookmarks(props.id, items),
+              updateBookmarks: (items: BookmarkItem[]) => updateNodeBookmarks(props.id, items),
               onBookmarkClick,
             }}
           />
@@ -296,7 +297,12 @@ export const SimpleBoardCanvas: React.FC<SimpleBoardCanvasProps> = ({ onBookmark
           defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
           minZoom={0.1}
           maxZoom={2}
-          onError={(error) => console.error('❌ React Flow Error:', error)}
+          onError={(error) => {
+            console.error('❌ React Flow Error:', error);
+            Sentry.captureException(error, {
+              tags: { component: 'SimpleBoardCanvas', action: 'react_flow_error' }
+            });
+          }}
           onInit={() => console.log('✅ React Flow initialized successfully')}
         >
           <Background gap={16} color="#e5e7eb" />

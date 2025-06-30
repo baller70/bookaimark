@@ -16,9 +16,14 @@ import {
   RefreshCw,
   User,
   BarChart3,
-  Zap
+  Zap,
+  ArrowLeft
 } from 'lucide-react';
 import { DnaPageHeader } from './dna-page-header';
+import { DNAProfileOverview } from './dna-profile-overview';
+import { useRouter } from 'next/navigation';
+import { NewHeaderComponent } from '../ui/new-header';
+import { NewSidebarComponent } from '../ui/new-sidebar';
 
 interface DnaProfileStats {
   totalEvents: number;
@@ -29,6 +34,12 @@ interface DnaProfileStats {
   pendingRecommendations: number;
 }
 
+const sidebarSections = [
+  { id: 'overview', label: 'Overview', icon: User },
+  { id: 'insights', label: 'Insights', icon: Lightbulb },
+  { id: 'recommendations', label: 'Recommendations', icon: Zap },
+];
+
 export default function DnaProfilePage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
@@ -36,6 +47,8 @@ export default function DnaProfilePage() {
   const [insights, setInsights] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [stats, setStats] = useState<DnaProfileStats | null>(null);
+  const [activeSection, setActiveSection] = useState('overview');
+  const router = useRouter();
 
   useEffect(() => {
     loadDnaProfile();
@@ -126,121 +139,54 @@ export default function DnaProfilePage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Standardized Header */}
-      <DnaPageHeader 
+    <div className="min-h-screen bg-background text-foreground transition-colors">
+      {/* New Header with props */}
+      <NewHeaderComponent
+        onBack={() => router.push('/dashboard')}
+        onRunAnalysis={triggerAnalysis}
+        analyzing={analyzing}
         title="DNA Profile"
-        description="AI-enhanced behavioral analysis to personalize your experience"
-      >
-        <Button
-          onClick={triggerAnalysis}
-          disabled={analyzing}
-          className="flex items-center gap-2"
-        >
-          {analyzing ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <Brain className="h-4 w-4" />
-          )}
-          {analyzing ? 'Analyzing...' : 'Run Analysis'}
-        </Button>
-      </DnaPageHeader>
+      />
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-blue-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Events</p>
-                  <p className="text-2xl font-bold">{stats.totalEvents}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* New Sidebar with props */}
+          <NewSidebarComponent
+            sections={sidebarSections}
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+          />
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-green-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Profile Age</p>
-                  <p className="text-2xl font-bold">{stats.profileAge}d</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-purple-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Confidence</p>
-                  <p className="text-2xl font-bold">{stats.confidenceScore}%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-yellow-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Insights</p>
-                  <p className="text-2xl font-bold">{stats.activeInsights}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-orange-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Recommendations</p>
-                  <p className="text-2xl font-bold">{stats.pendingRecommendations}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-red-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Last Analysis</p>
-                  <p className="text-sm font-medium">
-                    {stats.lastAnalysis 
-                      ? new Date(stats.lastAnalysis).toLocaleDateString()
-                      : 'Never'
-                    }
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-8">
+            {activeSection === 'overview' && profile && (
+              <DNAProfileOverview profileData={profile} />
+            )}
+            {activeSection === 'insights' && (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Lightbulb className="h-12 w-12 mx-auto mb-4 text-yellow-500" />
+                  <h3 className="text-lg font-semibold mb-2">Insights</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Your personalized insights will appear here.
                   </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
+            {activeSection === 'recommendations' && (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Zap className="h-12 w-12 mx-auto mb-4 text-orange-500" />
+                  <h3 className="text-lg font-semibold mb-2">Recommendations</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Your personalized recommendations will appear here.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
-      )}
-
-      {/* Main Content */}
-      <Card>
-        <CardContent className="p-8 text-center">
-          <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">DNA Profile Analysis</h3>
-          <p className="text-muted-foreground mb-4">
-            Your behavioral profile is being analyzed. Check back soon for insights and recommendations.
-          </p>
-          <Button onClick={triggerAnalysis} disabled={analyzing}>
-            {analyzing ? 'Analyzing...' : 'Run Analysis'}
-          </Button>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 } 

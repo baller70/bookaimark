@@ -2723,9 +2723,6 @@ export default function Dashboard() {
             <List className="h-5 w-5" />
             <span className="font-medium">LIST</span>
           </Button>
-
-
-
           <Button
             size="lg"
             variant={viewMode === 'timeline' ? 'default' : 'ghost'}

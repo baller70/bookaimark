@@ -1,6 +1,7 @@
 import './globals.css'
 import { Saira, Audiowide } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { GlobalSettingsProvider } from '@/components/providers/ThemeProvider'
 
 const saira = Saira({ subsets: ['latin'] })
 const audiowide = Audiowide({ 
@@ -23,7 +24,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${saira.className} ${audiowide.variable} min-h-screen antialiased`} suppressHydrationWarning>
         <ThemeProvider>
-          {children}
+          <GlobalSettingsProvider>
+            <div className="min-h-screen flex flex-col">
+              {children}
+            </div>
+          </GlobalSettingsProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -60,7 +60,7 @@ const initialState: DashboardState = {
     messages: 347,
     appsCreated: 12,
     successRate: 98.5,
-    lastUpdated: new Date()
+    lastUpdated: new Date('2024-01-01T00:00:00.000Z')
   },
   projects: [
     {
@@ -90,7 +90,7 @@ const initialState: DashboardState = {
       id: '1',
       title: 'New app created successfully',
       description: '2 minutes ago',
-      timestamp: new Date(Date.now() - 2 * 60 * 1000),
+      timestamp: new Date('2024-01-01T00:00:00.000Z'),
       type: 'Success',
       color: 'bg-green-500'
     },
@@ -98,7 +98,7 @@ const initialState: DashboardState = {
       id: '2',
       title: 'Credits purchased',
       description: '1 hour ago',
-      timestamp: new Date(Date.now() - 60 * 60 * 1000),
+      timestamp: new Date('2024-01-01T00:00:00.000Z'),
       type: 'Payment',
       color: 'bg-blue-500'
     },
@@ -106,7 +106,7 @@ const initialState: DashboardState = {
       id: '3',
       title: 'Profile updated',
       description: '3 hours ago',
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      timestamp: new Date('2024-01-01T00:00:00.000Z'),
       type: 'Profile',
       color: 'bg-yellow-500'
     },
@@ -114,7 +114,7 @@ const initialState: DashboardState = {
       id: '4',
       title: 'API key regenerated',
       description: '1 day ago',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      timestamp: new Date('2024-01-01T00:00:00.000Z'),
       type: 'Security',
       color: 'bg-purple-500'
     }
@@ -125,6 +125,24 @@ const initialState: DashboardState = {
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DashboardState>(initialState)
+  const mounted = React.useRef(false)
+
+  React.useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      setState(prev => ({
+        ...prev,
+        metrics: {
+          ...prev.metrics,
+          lastUpdated: new Date()
+        },
+        recentActivity: prev.recentActivity.map((item, idx) => ({
+          ...item,
+          timestamp: new Date(Date.now() - idx * 60 * 60 * 1000)
+        }))
+      }))
+    }
+  }, [])
 
   const actions: DashboardActions = {
     refreshMetrics: () => {

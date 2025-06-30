@@ -1,16 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { 
   BarChart3, 
   TrendingUp, 
   Clock, 
-  Star, 
+  Star,
   Bookmark,
   Eye,
   Activity,
@@ -97,9 +95,9 @@ export function AdvancedAnalyticsDashboard() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 density-gap">
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="density-p">
             <div className="flex items-center gap-2">
               <Bookmark className="h-4 w-4 text-blue-600" />
               <span className="text-sm font-medium">Total Bookmarks</span>
@@ -115,7 +113,7 @@ export function AdvancedAnalyticsDashboard() {
         </Card>
 
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="density-p">
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-green-600" />
               <span className="text-sm font-medium">Total Visits</span>
@@ -128,7 +126,7 @@ export function AdvancedAnalyticsDashboard() {
         </Card>
 
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="density-p">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-medium">Engagement</span>
@@ -141,7 +139,7 @@ export function AdvancedAnalyticsDashboard() {
         </Card>
 
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="density-p">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-cyan-600" />
               <span className="text-sm font-medium">Growth Rate</span>

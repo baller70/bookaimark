@@ -19,9 +19,7 @@ import {
   Users,
   FolderOpen,
   Dna,
-  Bot,
-  ShoppingCart,
-  Sparkles
+  ShoppingCart
 } from 'lucide-react'
 
 export function ShadcnSidebar() {
@@ -32,11 +30,8 @@ export function ShadcnSidebar() {
   const navigationItems = [
     { id: 'Dashboard', name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { id: 'DNA Profile', name: 'DNA Profile', icon: Dna, href: '/dna-profile' },
-    { id: 'AI-Copolit', name: 'AI-Copolit', icon: Bot, badge: 'New', href: '/ai-copolit' },
     { id: 'Marketplace', name: 'Marketplace', icon: ShoppingCart, href: '/marketplace' },
     { id: 'Setting', name: 'Setting', icon: Settings, href: '/settings' },
-    { id: 'Bookmark Marketplace 2.0', name: 'Bookmark Marketplace 2.0', icon: ShoppingCart, badge: 'Pro', href: '/marketplace-2' },
-    { id: 'AI-Copilot 3.0', name: 'AI-Copilot 3.0', icon: Sparkles, badge: 'Ultimate', href: '/ai-copilot-3' }
   ]
 
   const categoryItems = [
@@ -135,25 +130,12 @@ export function ShadcnSidebar() {
                             {isCollapsed ? (
                               <>
                                 <Icon className="h-5 w-5" />
-                                {item.badge && (
-                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-slate-400 rounded-full"></div>
-                                )}
                               </>
                             ) : (
                               <>
                                 <div className="flex items-center gap-3">
                                   <Icon className="h-4 w-4" />
                                   <span>{item.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {item.badge && (
-                                    <Badge 
-                                      variant="secondary" 
-                                      className="text-xs px-2 py-0.5 text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800"
-                                    >
-                                      {item.badge}
-                                    </Badge>
-                                  )}
                                 </div>
                               </>
                             )}

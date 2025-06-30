@@ -72,7 +72,6 @@ export default function Header() {
         }
       } else {
         setUser(null)
-        router.replace('/auth')
       }
     })
 
@@ -84,7 +83,7 @@ export default function Header() {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut()
-      router.replace('/auth')
+      // router.replace('/auth') // REMOVE forced redirect
     } catch (error) {
       console.error('Error signing out:', error)
       setError('Error signing out')

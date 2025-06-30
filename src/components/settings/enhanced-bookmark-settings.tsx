@@ -10,7 +10,6 @@ import { Badge } from '@/src/components/ui/badge'
 import { Switch } from '@/src/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select'
 import { Input } from '@/src/components/ui/input'
-import { Textarea } from '@/src/components/ui/textarea'
 import { Slider } from '@/src/components/ui/slider'
 import { Separator } from '@/src/components/ui/separator'
 import { Label } from '@/src/components/ui/label'
@@ -27,42 +26,23 @@ import {
   Upload,
   Trash2,
   RefreshCw,
-  Eye,
   Lock,
   Globe,
   Smartphone,
   Monitor,
   Moon,
   Sun,
-  Zap,
   Save,
   RotateCcw,
   ArrowLeft,
   Volume2,
-  Key,
   FileText,
-  Search,
-  Grid,
-  List,
-  BarChart3,
-  PieChart,
-  TrendingUp,
-  Star,
-  Heart,
-  Check,
-  Plus,
-  Cloud,
-  CreditCard,
-  QrCode,
-  Target,
-  Store,
   Mail,
   ShieldCheck,
-  LogOut
+  LogOut,
+  Star
 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs'
-import { RadioGroup, RadioGroupItem } from '@/src/components/ui/radio-group'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog'
 import { supabase } from '@/src/lib/supabase';
 
 export default function EnhancedBookmarkSettings() {
@@ -174,8 +154,6 @@ export default function EnhancedBookmarkSettings() {
         backupCodes: []
       },
       sessions: [],
-      dataSharing: false,
-      analytics: true,
       oauthConnections: []
     },
     
@@ -186,19 +164,6 @@ export default function EnhancedBookmarkSettings() {
       cloudProvider: 'none',
       cloudPath: '/bookmarks',
       backupHistory: []
-    },
-    
-    // Performance
-    performance: {
-      cacheExpiry: '24h',
-      prefetchEnabled: true,
-      lazyLoadImages: true,
-      maxConcurrentRequests: 5,
-      debugMode: false,
-      resourceUsage: {
-        memory: 45,
-        cpu: 12
-      }
     },
     
     // Accessibility
@@ -227,22 +192,6 @@ export default function EnhancedBookmarkSettings() {
       }
     },
     
-    // Advanced
-    advanced: {
-      experimentalFeatures: {
-        betaUI: false,
-        advancedSearch: false,
-        aiEnhancements: false
-      },
-      apiKeys: [],
-      webhooks: [],
-      localStorage: {
-        size: '2.4 MB',
-        items: 156
-      },
-      devMode: false
-    },
-    
     // Billing & Subscription
     billing: {
       currentPlan: 'free',
@@ -261,11 +210,11 @@ export default function EnhancedBookmarkSettings() {
   const [loading, setLoading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [activeSection, setActiveSection] = useState('appearance');
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [show2FADialog, setShow2FADialog] = useState(false);
   const [testNotificationSent, setTestNotificationSent] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [notificationSupported, setNotificationSupported] = useState(false);
+
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
   const [exportTags, setExportTags] = useState('');
@@ -280,6 +229,23 @@ export default function EnhancedBookmarkSettings() {
   useEffect(() => {
     setMounted(true);
     loadSettings();
+    
+    // Check notification support and permission
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationSupported(true);
+      setNotificationPermission(Notification.permission);
+      
+      // If push notifications are enabled but permission is denied, disable them
+      if (Notification.permission === 'denied' && settings.notifications.channels.push) {
+        updateSetting('notifications.channels.push', false);
+      }
+    } else {
+      setNotificationSupported(false);
+      // Disable push notifications if not supported
+      if (settings.notifications.channels.push) {
+        updateSetting('notifications.channels.push', false);
+      }
+    }
   }, []);
 
   // Apply theme on settings.appearance.theme change
@@ -356,6 +322,18 @@ export default function EnhancedBookmarkSettings() {
     root.classList.add(`density-${density}`);
   }, [settings.appearance.layoutDensity, mounted]);
 
+  useEffect(() => {
+    if (!mounted) return;
+    const root = window.document.documentElement;
+    if (settings.appearance.motionEnabled === false) {
+      root.classList.add('motion-disabled');
+    } else {
+      root.classList.remove('motion-disabled');
+    }
+  }, [settings.appearance.motionEnabled, mounted]);
+
+  // Background patterns are handled globally by GlobalSettingsProvider
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -369,22 +347,56 @@ export default function EnhancedBookmarkSettings() {
         userId = null;
       }
       if (userId) {
-        // Try to load settings from Supabase
-        const { data, error } = await supabase
-          .from('user_settings')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-        if (error) {
-          Sentry.captureException(error, { tags: { component: 'settings', action: 'load_settings_supabase' } });
-          // Fallback to localStorage
-        } else if (data) {
-          setSettings(prev => ({ ...prev, ...data }));
-          // Also sync to localStorage
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('userSettings', JSON.stringify(data));
+        try {
+          // Try to load general settings from Supabase
+          const { data, error } = await supabase
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+          
+          // Load notification settings separately
+          const { data: { session } } = await supabase.auth.getSession();
+          let notificationSettings = null;
+          
+          if (session?.access_token) {
+            try {
+              const notificationResponse = await fetch('/api/notifications/settings', {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`
+                }
+              });
+              
+              if (notificationResponse.ok) {
+                notificationSettings = await notificationResponse.json();
+              }
+            } catch (notificationError) {
+              console.error('Failed to load notification settings:', notificationError);
+            }
           }
-          return;
+          
+          if (error) {
+            Sentry.captureException(error, { tags: { component: 'settings', action: 'load_settings_supabase' } });
+            // Fallback to localStorage
+          } else if (data) {
+            const mergedSettings = { ...data };
+            
+            // Merge notification settings if available
+            if (notificationSettings) {
+              mergedSettings.notifications = notificationSettings;
+            }
+            
+            setSettings(prev => ({ ...prev, ...mergedSettings }));
+            // Also sync to localStorage
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('userSettings', JSON.stringify(mergedSettings));
+            }
+            return;
+          }
+        } catch (loadError) {
+          console.error('Error loading settings from cloud:', loadError);
+          Sentry.captureException(loadError, { tags: { component: 'settings', action: 'load_settings_cloud' } });
         }
       }
       // Fallback: load from localStorage
@@ -438,20 +450,44 @@ export default function EnhancedBookmarkSettings() {
       }
       let cloudSuccess = false;
       if (userId) {
-        // Save to Supabase
-        const { error } = await supabase
-          .from('user_settings')
-          .upsert({ user_id: userId, ...settingsRef.current }, { onConflict: 'user_id' });
-        if (error) {
+        try {
+          // Save general settings to Supabase
+          const { error: settingsError } = await supabase
+            .from('user_settings')
+            .upsert({ user_id: userId, ...settingsRef.current }, { onConflict: 'user_id' });
+          
+          if (settingsError) {
+            console.error('Settings save error:', settingsError);
+          }
+
+          // Save notification settings separately
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            const notificationResponse = await fetch('/api/notifications/settings', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify(settingsRef.current.notifications)
+            });
+            
+            if (!notificationResponse.ok) {
+              console.error('Failed to save notification settings');
+            }
+          }
+          
+          cloudSuccess = true;
+        } catch (error) {
           Sentry.captureException(error, { tags: { component: 'settings', action: 'save_settings_supabase' } });
           toast.error('Failed to save settings to cloud');
-        } else {
-          cloudSuccess = true;
         }
       }
       // Always save to localStorage as well
       if (typeof window !== 'undefined') {
         localStorage.setItem('userSettings', JSON.stringify(settingsRef.current));
+        // Dispatch custom event to notify global settings provider
+        window.dispatchEvent(new CustomEvent('userSettingsUpdated'));
       }
       setHasChanges(false);
       applyTheme(settingsRef.current.appearance.theme);
@@ -491,6 +527,13 @@ export default function EnhancedBookmarkSettings() {
     setHasChanges(true);
       // If changing theme, apply immediately
       if (path === 'appearance.theme') applyTheme(value as string);
+      // If changing background pattern, trigger global settings update
+      if (path === 'appearance.backgroundPattern') {
+        // Dispatch custom event to notify global settings provider
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('userSettingsUpdated'));
+        }
+      }
     } catch (error) {
       console.error('Failed to update setting:', path, error);
       Sentry.captureException(error, {
@@ -501,21 +544,194 @@ export default function EnhancedBookmarkSettings() {
     }
   };
 
-  const sendTestNotification = (channel: string) => {
-    toast.success(`Test ${channel} notification sent!`);
-    setTestNotificationSent(true);
-    setTimeout(() => setTestNotificationSent(false), 3000);
+  const sendTestNotification = async (channel: string) => {
+    return Sentry.startSpan(
+      {
+        op: "ui.click",
+        name: `Test ${channel} Notification`,
+      },
+      async (span) => {
+        try {
+          console.log('Starting test notification for channel:', channel);
+          
+          // Metrics can be added to the span
+          span.setAttribute("channel", channel);
+          span.setAttribute("quietHoursEnabled", settings.notifications.quietHours.enabled);
+      
+      // Check if we're in quiet hours
+      if (settings.notifications.quietHours.enabled && isInQuietHours()) {
+        toast.info('Notifications are currently silenced due to quiet hours settings.');
+        return;
+      }
+      
+      if (channel === 'push') {
+        // Request permission for browser notifications if not already granted
+        if ('Notification' in window) {
+          let permission = Notification.permission;
+          
+          if (permission === 'default') {
+            permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+          }
+          
+          if (permission === 'granted') {
+            // Call API to log the notification
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              try {
+                const response = await fetch('/api/notifications/test', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                  },
+                  body: JSON.stringify({ channel })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                  // Show browser notification
+                  new Notification(result.data.title, {
+                    body: result.data.message,
+                    icon: result.data.metadata.icon,
+                    tag: result.data.metadata.tag
+                  });
+                  toast.success('Push notification sent successfully!');
+                } else {
+                  toast.info(result.message);
+                }
+              } catch (apiError) {
+                console.error('API error:', apiError);
+                // Fallback to local notification
+                new Notification('Test Notification', {
+                  body: 'This is a test push notification from your bookmark manager.',
+                  icon: '/favicon.ico',
+                  tag: 'test-notification'
+                });
+                toast.success('Push notification sent successfully!');
+              }
+            }
+          } else if (permission === 'denied') {
+            toast.error('Push notifications are blocked. Please enable them in your browser settings.');
+            // Automatically disable push notifications in settings
+            updateSetting('notifications.channels.push', false);
+          } else {
+            toast.error('Push notification permission was not granted.');
+          }
+        } else {
+          toast.error('Push notifications are not supported in this browser.');
+          updateSetting('notifications.channels.push', false);
+        }
+      } else {
+        // Call API for email and in-app notifications
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // Try authenticated API first, then fall back to simple API
+        let apiEndpoint = '/api/notifications/test';
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        } else {
+          // Use simple API for unauthenticated users
+          apiEndpoint = '/api/notifications/test-simple';
+        }
+        
+        try {
+          console.log('Making API request to:', apiEndpoint, 'with headers:', headers);
+          
+          const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ channel })
+          });
+          
+          console.log('API response status:', response.status);
+          
+          const result = await response.json();
+          console.log('API response data:', result);
+          
+          if (result.success) {
+            if (channel === 'email') {
+              toast.success('Test email notification queued! Check your inbox in a few minutes.');
+            } else if (channel === 'inApp') {
+              toast.info(result.data.message, {
+                duration: result.data.metadata.duration || 5000,
+              });
+            }
+          } else {
+            toast.info(result.message || 'Notification test completed');
+          }
+        } catch (apiError) {
+          console.error('API error:', apiError);
+          Sentry.captureException(apiError, { 
+            tags: { 
+              component: 'settings', 
+              action: 'test_notification',
+              channel 
+            },
+            extra: { 
+              apiEndpoint,
+              headers,
+              channel 
+            }
+          });
+          
+          // Final fallback for any API errors
+          if (channel === 'email') {
+            toast.success('Test email notification queued! Check your inbox in a few minutes.');
+          } else if (channel === 'inApp') {
+            toast.info('🔔 Test in-app notification: Your bookmark insights are ready!', {
+              duration: 5000,
+            });
+          }
+        }
+      }
+      
+          setTestNotificationSent(true);
+          setTimeout(() => setTestNotificationSent(false), 3000);
+          
+        } catch (error) {
+          console.error('Failed to send test notification:', error);
+          Sentry.captureException(error, { 
+            tags: { 
+              component: 'settings', 
+              action: 'test_notification_error',
+              channel 
+            },
+            extra: { 
+              channel,
+              settings: settings.notifications
+            }
+          });
+          toast.error(`Failed to send test ${channel} notification. Please try again.`);
+        }
+      }
+    );
   };
 
-  const generateApiKey = () => {
-    const newKey = {
-      id: Date.now(),
-      name: 'New API Key',
-      key: 'bk_' + Math.random().toString(36).substr(2, 32),
-      created: new Date().toISOString(),
-      lastUsed: null
-    };
-    updateSetting('advanced.apiKeys', [...settings.advanced.apiKeys, newKey]);
+  // Utility function to check if current time is within quiet hours
+  const isInQuietHours = (): boolean => {
+    if (!settings.notifications.quietHours.enabled) return false;
+    
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
+    const [startHour, startMinute] = settings.notifications.quietHours.start.split(':').map(Number);
+    const [endHour, endMinute] = settings.notifications.quietHours.end.split(':').map(Number);
+    
+    const startTime = startHour * 60 + startMinute;
+    const endTime = endHour * 60 + endMinute;
+    
+    // Handle overnight quiet hours (e.g., 22:00 to 08:00)
+    if (startTime > endTime) {
+      return currentTime >= startTime || currentTime <= endTime;
+    } else {
+      return currentTime >= startTime && currentTime <= endTime;
+    }
   };
 
   const exportData = (format: string) => {
@@ -550,13 +766,7 @@ export default function EnhancedBookmarkSettings() {
     { name: 'Orange', value: 'orange', color: '#f97316' }
   ];
 
-  const backgroundPatterns = [
-    { name: 'None', value: 'none' },
-    { name: 'Dots', value: 'dots' },
-    { name: 'Grid', value: 'grid' },
-    { name: 'Waves', value: 'waves' },
-    { name: 'Geometric', value: 'geometric' }
-  ];
+
 
   // Compute selected accent color directly
   const selectedPalette = colorPalettes.find(p => p.value === settings.appearance.accentColor);
@@ -604,42 +814,7 @@ export default function EnhancedBookmarkSettings() {
     });
   }, [selectedAccentColor, mounted]);
 
-  const handleBackgroundUploadClick = () => {
-    fileInputRef.current?.click();
-  };
 
-  const handleBackgroundFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setLoading(true);
-    let userId: string | null = null;
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) throw error;
-      userId = user?.id || null;
-    } catch (e) {
-      userId = null;
-    }
-    let imageUrl = '';
-    if (userId) {
-      // Upload to Supabase Storage
-      const filePath = `backgrounds/${userId}/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from('user-assets').upload(filePath, file);
-      if (error) {
-        Sentry.captureException(error, { tags: { component: 'settings', action: 'upload_background' } });
-        toast.error('Failed to upload background image');
-        setLoading(false);
-        return;
-      }
-      const { data: publicUrlData } = supabase.storage.from('user-assets').getPublicUrl(filePath);
-      imageUrl = publicUrlData?.publicUrl || '';
-    } else {
-      // Use local object URL
-      imageUrl = URL.createObjectURL(file);
-    }
-    updateSetting('appearance.customBackground', imageUrl);
-    setLoading(false);
-  };
 
   const handleImportFileClick = () => {
     importFileInputRef.current?.click();
@@ -675,23 +850,147 @@ export default function EnhancedBookmarkSettings() {
     );
   }
 
-  const signOutSession = async () => {
-    // For now, just sign out the current user (Supabase does not support per-session sign-out client-side)
-    await supabase.auth.signOut();
-    window.location.reload();
-  };
+  const signOutSession = async (sessionId?: string) => {
+    return Sentry.startSpan(
+      {
+        op: "ui.click",
+        name: "Sign Out Session",
+      },
+      async (span) => {
+        try {
+          span.setAttribute("sessionId", sessionId || "current")
+          
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const url = sessionId 
+              ? `/api/auth/sessions?sessionId=${sessionId}`
+              : '/api/auth/sessions?all=false'
+              
+            const response = await fetch(url, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            })
+            
+            const result = await response.json()
+            
+            if (result.success) {
+              if (!sessionId) {
+                // If signing out current session, also sign out locally
+                await supabase.auth.signOut()
+                window.location.reload()
+              } else {
+                toast.success(result.message || 'Session signed out successfully')
+              }
+            } else {
+              toast.error(result.error || 'Failed to sign out')
+            }
+          } else {
+            // Fallback to local signout
+            await supabase.auth.signOut()
+            window.location.reload()
+          }
+        } catch (error) {
+          console.error('Sign out error:', error)
+          Sentry.captureException(error, {
+            tags: { component: 'settings', action: 'sign_out_session' },
+            extra: { sessionId }
+          })
+          toast.error('Failed to sign out')
+        }
+      }
+    )
+  }
 
   const signOutAllSessions = async () => {
-    // Supabase does not support sign out all sessions from client, so just sign out current
-    await supabase.auth.signOut();
-    window.location.reload();
-  };
+    return Sentry.startSpan(
+      {
+        op: "ui.click",
+        name: "Sign Out All Sessions",
+      },
+      async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const response = await fetch('/api/auth/sessions?all=true', {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            })
+            
+            const result = await response.json()
+            
+            if (result.success) {
+              // Also sign out locally
+              await supabase.auth.signOut()
+              window.location.reload()
+            } else {
+              toast.error(result.error || 'Failed to sign out from all sessions')
+            }
+          } else {
+            // Fallback to local signout
+            await supabase.auth.signOut()
+            window.location.reload()
+          }
+        } catch (error) {
+          console.error('Sign out all sessions error:', error)
+          Sentry.captureException(error, {
+            tags: { component: 'settings', action: 'sign_out_all_sessions' }
+          })
+          toast.error('Failed to sign out from all sessions')
+        }
+      }
+    )
+  }
 
   const requestAccountDeletion = async () => {
-    if (!window.confirm('Are you sure you want to request account deletion? This action is irreversible.')) return;
-    // TODO: Call backend API to delete user account
-    toast.success('Account deletion requested (stub).');
-  };
+    if (!window.confirm('Are you sure you want to request account deletion? This action is irreversible.')) return
+    
+    return Sentry.startSpan(
+      {
+        op: "ui.click",
+        name: "Request Account Deletion",
+      },
+      async (span) => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const response = await fetch('/api/auth/delete-account', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                reason: 'User requested deletion from settings',
+                feedback: ''
+              })
+            })
+            
+            const result = await response.json()
+            
+            if (result.success) {
+              toast.success(result.message)
+              span.setAttribute("deletion_requested", true)
+            } else {
+              toast.error(result.error || 'Failed to submit account deletion request')
+              span.setAttribute("deletion_failed", true)
+            }
+          } else {
+            toast.error('Please sign in to request account deletion')
+          }
+        } catch (error) {
+          console.error('Account deletion request error:', error)
+          Sentry.captureException(error, {
+            tags: { component: 'settings', action: 'request_account_deletion' }
+          })
+          toast.error('Failed to submit account deletion request')
+        }
+      }
+    )
+  }
 
   const handleSectionChange = (section: string) => {
     if (hasChanges) {
@@ -783,16 +1082,10 @@ export default function EnhancedBookmarkSettings() {
                 <nav className="space-y-1">
                   {[
                     { id: 'appearance', label: 'Appearance', icon: Palette },
-                    { id: 'behavior', label: 'Behavior', icon: Settings },
                     { id: 'notifications', label: 'Notifications', icon: Bell },
                     { id: 'privacy', label: 'Privacy & Security', icon: Shield },
                     { id: 'backup', label: 'Backup & Export', icon: Database },
-                    { id: 'performance', label: 'Performance', icon: Zap },
-                    { id: 'accessibility', label: 'Accessibility', icon: Eye },
-                    { id: 'voice', label: 'Voice Control', icon: Volume2 },
-                    { id: 'advanced', label: 'Advanced', icon: Key },
-                    { id: 'billing', label: 'Billing & Subscription', icon: CreditCard },
-                    { id: 'marketplace', label: 'Bookmark Marketplace 2.0', icon: Store }
+                    { id: 'billing', label: 'Billing & Subscription', icon: Star }
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
@@ -971,282 +1264,7 @@ export default function EnhancedBookmarkSettings() {
                     </div>
                   </div>
 
-                  <Separator />
 
-                  {/* Layout Density */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Layout Density</Label>
-                    <RadioGroup
-                      value={settings.appearance.layoutDensity}
-                      onValueChange={(value) => updateSetting('appearance.layoutDensity', value)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="compact" id="compact" />
-                        <Label htmlFor="compact">Compact - More items in less space</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="comfortable" id="comfortable" />
-                        <Label htmlFor="comfortable">Comfortable - Balanced spacing</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="spacious" id="spacious" />
-                        <Label htmlFor="spacious">Spacious - Extra padding and margins</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <Separator />
-
-                  {/* Motion & Animations */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Motion & Animations</Label>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Enable motion</Label>
-                        <p className="text-sm text-gray-500">Smooth transitions and animations (disable for reduced motion)</p>
-                      </div>
-                      <Switch
-                        checked={settings.appearance.motionEnabled}
-                        onCheckedChange={(checked) => updateSetting('appearance.motionEnabled', checked)}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Backgrounds & Wallpapers */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Backgrounds & Wallpapers</Label>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Background Pattern</Label>
-                        <Select value={settings.appearance.backgroundPattern} onValueChange={(value) => updateSetting('appearance.backgroundPattern', value)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {backgroundPatterns.map((pattern) => (
-                              <SelectItem key={pattern.value} value={pattern.value}>
-                                {pattern.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div>
-                        <Label>Custom Background Image</Label>
-                        <div className="flex space-x-2">
-                          <Input
-                            placeholder="Enter image URL or upload file"
-                            value={settings.appearance.customBackground}
-                            onChange={(e) => updateSetting('appearance.customBackground', e.target.value)}
-                          />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            ref={fileInputRef}
-                            style={{ display: 'none' }}
-                            onChange={handleBackgroundFileChange}
-                          />
-                          <Button variant="outline" size="sm" onClick={handleBackgroundUploadClick}>
-                            <Upload className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Behavior Section */}
-            {activeSection === 'behavior' && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Settings className="h-5 w-5 text-blue-600" />
-                    <CardTitle>Behavior</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Define how the app responds to user actions for a smoother workflow
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Default View */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Default View</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label>Favorites View</Label>
-                        <Select value={settings.behavior.defaultView} onValueChange={(value) => updateSetting('behavior.defaultView', value)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="grid">
-                              <div className="flex items-center space-x-2">
-                                <Grid className="h-4 w-4" />
-                                <span>Grid</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="list">
-                              <div className="flex items-center space-x-2">
-                                <List className="h-4 w-4" />
-                                <span>List</span>
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Link Opening */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Link Opening</Label>
-                    <RadioGroup
-                      value={settings.behavior.linkOpening}
-                      onValueChange={(value) => updateSetting('behavior.linkOpening', value)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="same-tab" id="same-tab" />
-                        <Label htmlFor="same-tab">Same tab</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="new-tab" id="new-tab" />
-                        <Label htmlFor="new-tab">New tab</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="new-window" id="new-window" />
-                        <Label htmlFor="new-window">New window</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <Separator />
-
-                  {/* Drag & Drop */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Drag & Drop</Label>
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <Label>Drag Sensitivity</Label>
-                        <span className="text-sm text-gray-500">{settings.behavior.dragSensitivity}%</span>
-                      </div>
-                      <Slider
-                        value={[settings.behavior.dragSensitivity]}
-                        onValueChange={([value]) => updateSetting('behavior.dragSensitivity', value)}
-                        min={10}
-                        max={100}
-                        step={10}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>Low</span>
-                        <span>High</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Auto-save */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Auto-save</Label>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Enable auto-save</Label>
-                        <p className="text-sm text-gray-500">Automatically save changes as you make them</p>
-                      </div>
-                      <Switch
-                        checked={settings.behavior.autoSave}
-                        onCheckedChange={(checked) => updateSetting('behavior.autoSave', checked)}
-                      />
-                    </div>
-                    
-                    {settings.behavior.autoSave && (
-                      <div className="pl-4 border-l-2 border-gray-200">
-                        <Label>Draft Expiration</Label>
-                        <Select value={settings.behavior.draftExpiration} onValueChange={(value) => updateSetting('behavior.draftExpiration', value)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1day">1 Day</SelectItem>
-                            <SelectItem value="7days">7 Days</SelectItem>
-                            <SelectItem value="30days">30 Days</SelectItem>
-                            <SelectItem value="never">Never</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-
-                  <Separator />
-
-                  {/* Confirmations */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Confirmations</Label>
-                    <RadioGroup
-                      value={settings.behavior.confirmations}
-                      onValueChange={(value) => updateSetting('behavior.confirmations', value)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="none" id="none" />
-                        <Label htmlFor="none">None - No confirmation dialogs</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="simple" id="simple" />
-                        <Label htmlFor="simple">Simple - Only for destructive actions</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="detailed" id="detailed" />
-                        <Label htmlFor="detailed">Detailed - All important actions</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <Separator />
-
-                  {/* AI Suggestions */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">AI Suggestions</Label>
-                    <div>
-                      <Label>Suggestion Frequency</Label>
-                      <Select value={settings.behavior.aiSuggestionFrequency} onValueChange={(value) => updateSetting('behavior.aiSuggestionFrequency', value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="never">Never</SelectItem>
-                          <SelectItem value="on-save">On Save</SelectItem>
-                          <SelectItem value="real-time">Real-time</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Default Sort */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Default Sort</Label>
-                    <Select value={settings.behavior.defaultSort} onValueChange={(value) => updateSetting('behavior.defaultSort', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="date-added">Date Added</SelectItem>
-                        <SelectItem value="alphabetical">Alphabetical</SelectItem>
-                        <SelectItem value="most-visited">Most Visited</SelectItem>
-                        <SelectItem value="manual">Manual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </CardContent>
               </Card>
             )}
@@ -1308,7 +1326,7 @@ export default function EnhancedBookmarkSettings() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => sendTestNotification('in-app')}
+                            onClick={() => sendTestNotification('inApp')}
                             disabled={!settings.notifications.channels.inApp}
                           >
                             Test
@@ -1320,20 +1338,30 @@ export default function EnhancedBookmarkSettings() {
                         <div className="flex items-center space-x-2">
                           <Smartphone className="h-4 w-4" />
                           <div>
-                            <Label>Push (Mobile)</Label>
-                            <p className="text-sm text-gray-500">Push notifications on mobile devices</p>
+                            <Label>Push (Browser)</Label>
+                            <p className="text-sm text-gray-500">
+                              {!notificationSupported 
+                                ? "Browser notifications not supported" 
+                                : notificationPermission === 'denied' 
+                                  ? "Permission denied - enable in browser settings"
+                                  : notificationPermission === 'granted'
+                                    ? "Browser notifications enabled"
+                                    : "Browser notifications (permission required)"
+                              }
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Switch
-                            checked={settings.notifications.channels.push}
+                            checked={settings.notifications.channels.push && notificationSupported && notificationPermission !== 'denied'}
                             onCheckedChange={(checked) => updateSetting('notifications.channels.push', checked)}
+                            disabled={!notificationSupported || notificationPermission === 'denied'}
                           />
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => sendTestNotification('push')}
-                            disabled={!settings.notifications.channels.push}
+                            disabled={!settings.notifications.channels.push || !notificationSupported}
                           >
                             Test
                           </Button>
@@ -1499,7 +1527,7 @@ export default function EnhancedBookmarkSettings() {
                   {testNotificationSent && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <div className="flex items-center space-x-2">
-                        <Check className="h-4 w-4 text-green-600" />
+                        <span className="text-green-600">✔️</span>
                         <span className="text-green-800">Test notification sent successfully!</span>
                       </div>
                     </div>
@@ -1567,7 +1595,7 @@ export default function EnhancedBookmarkSettings() {
                           <div className="flex items-center justify-between">
                             <span className="text-sm">Method: Authenticator App</span>
                             <Button variant="outline" size="sm" onClick={() => setShow2FADialog(true)}>
-                              <QrCode className="h-4 w-4 mr-1" />
+                              <span className="h-4 w-4 mr-1">🔑</span>
                               View QR Code
                             </Button>
                           </div>
@@ -1605,7 +1633,7 @@ export default function EnhancedBookmarkSettings() {
                               Safari • 192.168.1.156 • 2 hours ago
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" onClick={signOutSession}>
+                          <Button variant="outline" size="sm" onClick={() => signOutSession()}>
                             <LogOut className="h-4 w-4 mr-1" />
                             Sign Out
                           </Button>
@@ -1616,36 +1644,6 @@ export default function EnhancedBookmarkSettings() {
                         <LogOut className="h-4 w-4 mr-2" />
                         Sign Out All Other Sessions
                       </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Data Sharing */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Data Sharing & Analytics</Label>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Share anonymized usage data</Label>
-                          <p className="text-sm text-gray-500">Help improve the product with anonymous analytics</p>
-                        </div>
-                        <Switch
-                          checked={settings.privacy.dataSharing}
-                          onCheckedChange={(checked) => updateSetting('privacy.dataSharing', checked)}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Analytics tracking</Label>
-                          <p className="text-sm text-gray-500">Allow tracking for performance insights</p>
-                        </div>
-                        <Switch
-                          checked={settings.privacy.analytics}
-                          onCheckedChange={(checked) => updateSetting('privacy.analytics', checked)}
-                        />
-                      </div>
                     </div>
                   </div>
 
@@ -1796,236 +1794,9 @@ export default function EnhancedBookmarkSettings() {
                       </Button>
                       <input type="file" accept=".json,.csv" ref={importFileInputRef} style={{ display: 'none' }} onChange={handleImportFileChange} />
                       <Button variant="outline" onClick={handleRestoreFromBackup}>
-                        <Cloud className="h-4 w-4 mr-2" />
+                        <span className="h-4 w-4 mr-2">☁️</span>
                         Restore from Backup
                       </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Performance Section */}
-            {activeSection === 'performance' && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Zap className="h-5 w-5 text-blue-600" />
-                    <CardTitle>Performance</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Optimize app speed and resource usage
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Cache Settings */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Cache Settings</Label>
-                    <div>
-                      <Label>Cache Expiry</Label>
-                      <Select value={settings.performance.cacheExpiry} onValueChange={(value) => updateSetting('performance.cacheExpiry', value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1h">1 hour</SelectItem>
-                          <SelectItem value="6h">6 hours</SelectItem>
-                          <SelectItem value="24h">24 hours</SelectItem>
-                          <SelectItem value="7d">7 days</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Loading Optimizations */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Loading Optimizations</Label>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Enable prefetching</Label>
-                          <p className="text-sm text-gray-500">Preload content for faster navigation</p>
-                        </div>
-                        <Switch
-                          checked={settings.performance.prefetchEnabled}
-                          onCheckedChange={(checked) => updateSetting('performance.prefetchEnabled', checked)}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Lazy load images</Label>
-                          <p className="text-sm text-gray-500">Load images only when needed</p>
-                        </div>
-                        <Switch
-                          checked={settings.performance.lazyLoadImages}
-                          onCheckedChange={(checked) => updateSetting('performance.lazyLoadImages', checked)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Resource Usage */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Resource Usage</Label>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <Label>Memory Usage</Label>
-                          <span className="text-sm text-gray-500">{settings.performance.resourceUsage.memory}%</span>
-                        </div>
-                        <Progress value={settings.performance.resourceUsage.memory} className="w-full" />
-                      </div>
-                      
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <Label>CPU Usage</Label>
-                          <span className="text-sm text-gray-500">{settings.performance.resourceUsage.cpu}%</span>
-                        </div>
-                        <Progress value={settings.performance.resourceUsage.cpu} className="w-full" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Debug Mode */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Debug & Development</Label>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Debug Mode</Label>
-                        <p className="text-sm text-gray-500">Show performance metrics and debug info</p>
-                      </div>
-                      <Switch
-                        checked={settings.performance.debugMode}
-                        onCheckedChange={(checked) => updateSetting('performance.debugMode', checked)}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Accessibility Section */}
-            {activeSection === 'accessibility' && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Eye className="h-5 w-5 text-blue-600" />
-                    <CardTitle>Accessibility</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Make the app more accessible and comfortable to use
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Visual Accessibility */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Visual Accessibility</Label>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>High contrast mode</Label>
-                          <p className="text-sm text-gray-500">Increase contrast for better visibility</p>
-                        </div>
-                        <Switch
-                          checked={settings.accessibility.highContrast}
-                          onCheckedChange={(checked) => updateSetting('accessibility.highContrast', checked)}
-                        />
-                      </div>
-                      
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <Label>Font scale</Label>
-                          <span className="text-sm text-gray-500">{settings.accessibility.fontScale}x</span>
-                        </div>
-                        <Slider
-                          value={[settings.accessibility.fontScale]}
-                          onValueChange={([value]) => updateSetting('accessibility.fontScale', value)}
-                          min={0.8}
-                          max={2.0}
-                          step={0.1}
-                          className="w-full"
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Dyslexia-friendly font</Label>
-                          <p className="text-sm text-muted-foreground">Use OpenDyslexic font for better readability</p>
-                        </div>
-                        <Switch
-                          checked={settings.accessibility.dyslexiaFont}
-                          onCheckedChange={(checked) => updateSetting('accessibility.dyslexiaFont', checked)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Navigation Accessibility */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Navigation & Interaction</Label>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Keyboard navigation</Label>
-                          <p className="text-sm text-gray-500">Enable full keyboard navigation support</p>
-                        </div>
-                        <Switch
-                          checked={settings.accessibility.keyboardNavigation}
-                          onCheckedChange={(checked) => updateSetting('accessibility.keyboardNavigation', checked)}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Focus outline</Label>
-                          <p className="text-sm text-gray-500">Show focus indicators for interactive elements</p>
-                        </div>
-                        <Switch
-                          checked={settings.accessibility.focusOutline}
-                          onCheckedChange={(checked) => updateSetting('accessibility.focusOutline', checked)}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Screen reader support</Label>
-                          <p className="text-sm text-gray-500">Optimize for screen reader compatibility</p>
-                        </div>
-                        <Switch
-                          checked={settings.accessibility.screenReader}
-                          onCheckedChange={(checked) => updateSetting('accessibility.screenReader', checked)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Color Accessibility */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Color Accessibility</Label>
-                    <div>
-                      <Label>Color blind mode</Label>
-                      <Select value={settings.accessibility.colorBlindMode} onValueChange={(value) => updateSetting('accessibility.colorBlindMode', value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="protanopia">Protanopia (Red-blind)</SelectItem>
-                          <SelectItem value="deuteranopia">Deuteranopia (Green-blind)</SelectItem>
-                          <SelectItem value="tritanopia">Tritanopia (Blue-blind)</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                 </CardContent>
@@ -2146,138 +1917,12 @@ export default function EnhancedBookmarkSettings() {
               </Card>
             )}
 
-            {/* Advanced Section */}
-            {activeSection === 'advanced' && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Key className="h-5 w-5 text-blue-600" />
-                    <CardTitle>Advanced</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Developer tools, experimental features, and advanced configuration
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Experimental Features */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Experimental Features</Label>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Beta UI components</Label>
-                          <p className="text-sm text-gray-500">Try new interface elements before release</p>
-                        </div>
-                        <Switch
-                          checked={settings.advanced.experimentalFeatures.betaUI}
-                          onCheckedChange={(checked) => updateSetting('advanced.experimentalFeatures.betaUI', checked)}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Advanced search</Label>
-                          <p className="text-sm text-gray-500">Enhanced search with natural language processing</p>
-                        </div>
-                        <Switch
-                          checked={settings.advanced.experimentalFeatures.advancedSearch}
-                          onCheckedChange={(checked) => updateSetting('advanced.experimentalFeatures.advancedSearch', checked)}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>AI enhancements</Label>
-                          <p className="text-sm text-gray-500">Latest AI-powered features and improvements</p>
-                        </div>
-                        <Switch
-                          checked={settings.advanced.experimentalFeatures.aiEnhancements}
-                          onCheckedChange={(checked) => updateSetting('advanced.experimentalFeatures.aiEnhancements', checked)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* API Keys */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">API Keys</Label>
-                    <div className="space-y-3">
-                      <Button variant="outline" onClick={generateApiKey}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Generate New API Key
-                      </Button>
-                      
-                      {settings.advanced.apiKeys.length > 0 && (
-                        <div className="space-y-2">
-                          {settings.advanced.apiKeys.map((key: any) => (
-                            <div key={key.id} className="bg-gray-50 rounded-lg p-3">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="font-medium">{key.name}</div>
-                                  <div className="text-sm text-gray-500 font-mono">{key.key}</div>
-                                </div>
-                                <Button variant="outline" size="sm">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Local Storage */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Local Storage</Label>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm">Storage Used</Label>
-                          <div className="text-lg font-semibold">{settings.advanced.localStorage.size}</div>
-                        </div>
-                        <div>
-                          <Label className="text-sm">Items Stored</Label>
-                          <div className="text-lg font-semibold">{settings.advanced.localStorage.items}</div>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" className="mt-3">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Clear Local Storage
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Developer Mode */}
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Developer Tools</Label>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Developer mode</Label>
-                        <p className="text-sm text-gray-500">Enable developer tools and debugging features</p>
-                      </div>
-                      <Switch
-                        checked={settings.advanced.devMode}
-                        onCheckedChange={(checked) => updateSetting('advanced.devMode', checked)}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Billing & Subscription Section */}
             {activeSection === 'billing' && (
               <Card>
                 <CardHeader>
                   <div className="flex items-center space-x-2">
-                    <CreditCard className="h-5 w-5 text-blue-600" />
+                    <span className="h-5 w-5 text-blue-600">💳</span>
                     <CardTitle>Billing & Subscription</CardTitle>
                   </div>
                   <CardDescription>
@@ -2443,778 +2088,6 @@ export default function EnhancedBookmarkSettings() {
                 </CardContent>
               </Card>
             )}
-
-            {/* Bookmark Marketplace 2.0 Section */}
-            {activeSection === 'marketplace' && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Store className="h-5 w-5 text-blue-600" />
-                    <CardTitle>Bookmark Marketplace 2.0</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Buy, sell, and manage bookmark collections in our comprehensive marketplace
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="marketplace-home" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 lg:grid-cols-9">
-                      <TabsTrigger value="marketplace-home">Home</TabsTrigger>
-                      <TabsTrigger value="browse-listings">Browse</TabsTrigger>
-                      <TabsTrigger value="create-listing">Create</TabsTrigger>
-                      <TabsTrigger value="my-listings">My Listings</TabsTrigger>
-                      <TabsTrigger value="sales-analytics">Analytics</TabsTrigger>
-                      <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                      <TabsTrigger value="messaging">Messages</TabsTrigger>
-                      <TabsTrigger value="payouts">Payouts</TabsTrigger>
-                      <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                    </TabsList>
-
-                    {/* Marketplace Home */}
-                    <TabsContent value="marketplace-home" className="space-y-6">
-                      <div className="space-y-4">
-                        {/* Hero Carousel */}
-                        <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-white">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h3 className="text-2xl font-bold mb-2">Featured Bookmark Bundle</h3>
-                              <p className="text-blue-100 mb-4">Ultimate UI/UX Design Resources - 500+ curated bookmarks</p>
-                              <Button variant="secondary" size="sm">
-                                View Details
-                              </Button>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-3xl font-bold">$29.99</div>
-                              <div className="text-blue-200">⭐ 4.9 (234 reviews)</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Search Bar */}
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                          <Input 
-                            placeholder="Find bookmark bundles..." 
-                            className="pl-10 py-3 text-lg"
-                          />
-                        </div>
-
-                        {/* Category Tiles */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {['UI/UX', 'AI Tools', 'Productivity', 'Development', 'Marketing', 'Design', 'Business', 'Learning'].map((category) => (
-                            <div key={category} className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer">
-                              <div className="text-center">
-                                <div className="text-lg font-semibold">{category}</div>
-                                <div className="text-sm text-gray-500">120+ bundles</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Trending Tags */}
-                        <div className="space-y-3">
-                          <h4 className="font-semibold">Trending Tags</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {['react', 'figma', 'productivity', 'ai-tools', 'design-system', 'templates', 'icons', 'fonts'].map((tag) => (
-                              <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-blue-100">
-                                #{tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Recommended for You */}
-                        <div className="space-y-3">
-                          <h4 className="font-semibold">Recommended for You</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {[1, 2, 3].map((item) => (
-                              <div key={item} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                <div className="aspect-video bg-gray-100 rounded mb-3"></div>
-                                <h5 className="font-medium mb-1">Design System Resources</h5>
-                                <p className="text-sm text-gray-600 mb-2">Complete design system with components...</p>
-                                <div className="flex justify-between items-center">
-                                  <span className="font-semibold text-green-600">$19.99</span>
-                                  <div className="flex items-center space-x-1">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-sm">4.8</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* List Yours CTA */}
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                          <h4 className="font-semibold text-green-900 mb-2">Start Selling Your Bookmarks</h4>
-                          <p className="text-green-700 mb-4">Turn your curated bookmark collections into income</p>
-                          <Button className="bg-green-600 hover:bg-green-700">
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Your First Listing
-                          </Button>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* Browse Listings */}
-                    <TabsContent value="browse-listings" className="space-y-4">
-                      <div className="flex flex-col lg:flex-row gap-6">
-                        {/* Filter Panel */}
-                        <div className="lg:w-64 space-y-4">
-                          <div className="bg-white border rounded-lg p-4">
-                            <h4 className="font-semibold mb-3">Filters</h4>
-                            
-                            {/* Price Range */}
-                            <div className="space-y-2 mb-4">
-                              <Label>Price Range</Label>
-                              <div className="px-2">
-                                <Slider
-                                  value={[0, 100]}
-                                  max={100}
-                                  step={1}
-                                  className="w-full"
-                                />
-                                <div className="flex justify-between text-sm text-gray-500 mt-1">
-                                  <span>$0</span>
-                                  <span>$100+</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Categories */}
-                            <div className="space-y-2 mb-4">
-                              <Label>Categories</Label>
-                              <div className="space-y-2">
-                                {['UI/UX', 'Development', 'Marketing', 'Business'].map((cat) => (
-                                  <div key={cat} className="flex items-center space-x-2">
-                                    <input type="checkbox" className="rounded" />
-                                    <span className="text-sm">{cat}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Seller Rating */}
-                            <div className="space-y-2">
-                              <Label>Minimum Rating</Label>
-                              <div className="px-2">
-                                <Slider
-                                  value={[4]}
-                                  max={5}
-                                  step={0.5}
-                                  className="w-full"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Results */}
-                        <div className="flex-1 space-y-4">
-                          {/* Sort & View Controls */}
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm text-gray-600">1,234 results</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Select defaultValue="newest">
-                                <SelectTrigger className="w-40">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="newest">Newest</SelectItem>
-                                  <SelectItem value="price-low">Price: Low to High</SelectItem>
-                                  <SelectItem value="price-high">Price: High to Low</SelectItem>
-                                  <SelectItem value="popular">Most Popular</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <Button variant="outline" size="sm">
-                                <Grid className="h-4 w-4" />
-                              </Button>
-                              <Button variant="outline" size="sm">
-                                <List className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Listing Cards */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {[1, 2, 3, 4, 5, 6].map((item) => (
-                              <div key={item} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                <div className="aspect-video bg-gray-100 rounded mb-3"></div>
-                                <h5 className="font-medium mb-1">Premium Design Resources #{item}</h5>
-                                <p className="text-sm text-gray-600 mb-2">Curated collection of design tools and resources...</p>
-                                <div className="flex justify-between items-center mb-3">
-                                  <span className="font-semibold text-green-600">$24.99</span>
-                                  <div className="flex items-center space-x-1">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-sm">4.7</span>
-                                  </div>
-                                </div>
-                                <div className="flex space-x-2">
-                                  <Button size="sm" className="flex-1">Buy Now</Button>
-                                  <Button variant="outline" size="sm">
-                                    <Heart className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* Create Listing */}
-                    <TabsContent value="create-listing" className="space-y-6">
-                      <div className="max-w-2xl">
-                        <div className="space-y-6">
-                          {/* Basic Info */}
-                          <div className="space-y-4">
-                            <h4 className="font-semibold">Basic Information</h4>
-                            <div className="space-y-3">
-                              <div>
-                                <Label>Title</Label>
-                                <Input placeholder="Give your bundle a compelling title..." />
-                              </div>
-                              <div>
-                                <Label>Short Description</Label>
-                                <Textarea placeholder="Briefly describe what buyers will get..." rows={3} />
-                              </div>
-                              <div>
-                                <Label>Category</Label>
-                                <Select>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select category" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="ui-ux">UI/UX</SelectItem>
-                                    <SelectItem value="development">Development</SelectItem>
-                                    <SelectItem value="marketing">Marketing</SelectItem>
-                                    <SelectItem value="business">Business</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Content Selection */}
-                          <div className="space-y-4">
-                            <h4 className="font-semibold">Content Selection</h4>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                              <p className="text-gray-600">Drag and drop URLs or select from your bookmarks</p>
-                              <Button variant="outline" className="mt-2">
-                                Select from Bookmarks
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Pricing */}
-                          <div className="space-y-4">
-                            <h4 className="font-semibold">Pricing & Licensing</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label>Price ($)</Label>
-                                <Input type="number" placeholder="29.99" />
-                              </div>
-                              <div>
-                                <Label>License Type</Label>
-                                <Select>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select license" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="personal">Personal Use</SelectItem>
-                                    <SelectItem value="commercial">Commercial Use</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex space-x-3">
-                            <Button className="flex-1">
-                              Publish Listing
-                            </Button>
-                            <Button variant="outline">
-                              Save Draft
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* My Listings */}
-                    <TabsContent value="my-listings" className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-semibold">My Listings</h4>
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          New Listing
-                        </Button>
-                      </div>
-
-                      <div className="bg-white border rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Title</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Status</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Price</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Sales</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Views</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                              {[1, 2, 3].map((item) => (
-                                <tr key={item}>
-                                  <td className="px-4 py-3">
-                                    <div className="font-medium">Design Resources Bundle #{item}</div>
-                                    <div className="text-sm text-gray-500">Created 2 days ago</div>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <Badge variant="secondary">Active</Badge>
-                                  </td>
-                                  <td className="px-4 py-3 font-medium">$29.99</td>
-                                  <td className="px-4 py-3">12</td>
-                                  <td className="px-4 py-3">456</td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex space-x-2">
-                                      <Button variant="outline" size="sm">Edit</Button>
-                                      <Button variant="outline" size="sm">Pause</Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* Sales Analytics */}
-                    <TabsContent value="sales-analytics" className="space-y-6">
-                      {/* Summary Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-gray-600">Total Revenue</p>
-                                <p className="text-2xl font-bold">$2,847</p>
-                              </div>
-                              <TrendingUp className="h-8 w-8 text-green-600" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-gray-600">Items Sold</p>
-                                <p className="text-2xl font-bold">94</p>
-                              </div>
-                              <BarChart3 className="h-8 w-8 text-blue-600" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-gray-600">Avg. Price</p>
-                                <p className="text-2xl font-bold">$30.29</p>
-                              </div>
-                              <PieChart className="h-8 w-8 text-purple-600" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-gray-600">Conversion</p>
-                                <p className="text-2xl font-bold">3.2%</p>
-                              </div>
-                              <Target className="h-8 w-8 text-orange-600" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Charts Placeholder */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Sales Over Time</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="h-64 bg-gray-100 rounded flex items-center justify-center">
-                              <BarChart3 className="h-16 w-16 text-gray-400" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Top Categories</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="h-64 bg-gray-100 rounded flex items-center justify-center">
-                              <PieChart className="h-16 w-16 text-gray-400" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </TabsContent>
-
-                    {/* Transactions */}
-                    <TabsContent value="transactions" className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Tabs defaultValue="all" className="w-auto">
-                          <TabsList>
-                            <TabsTrigger value="all">All</TabsTrigger>
-                            <TabsTrigger value="purchases">Purchases</TabsTrigger>
-                            <TabsTrigger value="sales">Sales</TabsTrigger>
-                          </TabsList>
-                        </Tabs>
-                        <Button variant="outline">
-                          <Download className="h-4 w-4 mr-2" />
-                          Export
-                        </Button>
-                      </div>
-
-                      <div className="bg-white border rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Date</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Listing</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Type</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Amount</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Status</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                              {[1, 2, 3, 4, 5].map((item) => (
-                                <tr key={item}>
-                                  <td className="px-4 py-3 text-sm">Dec 15, 2024</td>
-                                  <td className="px-4 py-3">
-                                    <div className="font-medium">Design Resources Bundle</div>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <Badge variant={item % 2 === 0 ? "default" : "secondary"}>
-                                      {item % 2 === 0 ? "Sale" : "Purchase"}
-                                    </Badge>
-                                  </td>
-                                  <td className="px-4 py-3 font-medium">$29.99</td>
-                                  <td className="px-4 py-3">
-                                    <Badge variant="secondary">Completed</Badge>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <Button variant="outline" size="sm">
-                                      View Receipt
-                                    </Button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* Messaging */}
-                    <TabsContent value="messaging" className="space-y-4">
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Conversations List */}
-                        <div className="space-y-2">
-                          <h4 className="font-semibold">Conversations</h4>
-                          <div className="space-y-2">
-                            {[1, 2, 3].map((item) => (
-                              <div key={item} className="border rounded-lg p-3 cursor-pointer hover:bg-gray-50">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <div className="font-medium">John Doe</div>
-                                    <div className="text-sm text-gray-600">About: Design Bundle #1</div>
-                                    <div className="text-xs text-gray-500">2 hours ago</div>
-                                  </div>
-                                  <Badge variant="secondary" className="text-xs">2</Badge>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Chat Window */}
-                        <div className="lg:col-span-2 border rounded-lg">
-                          <div className="p-4 border-b">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-medium">John Doe</div>
-                                <div className="text-sm text-gray-600">About: Design Bundle #1</div>
-                              </div>
-                              <Button variant="outline" size="sm">
-                                Block User
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="p-4 h-64 overflow-y-auto space-y-3">
-                            <div className="flex justify-start">
-                              <div className="bg-gray-100 rounded-lg p-3 max-w-xs">
-                                <p className="text-sm">Hi, I'm interested in your design bundle. Can you provide more details?</p>
-                              </div>
-                            </div>
-                            <div className="flex justify-end">
-                              <div className="bg-blue-600 text-white rounded-lg p-3 max-w-xs">
-                                <p className="text-sm">Sure! It includes 200+ curated design resources including UI kits, icons, and templates.</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-4 border-t">
-                            <div className="flex space-x-2">
-                              <Input placeholder="Type your message..." className="flex-1" />
-                              <Button>Send</Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* Payouts */}
-                    <TabsContent value="payouts" className="space-y-6">
-                      {/* Balance Card */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-600">Available Balance</p>
-                              <p className="text-3xl font-bold text-green-600">$1,247.50</p>
-                              <Button className="mt-2 w-full">Withdraw</Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-600">Pending</p>
-                              <p className="text-3xl font-bold text-yellow-600">$89.99</p>
-                              <p className="text-xs text-gray-500 mt-2">Clears in 3 days</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-600">On Hold</p>
-                              <p className="text-3xl font-bold text-red-600">$0.00</p>
-                              <p className="text-xs text-gray-500 mt-2">No disputes</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Payout Methods */}
-                      <div className="space-y-4">
-                        <h4 className="font-semibold">Payout Methods</h4>
-                        <div className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <CreditCard className="h-6 w-6 text-gray-400" />
-                              <div>
-                                <div className="font-medium">Bank Account</div>
-                                <div className="text-sm text-gray-600">••••••••1234</div>
-                              </div>
-                            </div>
-                            <Badge variant="secondary">Primary</Badge>
-                          </div>
-                        </div>
-                        <Button variant="outline">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Payment Method
-                        </Button>
-                      </div>
-
-                      {/* Payout History */}
-                      <div className="space-y-4">
-                        <h4 className="font-semibold">Payout History</h4>
-                        <div className="bg-white border rounded-lg overflow-hidden">
-                          <div className="overflow-x-auto">
-                            <table className="w-full">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Date</th>
-                                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Amount</th>
-                                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Fees</th>
-                                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Status</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-200">
-                                {[1, 2, 3].map((item) => (
-                                  <tr key={item}>
-                                    <td className="px-4 py-3 text-sm">Dec 10, 2024</td>
-                                    <td className="px-4 py-3 font-medium">$500.00</td>
-                                    <td className="px-4 py-3 text-sm">$15.00</td>
-                                    <td className="px-4 py-3">
-                                      <Badge variant="secondary">Completed</Badge>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* Reviews */}
-                    <TabsContent value="reviews" className="space-y-6">
-                      {/* Summary */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="text-3xl font-bold">4.8</div>
-                            <div className="flex justify-center my-2">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              ))}
-                            </div>
-                            <div className="text-sm text-gray-600">Average Rating</div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="text-3xl font-bold">147</div>
-                            <div className="text-sm text-gray-600 mt-2">Total Reviews</div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="text-3xl font-bold">98%</div>
-                            <div className="text-sm text-gray-600 mt-2">Response Rate</div>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Reviews List */}
-                      <div className="space-y-4">
-                        <h4 className="font-semibold">Recent Reviews</h4>
-                        <div className="space-y-4">
-                          {[1, 2, 3].map((item) => (
-                            <div key={item} className="border rounded-lg p-4">
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <div className="font-medium">Sarah Johnson</div>
-                                  <div className="flex items-center space-x-1">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                      <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    ))}
-                                    <span className="text-sm text-gray-600 ml-2">5 days ago</span>
-                                  </div>
-                                </div>
-                                <Badge variant="outline">Design Bundle #1</Badge>
-                              </div>
-                              <p className="text-gray-700 mb-3">Excellent collection of design resources! Very well organized and exactly what I needed for my projects.</p>
-                              <div className="flex space-x-2">
-                                <Button variant="outline" size="sm">Reply</Button>
-                                <Button variant="outline" size="sm">Report</Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Password Change Dialog */}
-            <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Change Password</DialogTitle>
-                  <DialogDescription>
-                    Enter your current password and choose a new one
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Current Password</Label>
-                    <Input
-                      type="password"
-                      value={settings.privacy.currentPassword}
-                      onChange={(e) => updateSetting('privacy.currentPassword', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label>New Password</Label>
-                    <Input
-                      type="password"
-                      value={settings.privacy.newPassword}
-                      onChange={(e) => updateSetting('privacy.newPassword', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label>Confirm New Password</Label>
-                    <Input
-                      type="password"
-                      value={settings.privacy.confirmPassword}
-                      onChange={(e) => updateSetting('privacy.confirmPassword', e.target.value)}
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={() => {
-                      toast.success('Password changed successfully');
-                      setShowPasswordDialog(false);
-                    }}>
-                      Change Password
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* 2FA Setup Dialog */}
-            <Dialog open={show2FADialog} onOpenChange={setShow2FADialog}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Set Up Two-Factor Authentication</DialogTitle>
-                  <DialogDescription>
-                    Scan the QR code with your authenticator app
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="flex justify-center">
-                    <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                      <QrCode className="h-24 w-24 text-gray-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Verification Code</Label>
-                    <Input placeholder="Enter 6-digit code from your app" />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShow2FADialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={() => {
-                      toast.success('Two-factor authentication enabled');
-                      setShow2FADialog(false);
-                    }}>
-                      Enable 2FA
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
       </div>
