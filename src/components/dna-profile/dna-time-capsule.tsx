@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Calendar } from '@/components/ui/calendar'
@@ -18,16 +17,10 @@ import {
   History,
   RotateCcw,
   Download,
-  Upload,
   Trash2,
   Edit,
   Share,
-  Eye,
   Plus,
-  Archive,
-  Sparkles,
-  Brain,
-  AlertTriangle,
   CheckCircle,
   Timer,
   Bookmark,
@@ -362,7 +355,7 @@ export default function DnaTimeCapsule() {
             Schedule
           </Button>
           <Button variant="outline" onClick={() => setShowCompareDialog(true)}>
-                            <GitCompare className="h-4 w-4 mr-2" />
+            <Compare className="h-4 w-4 mr-2" />
             Compare
           </Button>
           <Button onClick={() => setShowCreateDialog(true)}>
@@ -457,7 +450,7 @@ export default function DnaTimeCapsule() {
                   {selectedCapsule.aiSummary && (
                     <div>
                       <h4 className="font-medium mb-2 flex items-center">
-                        <Sparkles className="h-4 w-4 mr-1 text-purple-500" />
+                        <Star className="h-4 w-4 mr-1 text-purple-500" />
                         AI Summary
                       </h4>
                       <p className="text-sm text-gray-600 bg-purple-50 p-3 rounded-lg">
@@ -574,7 +567,7 @@ export default function DnaTimeCapsule() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center">
-              <GitCompare className="h-5 w-5 mr-2" />
+              <Compare className="h-5 w-5 mr-2" />
               Compare Capsules
             </DialogTitle>
           </DialogHeader>
