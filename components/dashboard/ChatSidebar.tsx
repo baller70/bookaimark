@@ -89,7 +89,17 @@ export function ChatSidebar() {
     }
   }
 
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   const formatTime = (date: Date) => {
+    // Prevent hydration mismatch by only showing time on client
+    if (!isClient) {
+      return ''
+    }
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
       minute: '2-digit',
@@ -167,13 +177,15 @@ export function ChatSidebar() {
                   }`}
                 >
                   <p className="text-sm leading-relaxed">{message.content}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.isUser 
-                      ? 'text-blue-100' 
-                      : 'text-slate-500 dark:text-slate-400'
-                  }`}>
-                    {formatTime(message.timestamp)}
-                  </p>
+                  {isClient && (
+                    <p className={`text-xs mt-1 ${
+                      message.isUser 
+                        ? 'text-blue-100' 
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}>
+                      {formatTime(message.timestamp)}
+                    </p>
+                  )}
                 </div>
 
                 {message.isUser && (

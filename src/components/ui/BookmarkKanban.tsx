@@ -3,14 +3,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { motion } from 'framer-motion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { 
-  ExternalLink, 
   Heart,
-  MoreHorizontal,
   Search,
   ArrowLeft,
   Folder as FolderIcon,
@@ -19,10 +17,8 @@ import {
   Globe,
   Tag,
   Calendar,
-  Eye,
   Plus,
   X,
-  Edit3,
   Target,
   Clock,
   CheckCircle,
@@ -30,9 +26,29 @@ import {
   Zap,
   Settings
 } from 'lucide-react';
-import Image from 'next/image';
 import type { BookmarkWithRelations } from './FolderCard';
 import type { Folder as FolderType } from './FolderFormDialog';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+  useDroppable
+} from '@dnd-kit/core';
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy,
+  useSortable,
+  rectSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface KanbanViewProps {
   bookmarks: BookmarkWithRelations[];
@@ -315,6 +331,195 @@ function BookmarkAssignmentDialog({
   );
 }
 
+// Sortable Board Component
+function SortableKanbanBoard({ 
+  board, 
+  bookmarks, 
+  onBookmarkClick, 
+  onDeleteBoard,
+  getFaviconUrl,
+  formatDate 
+}: {
+  board: KanbanBoard;
+  bookmarks: BookmarkWithRelations[];
+  onBookmarkClick?: (bookmark: BookmarkWithRelations) => void;
+  onDeleteBoard: (boardId: string) => void;
+  getFaviconUrl: (url: string) => string;
+  formatDate: (date: string | null) => string;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: board.id });
+
+  const { setNodeRef: droppableRef } = useDroppable({
+    id: board.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const boardBookmarks = bookmarks.filter(bookmark => 
+    board.bookmarkIds.includes(bookmark.id)
+  );
+
+  const IconComponent = board.icon;
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div className={`rounded-lg border-2 p-4 min-h-[400px] ${board.color}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <div 
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/50 transition-colors"
+            >
+              <div className="flex flex-col space-y-0.5">
+                <div className="flex space-x-0.5">
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                </div>
+                <div className="flex space-x-0.5">
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                </div>
+              </div>
+            </div>
+            <IconComponent className="h-5 w-5 text-gray-600" />
+            <div>
+              <h3 className="font-semibold text-gray-900">{board.name}</h3>
+              <p className="text-xs text-gray-500">{board.description}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Badge variant="secondary" className="text-xs">
+              {boardBookmarks.length}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDeleteBoard(board.id)}
+              className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+        
+        <div ref={droppableRef} className="space-y-2 min-h-[300px]">
+          <SortableContext items={boardBookmarks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+            {boardBookmarks.map((bookmark) => (
+              <SortableKanbanBookmark
+                key={bookmark.id}
+                bookmark={bookmark}
+                onBookmarkClick={onBookmarkClick}
+                getFaviconUrl={getFaviconUrl}
+                formatDate={formatDate}
+              />
+            ))}
+          </SortableContext>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sortable Bookmark Component
+function SortableKanbanBookmark({ 
+  bookmark, 
+  onBookmarkClick, 
+  getFaviconUrl, 
+  formatDate 
+}: {
+  bookmark: BookmarkWithRelations;
+  onBookmarkClick?: (bookmark: BookmarkWithRelations) => void;
+  getFaviconUrl: (url: string) => string;
+  formatDate: (date: string | null) => string;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: bookmark.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <Card className="cursor-pointer hover:shadow-md transition-shadow group">
+        <CardContent className="p-3">
+          <div className="flex items-start space-x-3">
+            <div 
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity mt-1"
+            >
+              <div className="flex flex-col space-y-0.5">
+                <div className="flex space-x-0.5">
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                </div>
+                <div className="flex space-x-0.5">
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                  <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                </div>
+              </div>
+            </div>
+            <img
+              src={getFaviconUrl(bookmark.url)}
+              alt=""
+              className="w-4 h-4 mt-0.5 flex-shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/favicon.ico';
+              }}
+            />
+            <div className="flex-1 min-w-0" onClick={() => onBookmarkClick?.(bookmark)}>
+              <h4 className="text-sm font-medium text-gray-900 truncate">
+                {bookmark.title}
+              </h4>
+              {bookmark.description && (
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                  {bookmark.description}
+                </p>
+              )}
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center space-x-2">
+                  {bookmark.tags && bookmark.tags.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {bookmark.tags[0]}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center space-x-1 text-xs text-gray-400">
+                  {bookmark.created_at && (
+                    <span>{formatDate(bookmark.created_at)}</span>
+                  )}
+                  {bookmark.isFavorite && (
+                    <Heart className="h-3 w-3 fill-red-500 text-red-500" />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function KanbanView({ 
   bookmarks, 
   onBookmarkClick, 
@@ -328,6 +533,15 @@ export function KanbanView({
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
   const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
   const [isAssignmentOpen, setIsAssignmentOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Initialize with default boards
   useEffect(() => {
@@ -402,6 +616,88 @@ export function KanbanView({
         ? { ...board, bookmarkIds: board.bookmarkIds.filter(id => id !== bookmarkId) }
         : board
     ));
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    
+    if (!over) return;
+    
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    
+    // Find the boards that contain the active and over items
+    const activeBoard = boards.find(board => board.bookmarkIds.includes(activeId));
+    const overBoard = boards.find(board => board.id === overId || board.bookmarkIds.includes(overId));
+    
+    if (!activeBoard || !overBoard) return;
+    
+    // If moving between different boards
+    if (activeBoard.id !== overBoard.id) {
+      setBoards(prev => prev.map(board => {
+        if (board.id === activeBoard.id) {
+          return {
+            ...board,
+            bookmarkIds: board.bookmarkIds.filter(id => id !== activeId)
+          };
+        }
+        if (board.id === overBoard.id) {
+          return {
+            ...board,
+            bookmarkIds: [...board.bookmarkIds, activeId]
+          };
+        }
+        return board;
+      }));
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over) {
+      setActiveId(null);
+      return;
+    }
+    
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    
+    if (activeId === overId) {
+      setActiveId(null);
+      return;
+    }
+    
+    // Handle board reordering
+    const activeBoardIndex = boards.findIndex(board => board.id === activeId);
+    const overBoardIndex = boards.findIndex(board => board.id === overId);
+    
+    if (activeBoardIndex !== -1 && overBoardIndex !== -1) {
+      setBoards(prev => arrayMove(prev, activeBoardIndex, overBoardIndex));
+    } else {
+      // Handle bookmark reordering within the same board
+      const activeBoard = boards.find(board => board.bookmarkIds.includes(activeId));
+      const overBoard = boards.find(board => board.id === overId || board.bookmarkIds.includes(overId));
+      
+      if (activeBoard && overBoard && activeBoard.id === overBoard.id) {
+        const activeIndex = activeBoard.bookmarkIds.indexOf(activeId);
+        const overIndex = activeBoard.bookmarkIds.indexOf(overId);
+        
+        if (activeIndex !== -1 && overIndex !== -1) {
+          setBoards(prev => prev.map(board => 
+            board.id === activeBoard.id 
+              ? { ...board, bookmarkIds: arrayMove(board.bookmarkIds, activeIndex, overIndex) }
+              : board
+          ));
+        }
+      }
+    }
+    
+    setActiveId(null);
   };
 
   const filteredBookmarks = useMemo(() => {
@@ -549,166 +845,61 @@ export function KanbanView({
       </div>
 
       {/* Kanban Boards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {boards.map((board) => {
-          const boardBookmarks = filteredBookmarks.filter(bookmark => 
-            board.bookmarkIds.includes(bookmark.id)
-          );
-          const IconComponent = board.icon;
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={boards.map(board => board.id)} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {boards.map((board) => {
+              const boardBookmarks = filteredBookmarks.filter(bookmark => 
+                board.bookmarkIds.includes(bookmark.id)
+              );
+              const IconComponent = board.icon;
 
-          return (
+              return (
+                <SortableKanbanBoard
+                  key={board.id}
+                  board={board}
+                  bookmarks={boardBookmarks}
+                  onBookmarkClick={onBookmarkClick}
+                  onDeleteBoard={handleDeleteBoard}
+                  getFaviconUrl={getFaviconUrl}
+                  formatDate={formatDate}
+                />
+              );
+            })}
+
+            {/* Add Board Card */}
             <motion.div
-              key={board.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: boards.length * 0.1 }}
               className="flex flex-col h-[600px]"
             >
-              <Card className={`h-full flex flex-col ${board.color} border-2`}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-2 bg-white/80 dark:bg-gray-800/80 rounded-lg">
-                        <IconComponent className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">
-                          {board.name}
-                        </CardTitle>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          {board.description}
-                        </p>
-                      </div>
+              <Card 
+                className="h-full flex flex-col border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-200 cursor-pointer bg-gray-50/50 dark:bg-gray-800/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/10"
+                onClick={() => setIsCreateBoardOpen(true)}
+              >
+                <CardContent className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20 transition-colors">
+                      <Plus className="h-8 w-8 text-gray-500 dark:text-gray-400" />
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <Badge variant="secondary" className="text-xs">
-                        {boardBookmarks.length}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteBoard(board.id)}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Add New Board</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Create a custom board to organize your bookmarks
+                    </p>
                   </div>
-                </CardHeader>
-
-                <CardContent className="flex-1 overflow-y-auto space-y-3 pb-4">
-                  <AnimatePresence>
-                    {boardBookmarks.map((bookmark, index) => (
-                      <motion.div
-                        key={bookmark.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="group"
-                      >
-                        <Card className="cursor-pointer hover:shadow-md transition-all duration-200 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-                          <CardContent className="p-4">
-                            <div className="flex items-start space-x-3">
-                              <div className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded flex-shrink-0">
-                                <img 
-                                  src={getFaviconUrl(bookmark.url)} 
-                                  alt=""
-                                  className="w-5 h-5"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                  }}
-                                />
-                                <Globe className="w-4 h-4 text-gray-500 hidden" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-sm text-gray-900 dark:text-white line-clamp-2 mb-1">
-                                  {bookmark.title}
-                                </h4>
-                                {bookmark.description && (
-                                  <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
-                                    {bookmark.description}
-                                  </p>
-                                )}
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-gray-500">
-                                    {getDomainFromUrl(bookmark.url)}
-                                  </span>
-                                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onFavorite?.(bookmark);
-                                      }}
-                                      className={`h-6 w-6 p-0 ${
-                                        bookmark.is_favorite 
-                                          ? 'text-red-500' 
-                                          : 'text-gray-400 hover:text-red-500'
-                                      }`}
-                                    >
-                                      <Heart className={`h-3 w-3 ${bookmark.is_favorite ? 'fill-current' : ''}`} />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.open(bookmark.url, '_blank');
-                                      }}
-                                      className="h-6 w-6 p-0 text-gray-400 hover:text-blue-500"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-
-                  {boardBookmarks.length === 0 && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      <IconComponent className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No bookmarks assigned</p>
-                      <p className="text-xs">Use "Manage Assignments" to add bookmarks</p>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </motion.div>
-          );
-        })}
-
-        {/* Add Board Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: boards.length * 0.1 }}
-          className="flex flex-col h-[600px]"
-        >
-          <Card 
-            className="h-full flex flex-col border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-200 cursor-pointer bg-gray-50/50 dark:bg-gray-800/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/10"
-            onClick={() => setIsCreateBoardOpen(true)}
-          >
-            <CardContent className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20 transition-colors">
-                  <Plus className="h-8 w-8 text-gray-500 dark:text-gray-400" />
-                </div>
-                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Add New Board</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Create a custom board to organize your bookmarks
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Unassigned Bookmarks Section */}
       {unassignedBookmarks.length > 0 && (

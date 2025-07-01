@@ -6,6 +6,7 @@ import {
   ConnectorString, 
   TimelinePosition 
 } from '../models/timeline.models';
+import { appLogger } from '@/lib/logger';
 
 const API_BASE = '/api/timeline';
 
@@ -60,7 +61,7 @@ export class TimelineService {
       // TODO: Replace with real API calls when backend is ready
       return Promise.resolve(mockTimelineData);
     } catch (error) {
-      console.error('Error fetching timeline data:', error);
+      appLogger.error('Error fetching timeline data', error);
       throw error;
     }
   }

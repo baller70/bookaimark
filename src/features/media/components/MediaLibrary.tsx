@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +66,7 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
   } = useMediaLibrary();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const loadingRef = useRef(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [persistentFiles, setPersistentFiles] = useState<UserMediaFile[]>([]);
@@ -78,17 +79,32 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
   }, []);
 
   const loadPersistentFiles = async () => {
+    // Prevent multiple simultaneous calls using ref (works better than state for race conditions)
+    if (loadingRef.current) {
+      return;
+    }
+    
     try {
+      loadingRef.current = true;
       setIsLoadingFiles(true);
       const response = await userDataService.getMediaFiles();
       setPersistentFiles(response.data);
     } catch (error) {
+      // Check if it's an authentication error (401)
+      if (error instanceof Error && error.message.includes('Unauthorized')) {
+        // Silently handle auth errors when user is not logged in
+        console.warn('User not authenticated - skipping persistent files load');
+        setPersistentFiles([]);
+        return;
+      }
+      
       console.error('Failed to load persistent files:', error);
       // Don't show toast error for initial load failures to avoid disrupting the user experience
       // toast.error('Failed to load saved files');
       setPersistentFiles([]); // Set empty array as fallback
     } finally {
       setIsLoadingFiles(false);
+      loadingRef.current = false;
     }
   };
 

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkPilot Browser Launcher</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      width: 48px;
+      height: 48px;
+      background: white;
+      border-radius: 12px;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+    
+    .capture-btn {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .capture-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    .capture-btn:active {
+      transform: translateY(0);
+    }
+    
+    .capture-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .info {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+    
+    .shortcut {
+      text-align: center;
+      font-size: 11px;
+      opacity: 0.7;
+    }
+    
+    .kbd {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 10px;
+    }
+    
+    .status {
+      text-align: center;
+      font-size: 12px;
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 6px;
+    }
+    
+    .status.success {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    
+    .status.error {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🔗</div>
+    <h1>LinkPilot</h1>
+    <div class="subtitle">Browser Launcher</div>
+  </div>
+  
+  <div class="info">
+    Capture all tabs from this window and convert them into organized bookmarks in LinkPilot.
+  </div>
+  
+  <button id="captureBtn" class="capture-btn">
+    <span>📋</span>
+    Capture Current Window
+  </button>
+  
+  <div class="shortcut">
+    Keyboard shortcut: 
+    <span class="kbd">Alt</span> + 
+    <span class="kbd">Shift</span> + 
+    <span class="kbd">B</span>
+  </div>
+  
+  <div id="status" class="status hidden"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html> 

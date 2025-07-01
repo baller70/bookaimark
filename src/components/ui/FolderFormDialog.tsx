@@ -177,6 +177,8 @@ export function FolderFormDialog({
                   id="folder-goal-type"
                   className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={folder?.goal_type || ''}
+                  onChange={() => {}} // Read-only, no-op handler
+                  disabled
                 >
                   <option value="">Select type</option>
                   <option value="organize">Organize</option>
@@ -194,6 +196,7 @@ export function FolderFormDialog({
                   id="folder-goal-description"
                   className="w-full mt-1"
                   value={folder?.goal_description || ''}
+                  onChange={() => {}} // Read-only, no-op handler
                   readOnly
                 />
               </div>
@@ -204,6 +207,8 @@ export function FolderFormDialog({
                   id="folder-goal-status"
                   className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={folder?.goal_status || ''}
+                  onChange={() => {}} // Read-only, no-op handler
+                  disabled
                 >
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
@@ -219,6 +224,8 @@ export function FolderFormDialog({
                   id="folder-goal-priority"
                   className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={folder?.goal_priority || ''}
+                  onChange={() => {}} // Read-only, no-op handler
+                  disabled
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -246,6 +253,7 @@ export function FolderFormDialog({
                   id="folder-goal-notes"
                   className="w-full mt-1"
                   value={folder?.goal_notes || ''}
+                  onChange={() => {}} // Read-only, no-op handler
                   readOnly
                 />
               </div>

@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "LinkPilot Browser Launcher",
+  "version": "0.1.0",
+  "description": "Capture browser tabs and convert them into organized bookmarks in LinkPilot",
+  "permissions": [
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://*.linkpilot.app/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LinkPilot Browser Launcher"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+} 

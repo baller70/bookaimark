@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/types/supabase'
+import { appLogger } from '@/lib/logger'
 
 // Get environment variables with fallbacks for development
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://localhost-placeholder.supabase.co'
@@ -17,10 +18,10 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NODE_ENV === 'prod
 // Log warning in development if using placeholder values
 if (process.env.NODE_ENV === 'development') {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    console.warn('⚠️  NEXT_PUBLIC_SUPABASE_URL not found. Using placeholder. Add your Supabase URL to .env.local')
+    appLogger.warn('NEXT_PUBLIC_SUPABASE_URL not found. Using placeholder. Add your Supabase URL to .env.local')
   }
   if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.warn('⚠️  NEXT_PUBLIC_SUPABASE_ANON_KEY not found. Using placeholder. Add your Supabase anon key to .env.local')
+    appLogger.warn('NEXT_PUBLIC_SUPABASE_ANON_KEY not found. Using placeholder. Add your Supabase anon key to .env.local')
   }
 }
 

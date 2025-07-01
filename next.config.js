@@ -3,13 +3,64 @@ const { withSentryConfig } = require("@sentry/nextjs");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Point to the frontend directory for pages and components
   pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  // Removed deprecated options: swcMinify and experimental.appDir
-  // swcMinify is enabled by default in Next.js 13+
-  // appDir is now stable and enabled by default
+  
+  // Performance optimizations
+  compress: true,
+  poweredByHeader: false,
+  
+  // Image optimization
+  images: {
+    formats: ['image/webp', 'image/avif'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
+  
+  // Experimental optimizations
+  experimental: {
+    optimizeCss: true,
+    optimizeServerReact: true,
+    serverMinification: true,
+  },
+  
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  
+  // Webpack optimizations
+  webpack: (config, { dev, isServer }) => {
+    // Production optimizations
+    if (!dev) {
+      // Tree shaking
+      config.optimization.usedExports = true;
+      config.optimization.sideEffects = false;
+      
+      // Bundle splitting for better caching
+      if (!isServer) {
+        config.optimization.splitChunks = {
+          chunks: 'all',
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+            },
+            common: {
+              name: 'common',
+              minChunks: 2,
+              chunks: 'all',
+              enforce: true,
+            },
+          },
+        };
+      }
+    }
+    
+    return config;
   },
 }
 

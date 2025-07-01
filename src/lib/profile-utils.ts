@@ -1,5 +1,6 @@
 // Profile utility functions for consistent profile picture handling across the app
 import * as Sentry from '@sentry/nextjs'
+import { appLogger } from '@/lib/logger'
 
 export const getProfilePicture = (): string => {
   if (typeof window === 'undefined') {
@@ -15,7 +16,7 @@ export const getProfilePicture = (): string => {
         return settings.profile.avatar;
       }
     } catch (error) {
-      console.log('Error loading profile avatar from settings:', error);
+      appLogger.warn('Error loading profile avatar from settings', error);
       Sentry.captureException(error, {
         tags: { component: 'profile-utils', action: 'get_profile_picture' },
         level: 'warning'
@@ -42,7 +43,7 @@ export const getUserName = (): string => {
         return settings.profile.name;
       }
     } catch (error) {
-      console.log('Error loading user name from settings:', error);
+      appLogger.warn('Error loading user name from settings', error);
       Sentry.captureException(error, {
         tags: { component: 'profile-utils', action: 'get_user_name' },
         level: 'warning'
@@ -71,7 +72,7 @@ export const onProfilePictureChange = (callback: (newPicture: string) => void) =
           callback(settings.profile.avatar);
         }
       } catch (error) {
-        console.log('Error handling profile picture change:', error);
+        appLogger.warn('Error handling profile picture change', error);
       }
     } else if (e.key === 'profilePicture' && e.newValue) {
       callback(e.newValue);

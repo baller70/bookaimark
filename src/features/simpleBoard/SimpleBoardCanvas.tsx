@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -11,6 +11,7 @@ import ReactFlow, {
   Edge,
   Node,
   NodeTypes,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
@@ -98,6 +99,58 @@ interface SimpleBoardCanvasProps {
   onBookmarkClick?: (bookmark: BookmarkItem) => void;
 }
 
+// Error Boundary for React Flow
+class ReactFlowErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError?: (error: Error) => void },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode; onError?: (error: Error) => void }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('🚨 React Flow Error Boundary caught error:', error);
+    console.error('Error Info:', errorInfo);
+    
+    Sentry.captureException(error, {
+      tags: { component: 'ReactFlowErrorBoundary' },
+      extra: { errorInfo }
+    });
+    
+    if (this.props.onError) {
+      this.props.onError(error);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-red-50 border border-red-200 rounded-lg">
+          <div className="text-center p-8">
+            <h3 className="text-lg font-semibold text-red-800 mb-2">React Flow Error</h3>
+            <p className="text-red-600 mb-4">
+              {this.state.error?.message || 'An error occurred in the React Flow component'}
+            </p>
+            <button
+              onClick={() => this.setState({ hasError: false, error: undefined })}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 /**
  * ROBUST SimpleBoardCanvas with comprehensive debugging and drag-and-drop
  * ✅ Node dragging (React Flow)
@@ -164,7 +217,10 @@ export const SimpleBoardCanvas: React.FC<SimpleBoardCanvasProps> = ({ onBookmark
         );
       } catch (error) {
         console.error('❌ Error rendering BoardNode:', error);
-        return <div>Error rendering node {props.id}</div>;
+        Sentry.captureException(error, {
+          tags: { component: 'BoardNode', nodeId: props.id }
+        });
+        return <div className="p-4 bg-red-100 border border-red-300 rounded">Error rendering node {props.id}</div>;
       }
     },
   };
@@ -202,6 +258,19 @@ export const SimpleBoardCanvas: React.FC<SimpleBoardCanvasProps> = ({ onBookmark
 
   if (!mounted) {
     return <div className="w-full h-full flex items-center justify-center">Loading...</div>;
+  }
+
+  // Safety check for nodeTypes
+  if (!nodeTypes || Object.keys(nodeTypes).length === 0) {
+    console.error('❌ NodeTypes not properly defined:', nodeTypes);
+    return <div className="w-full h-full flex items-center justify-center text-red-500">Error: NodeTypes not defined</div>;
+  }
+
+  // Validate nodes have valid types
+  const invalidNodes = nodes.filter(node => !nodeTypes[node.type || 'default']);
+  if (invalidNodes.length > 0) {
+    console.error('❌ Invalid node types found:', invalidNodes.map(n => ({ id: n.id, type: n.type })));
+    return <div className="w-full h-full flex items-center justify-center text-red-500">Error: Invalid node types detected</div>;
   }
 
   return (
@@ -275,44 +344,62 @@ export const SimpleBoardCanvas: React.FC<SimpleBoardCanvasProps> = ({ onBookmark
 
       {/* REACT FLOW CANVAS */}
       <ReactFlowProvider>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={handleConnect}
-          nodeTypes={nodeTypes}
-          fitView
-          attributionPosition="bottom-left"
-          className="bg-gradient-to-br from-gray-50 to-gray-100"
-          nodesDraggable={true}
-          nodesConnectable={true}
-          elementsSelectable={true}
-          selectNodesOnDrag={false}
-          panOnDrag={true}
-          zoomOnScroll={true}
-          zoomOnPinch={true}
-          panOnScroll={false}
-          preventScrolling={false}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-          minZoom={0.1}
-          maxZoom={2}
+        <ReactFlowErrorBoundary 
           onError={(error) => {
-            console.error('❌ React Flow Error:', error);
-            Sentry.captureException(error, {
-              tags: { component: 'SimpleBoardCanvas', action: 'react_flow_error' }
-            });
+            console.error('❌ React Flow Error Boundary caught:', error);
           }}
-          onInit={() => console.log('✅ React Flow initialized successfully')}
         >
-          <Background gap={16} color="#e5e7eb" />
-          <MiniMap 
-            nodeColor="#3b82f6"
-            maskColor="rgba(0,0,0,0.1)"
-            position="bottom-left"
-          />
-          <Controls position="bottom-right" />
-        </ReactFlow>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={handleConnect}
+            nodeTypes={nodeTypes}
+            fitView
+            attributionPosition="bottom-left"
+            className="bg-gradient-to-br from-gray-50 to-gray-100"
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            selectNodesOnDrag={false}
+            panOnDrag={true}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            panOnScroll={false}
+            preventScrolling={false}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+            minZoom={0.1}
+            maxZoom={2}
+            onError={(error) => {
+              console.error('❌ React Flow Error:', error);
+              console.error('❌ Error details:', {
+                message: typeof error === 'string' ? error : (error as Error).message,
+                stack: typeof error === 'string' ? 'No stack trace' : (error as Error).stack,
+                nodeTypes: Object.keys(nodeTypes),
+                nodesCount: nodes.length,
+                edgesCount: edges.length
+              });
+              Sentry.captureException(error, {
+                tags: { component: 'SimpleBoardCanvas', action: 'react_flow_error' },
+                extra: {
+                  nodeTypes: Object.keys(nodeTypes),
+                  nodesCount: nodes.length,
+                  edgesCount: edges.length
+                }
+              });
+            }}
+            onInit={() => console.log('✅ React Flow initialized successfully')}
+          >
+            <Background gap={16} color="#e5e7eb" />
+            <MiniMap 
+              nodeColor="#3b82f6"
+              maskColor="rgba(0,0,0,0.1)"
+              position="bottom-left"
+            />
+            <Controls position="bottom-right" />
+          </ReactFlow>
+        </ReactFlowErrorBoundary>
       </ReactFlowProvider>
     </div>
   );

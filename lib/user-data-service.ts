@@ -51,6 +51,12 @@ class UserDataService {
     }
 
     const response = await fetch(`${this.baseUrl}/media?${params}`);
+    
+    // Handle authentication errors specifically
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    
     const result = await response.json();
 
     if (!result.success) {

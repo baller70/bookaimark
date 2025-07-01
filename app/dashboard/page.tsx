@@ -104,9 +104,11 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 // Custom Infinity Board Background Component (no nodes, just background)
-const InfinityBoardBackground = () => {
+const InfinityBoardBackground = ({ isActive }: { isActive: boolean }) => {
   const [nodes] = useNodesState([]);
   const [edges] = useEdgesState([]);
+
+  if (!isActive) return null;
 
   return (
     <ReactFlowProvider>
@@ -123,6 +125,9 @@ const InfinityBoardBackground = () => {
         zoomOnScroll={true}
         zoomOnPinch={true}
         zoomOnDoubleClick={true}
+        onError={(error) => {
+          console.error('❌ InfinityBoardBackground React Flow Error:', error);
+        }}
       >
         <Background gap={12} color="#e5e7eb" />
         <MiniMap position="bottom-left" />
@@ -133,14 +138,17 @@ const InfinityBoardBackground = () => {
 };
 
 // HIERARCHY Infinity Board with Full Editing Capabilities - DEFINITIVE SOLUTION
-const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, onOpenDetail }: {
+const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, onOpenDetail, isActive }: {
   folders: any[];
   bookmarks: any[];
   onCreateFolder: () => void;
   onAddBookmark: () => void;
   onOpenDetail: (bookmark: any) => void;
+  isActive: boolean;
 }) => {
   const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 });
+  
+  if (!isActive) return null;
   
   return (
     <div className="relative w-full min-h-screen overflow-auto">
@@ -169,6 +177,9 @@ const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, 
                 y: viewport.y,
                 zoom: viewport.zoom
               });
+            }}
+            onError={(error) => {
+              console.error('❌ KHV1InfinityBoard React Flow Error:', error);
             }}
           >
             <Background gap={12} color="#e5e7eb" />
@@ -282,6 +293,92 @@ export default function Dashboard() {
 
   // HIERARCHY view mode state
   const [khV1ViewMode, setKhV1ViewMode] = useState<'chart' | 'timeline'>('chart');
+
+  // Add active tab state for bookmark modal
+  const [activeBookmarkTab, setActiveBookmarkTab] = useState('overview');
+  const [hasVisitedMediaTab, setHasVisitedMediaTab] = useState(false);
+
+  // State for mock folders used in Folder 2.0 and Goal 2.0 views
+  const [mockFolders, setMockFolders] = useState([
+    {
+      id: '1',
+      name: 'Development',
+      description: 'All development related bookmarks and resources',
+      color: '#3b82f6'
+    },
+    {
+      id: '2', 
+      name: 'Design',
+      description: 'Design tools, inspiration, and creative resources',
+      color: '#ef4444'
+    },
+    {
+      id: '3',
+      name: 'Productivity',
+      description: 'Tools and apps to boost productivity',
+      color: '#10b981'
+    },
+    {
+      id: '4',
+      name: 'Entertainment',
+      description: 'Fun and entertainment websites',
+      color: '#8b5cf6'
+    },
+    {
+      id: '5',
+      name: 'Social',
+      description: 'Social media and networking platforms',
+      color: '#f59e0b'
+    },
+    {
+      id: '6',
+      name: 'Education',
+      description: 'Learning resources and educational content',
+      color: '#06b6d4'
+    }
+  ]);
+
+  const [mockGoalFolders, setMockGoalFolders] = useState([
+    {
+      id: '1',
+      name: 'Q1 Learning Goals',
+      description: 'Complete React and TypeScript courses',
+      color: '#3b82f6',
+      deadline_date: '2024-03-31',
+      goal_type: 'learn_category',
+      goal_description: 'Master React hooks and TypeScript fundamentals',
+      goal_status: 'in_progress',
+      goal_priority: 'high',
+      goal_progress: 65,
+      goal_notes: 'Making good progress on React hooks'
+    },
+    {
+      id: '2',
+      name: 'Project Organization',
+      description: 'Organize all development resources',
+      color: '#10b981',
+      deadline_date: '2024-02-15',
+      goal_type: 'organize',
+      goal_description: 'Create a systematic approach to project management',
+      goal_status: 'pending',
+      goal_priority: 'medium',
+      goal_progress: 25,
+      goal_notes: 'Need to start organizing soon'
+    },
+    {
+      id: '3',
+      name: 'Research New Technologies',
+      description: 'Explore emerging web technologies',
+      color: '#f59e0b',
+      deadline_date: '2024-04-30',
+      goal_type: 'research_topic',
+      goal_description: 'Research and evaluate new frameworks and tools',
+      goal_status: 'in_progress',
+      goal_priority: 'low',
+      goal_progress: 40,
+      goal_notes: 'Focusing on Next.js 14 and React Server Components'
+    }
+  ]);
 
   // Reset compact view mode when switching away from compact/list view
   useEffect(() => {
@@ -942,19 +1039,62 @@ export default function Dashboard() {
     setShowDefaultLogoModal(true)
   }
 
+  const handleTabChange = (value: string) => {
+    console.log('Tab changed to:', value)
+    setActiveBookmarkTab(value)
+    if (value === 'media') {
+      console.log('Media tab visited - setting hasVisitedMediaTab to true')
+      setHasVisitedMediaTab(true)
+    }
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
 
     if (active.id !== over?.id && over?.id) {
-      setBookmarks((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id)
-        const newIndex = items.findIndex((item) => item.id === over.id)
+      // Handle bookmark reordering
+      const activeBookmarkIndex = bookmarks.findIndex((item) => item.id === active.id)
+      const overBookmarkIndex = bookmarks.findIndex((item) => item.id === over.id)
+      
+      if (activeBookmarkIndex !== -1 && overBookmarkIndex !== -1) {
+        setBookmarks((items) => arrayMove(items, activeBookmarkIndex, overBookmarkIndex))
+        return
+      }
 
-        if (oldIndex !== -1 && newIndex !== -1) {
-          return arrayMove(items, oldIndex, newIndex)
+      // Handle mockFolders reordering (Folder 2.0)
+      const activeFolderIndex = mockFolders.findIndex((item) => item.id === active.id)
+      const overFolderIndex = mockFolders.findIndex((item) => item.id === over.id)
+      
+      if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
+        setMockFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
+        return
+      }
+
+      // Handle mockGoalFolders reordering (Goal 2.0) - only in goal2 view
+      if (viewMode === 'goal2') {
+        const activeGoalIndex = mockGoalFolders.findIndex((item) => item.id === active.id)
+        const overGoalIndex = mockGoalFolders.findIndex((item) => item.id === over.id)
+        
+        console.log('🎯 Goal 2.0 Drag Debug:', {
+          activeId: active.id,
+          overId: over.id,
+          activeGoalIndex,
+          overGoalIndex,
+          mockGoalFoldersLength: mockGoalFolders.length,
+          mockGoalFolders: mockGoalFolders.map(f => ({ id: f.id, name: f.name }))
+        })
+        
+        if (activeGoalIndex !== -1 && overGoalIndex !== -1) {
+          console.log('✅ Goal 2.0 Reordering folders from index', activeGoalIndex, 'to index', overGoalIndex)
+          setMockGoalFolders((items) => {
+            const newItems = arrayMove(items, activeGoalIndex, overGoalIndex)
+            console.log('🎯 New Goal order:', newItems.map(f => ({ id: f.id, name: f.name })))
+            return newItems
+          })
+          console.log('🎉 Goal 2.0 drag-and-drop completed successfully!')
+          return
         }
-        return items
-      })
+      }
     }
   }
 
@@ -1514,6 +1654,69 @@ export default function Dashboard() {
     </div>
   )
 
+  // Sortable Folder Cards for Drag and Drop
+  const SortableCompactFolderCard = ({ category, bookmarkCount }: { category: string, bookmarkCount: number }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: category })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      zIndex: isDragging ? 1000 : 1,
+    }
+
+    return (
+      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
+        {/* Drag Handle - Top Right */}
+        <div 
+          {...listeners} 
+          className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
+        >
+          <GripVertical className="h-4 w-4 text-gray-700" />
+        </div>
+        <CompactFolderCard category={category} bookmarkCount={bookmarkCount} />
+      </div>
+    )
+  }
+
+  const SortableListFolderCard = ({ category, bookmarkCount }: { category: string, bookmarkCount: number }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: category })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      zIndex: isDragging ? 1000 : 1,
+    }
+
+    return (
+      <div ref={setNodeRef} style={style} className="relative group">
+        {/* Drag Handle - Right Side */}
+        <div 
+          {...listeners} 
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
+        >
+          <GripVertical className="h-4 w-4 text-gray-700" />
+        </div>
+        <ListFolderCard category={category} bookmarkCount={bookmarkCount} />
+      </div>
+    )
+  }
+
   const SortableListBookmarkCard = ({ bookmark }: { bookmark: any }) => {
     const {
       attributes,
@@ -1696,45 +1899,262 @@ export default function Dashboard() {
       transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
-      zIndex: isDragging ? 1000 : 1,
     }
 
     return (
-      <div ref={setNodeRef} style={style} {...attributes} className="relative group">
-        {/* Drag Handle - Left Side */}
-        <div 
-          {...listeners} 
-          className="absolute left-2 top-1/2 transform -translate-y-1/2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-105"
-        >
-          <GripVertical className="h-4 w-4 text-gray-700" />
-        </div>
-        <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-200 hover:border-blue-600 bg-white" onClick={() => handleBookmarkClick(bookmark)}>
-          <div className="flex items-center space-x-4 ml-8">
-            <div className="h-12 w-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
-              {bookmark.logo ? (
-                <img src={bookmark.logo} alt={bookmark.title} className="h-8 w-8 object-contain" />
-              ) : (
-                <GitBranch className="h-6 w-6 text-blue-600" />
-              )}
+      <div ref={setNodeRef} style={style} {...attributes}>
+        <div className="relative group">
+          {/* Drag handle */}
+          <div 
+            {...listeners}
+            className="absolute left-[-24px] top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing z-10"
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+              <div className="w-1 h-1 bg-gray-400 rounded-full ml-1"></div>
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-lg truncate text-gray-900">{bookmark.title}</h3>
-              <p className="text-sm text-gray-500 truncate">{bookmark.description}</p>
-              <div className="flex items-center space-x-4 mt-2">
-                <Badge className={`${getCategoryColor(bookmark.category)} text-xs`}>
-                  {bookmark.category}
-                </Badge>
-                <span className="text-xs text-gray-400">{bookmark.visits} visits</span>
+          </div>
+          <FolderCard bookmark={bookmark} />
+        </div>
+      </div>
+    )
+  }
+
+  // Sortable version of FolderCard for Folder 2.0
+  const SortableFolderCard2 = ({ folder, bookmarkCount, onEdit, onDelete, onAddBookmark, onDrop, onDragOver, onClick }: {
+    folder: Folder;
+    bookmarkCount: number;
+    onEdit: (folder: Folder) => void;
+    onDelete: (folderId: string) => void;
+    onAddBookmark: (folderId: string) => void;
+    onDrop: (folderId: string, bookmark: BookmarkWithRelations) => void;
+    onDragOver: (event: React.DragEvent) => void;
+    onClick?: () => void;
+  }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: folder.id })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    return (
+      <div ref={setNodeRef} style={style} {...attributes}>
+        <div className="relative group">
+          {/* Drag handle */}
+          <div 
+            {...listeners}
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing z-10 bg-white/80 rounded-md p-1 shadow-sm"
+          >
+            <div className="flex flex-col space-y-0.5">
+              <div className="flex space-x-0.5">
+                <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+              </div>
+              <div className="flex space-x-0.5">
+                <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+          <FolderCard
+            folder={folder}
+            bookmarkCount={bookmarkCount}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onAddBookmark={onAddBookmark}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onClick={onClick}
+            disableLink={true}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Goal Folder Card component (non-sortable)
+  const GoalFolderCard = ({ folder, bookmarkCount, onEdit, onDelete, onAddBookmark, onDrop, onDragOver, onClick }: {
+    folder: Folder;
+    bookmarkCount: number;
+    onEdit: (folder: Folder) => void;
+    onDelete: (folderId: string) => void;
+    onAddBookmark: (folderId: string) => void;
+    onDrop: (folderId: string, bookmark: BookmarkWithRelations) => void;
+    onDragOver: (event: React.DragEvent) => void;
+    onClick?: () => void;
+  }) => {
+    return (
+      <div 
+        className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+        onClick={onClick}
+        onDrop={(e) => {
+          e.preventDefault();
+          // Handle bookmark drop logic here
+        }}
+        onDragOver={onDragOver}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: folder.color }}
+            >
+              <Target className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">{folder.name}</h3>
+              <p className="text-sm text-gray-600">{folder.description}</p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(folder);
+            }}
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Progress</span>
+            <span className="font-medium">{folder.goal_progress}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${folder.goal_progress}%` }}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Deadline</span>
+            <span className="font-medium">
+              {folder.deadline_date ? new Date(folder.deadline_date).toLocaleDateString() : 'No deadline'}
+            </span>
+          </div>
+          
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Priority</span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              folder.goal_priority === 'high' ? 'bg-red-100 text-red-800' :
+              folder.goal_priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-green-100 text-green-800'
+            }`}>
+              {folder.goal_priority}
+            </span>
+          </div>
+          
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Status</span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              folder.goal_status === 'completed' ? 'bg-green-100 text-green-800' :
+              folder.goal_status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+              folder.goal_status === 'overdue' ? 'bg-red-100 text-red-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {folder.goal_status?.replace('_', ' ')}
+            </span>
+          </div>
+          
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Bookmarks</span>
+            <span className="font-medium">{bookmarkCount}</span>
+          </div>
+        </div>
+        
+        {folder.goal_notes && (
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600">{folder.goal_notes}</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Sortable version of Goal Folder Card for Goal 2.0
+  const SortableGoalFolderCard = ({ folder, bookmarkCount, onEdit, onDelete, onAddBookmark, onDrop, onDragOver, onClick }: {
+    folder: Folder;
+    bookmarkCount: number;
+    onEdit: (folder: Folder) => void;
+    onDelete: (folderId: string) => void;
+    onAddBookmark: (folderId: string) => void;
+    onDrop: (folderId: string, bookmark: BookmarkWithRelations) => void;
+    onDragOver: (event: React.DragEvent) => void;
+    onClick?: () => void;
+  }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: folder.id })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    // Prevent click event when dragging
+    const handleClick = (e: React.MouseEvent) => {
+      if (isDragging) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      onClick?.();
+    }
+
+    return (
+      <div ref={setNodeRef} style={style} {...attributes}>
+        <div className="relative group">
+          {/* Drag handle - positioned with higher z-index and proper event handling */}
+          <div 
+            {...listeners}
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing z-50 bg-white/90 rounded-md p-2 shadow-md border border-gray-200 hover:bg-white hover:shadow-lg"
+            onMouseDown={(e) => {
+              e.stopPropagation(); // Prevent card click when starting drag
+            }}
+          >
+            <div className="flex flex-col space-y-0.5">
+              <div className="flex space-x-0.5">
+                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
+                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
+              </div>
+              <div className="flex space-x-0.5">
+                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
+                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
               </div>
             </div>
           </div>
           
-          {/* Action Icons */}
-          <BookmarkActionIcons bookmark={bookmark} />
-          
-          {/* Usage Percentage Hexagon */}
-          <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
-        </Card>
+          {/* Use the separated GoalFolderCard component */}
+          <GoalFolderCard
+            folder={folder}
+            bookmarkCount={bookmarkCount}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onAddBookmark={onAddBookmark}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onClick={handleClick}
+          />
+        </div>
       </div>
     )
   }
@@ -1748,18 +2168,28 @@ export default function Dashboard() {
           // Show folder view - group bookmarks by category
           const categories = [...new Set(bookmarks.map(bookmark => bookmark.category))]
           return (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {categories.map((category) => {
-                const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
-                return (
-                  <CompactFolderCard 
-                    key={category} 
-                    category={category} 
-                    bookmarkCount={categoryBookmarks.length} 
-                  />
-                )
-              })}
-            </div>
+            <ClientOnlyDndProvider>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={categories} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {categories.map((category) => {
+                      const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
+                      return (
+                        <SortableCompactFolderCard 
+                          key={category} 
+                          category={category} 
+                          bookmarkCount={categoryBookmarks.length} 
+                        />
+                      )
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </ClientOnlyDndProvider>
           )
         } else {
           // Show bookmarks within selected folder
@@ -1814,18 +2244,28 @@ export default function Dashboard() {
           // Show folder view for list - group bookmarks by category
           const categories = [...new Set(bookmarks.map(bookmark => bookmark.category))]
           return (
-            <div className="space-y-4">
-              {categories.map((category) => {
-                const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
-                return (
-                  <ListFolderCard 
-                    key={category} 
-                    category={category} 
-                    bookmarkCount={categoryBookmarks.length} 
-                  />
-                )
-              })}
-            </div>
+            <ClientOnlyDndProvider>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={categories} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-4">
+                    {categories.map((category) => {
+                      const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
+                      return (
+                        <SortableListFolderCard 
+                          key={category} 
+                          category={category} 
+                          bookmarkCount={categoryBookmarks.length} 
+                        />
+                      )
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </ClientOnlyDndProvider>
           )
         }
         
@@ -1909,9 +2349,13 @@ export default function Dashboard() {
           </div>
         )
       case 'timeline':
+        console.log('🕒 Rendering timeline view with SimpleBoardCanvas');
         return (
           <div className="w-full h-screen">
-            <SimpleBoardCanvas onBookmarkClick={handleBookmarkClick} />
+            <SimpleBoardCanvas 
+              key="timeline-board" 
+              onBookmarkClick={handleBookmarkClick} 
+            />
           </div>
         )
       case 'hierarchyV1':
@@ -1969,40 +2413,13 @@ export default function Dashboard() {
                   onCreateFolder={() => setShowAddFolder(true)}
                   onAddBookmark={() => setShowAddBookmark(true)}
                   onOpenDetail={handleBookmarkClick}
+                  isActive={true}
                 />
               </div>
             </DndContext>
           </ClientOnlyDndProvider>
         )
       case 'folder2':
-        // Create mock folders for demonstration
-        const mockFolders: Folder[] = [
-          {
-            id: '1',
-            name: 'Development',
-            description: 'All development related bookmarks and resources',
-            color: '#3b82f6'
-          },
-          {
-            id: '2', 
-            name: 'Design',
-            description: 'Design tools, inspiration, and creative resources',
-            color: '#ef4444'
-          },
-          {
-            id: '3',
-            name: 'Productivity',
-            description: 'Tools and apps to boost productivity',
-            color: '#10b981'
-          },
-          {
-            id: '4',
-            name: 'Learning',
-            description: 'Educational content and learning platforms',
-            color: '#f59e0b'
-          }
-        ];
-
         const handleFolderEdit = (folder: Folder) => {
           console.log('Edit folder:', folder);
           showNotification(`Edit folder: ${folder.name}`);
@@ -2040,78 +2457,60 @@ export default function Dashboard() {
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 density-gap">
-                  {mockFolders.map((folder) => {
-                    const folderBookmarks = bookmarks.filter(bookmark => 
-                      bookmark.category.toLowerCase() === folder.name.toLowerCase()
-                    );
-                    
-                    return (
-                      <FolderCard
-                        key={folder.id}
-                        folder={folder}
-                        bookmarkCount={folderBookmarks.length}
-                        onEdit={handleFolderEdit}
-                        onDelete={handleFolderDelete}
-                        onAddBookmark={handleFolderAddBookmark}
-                        onDrop={handleFolderDrop}
-                        onDragOver={handleFolderDragOver}
-                        disableLink={true}
-                        onClick={() => {
-                          console.log('Folder clicked:', folder);
-                          showNotification(`Opened folder: ${folder.name}`);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
+                <SortableContext items={mockFolders.map(f => f.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 density-gap">
+                    {mockFolders.map((folder) => {
+                      const folderBookmarks = bookmarks.filter(bookmark => 
+                        bookmark.category.toLowerCase() === folder.name.toLowerCase()
+                      );
+                      
+                      return (
+                        <SortableFolderCard2
+                          key={folder.id}
+                          folder={folder}
+                          bookmarkCount={folderBookmarks.length}
+                          onEdit={handleFolderEdit}
+                          onDelete={handleFolderDelete}
+                          onAddBookmark={handleFolderAddBookmark}
+                          onDrop={handleFolderDrop}
+                          onDragOver={handleFolderDragOver}
+                          onClick={() => {
+                            console.log('Folder clicked:', folder);
+                            showNotification(`Opened folder: ${folder.name}`);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </SortableContext>
               </DndContext>
             </ClientOnlyDndProvider>
           </div>
         )
       case 'goal2':
-        // Create mock goal folders for demonstration
-        const mockGoalFolders: Folder[] = [
-          {
-            id: '1',
-            name: 'Q1 Learning Goals',
-            description: 'Complete React and TypeScript courses',
-            color: '#3b82f6',
-            deadline_date: '2024-03-31',
-            goal_type: 'learn_category',
-            goal_description: 'Master React hooks and TypeScript fundamentals',
-            goal_status: 'in_progress',
-            goal_priority: 'high',
-            goal_progress: 65,
-            goal_notes: 'Making good progress on React hooks'
-          },
-          {
-            id: '2',
-            name: 'Project Organization',
-            description: 'Organize all development resources',
-            color: '#10b981',
-            deadline_date: '2024-02-15',
-            goal_type: 'organize',
-            goal_description: 'Create a systematic approach to project management',
-            goal_status: 'pending',
-            goal_priority: 'medium',
-            goal_progress: 25,
-            goal_notes: 'Need to start organizing soon'
-          },
-          {
-            id: '3',
-            name: 'Research New Technologies',
-            description: 'Explore emerging web technologies',
-            color: '#f59e0b',
-            deadline_date: '2024-04-30',
-            goal_type: 'research_topic',
-            goal_description: 'Research and evaluate new frameworks and tools',
-            goal_status: 'in_progress',
-            goal_priority: 'low',
-            goal_progress: 40,
-            goal_notes: 'Focusing on Next.js 14 and React Server Components'
-          }
-        ];
+        const handleGoalEdit = (folder: Folder) => {
+          console.log('Edit goal folder:', folder);
+          showNotification(`Edit goal folder: ${folder.name}`);
+        };
+
+        const handleGoalDelete = (folderId: string) => {
+          console.log('Delete goal folder:', folderId);
+          showNotification(`Delete goal folder: ${folderId}`);
+        };
+
+        const handleGoalAddBookmark = (folderId: string) => {
+          console.log('Add bookmark to goal folder:', folderId);
+          showNotification(`Add bookmark to goal folder: ${folderId}`);
+        };
+
+        const handleGoalDrop = (folderId: string, bookmark: BookmarkWithRelations) => {
+          console.log('Drop bookmark to goal folder:', folderId, bookmark);
+          showNotification(`Moved "${bookmark.title}" to goal folder`);
+        };
+
+        const handleGoalDragOver = (event: React.DragEvent) => {
+          event.preventDefault();
+        };
 
         const handleGoalSubmit = (data: { name: string; description?: string; color?: string; reminder_at?: string | null }) => {
           console.log('Goal folder submitted:', data);
@@ -2139,96 +2538,40 @@ export default function Dashboard() {
               </Button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockGoalFolders.map((folder) => {
-                const folderBookmarks = bookmarks.filter(bookmark => 
-                  bookmark.category.toLowerCase().includes(folder.name.toLowerCase().split(' ')[0])
-                );
-                
-                return (
-                  <div key={folder.id} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: folder.color }}
-                        >
-                          <Target className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{folder.name}</h3>
-                          <p className="text-sm text-gray-600">{folder.description}</p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedGoalFolder(folder);
-                          setGoalDialogOpen(true);
-                        }}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Progress</span>
-                        <span className="font-medium">{folder.goal_progress}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${folder.goal_progress}%` }}
+            <ClientOnlyDndProvider>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={mockGoalFolders.map(f => f.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {mockGoalFolders.map((folder) => {
+                      const folderBookmarks = bookmarks.filter(bookmark => 
+                        bookmark.category.toLowerCase().includes(folder.name.toLowerCase().split(' ')[0])
+                      );
+                      
+                      return (
+                        <SortableGoalFolderCard
+                          key={folder.id}
+                          folder={folder}
+                          bookmarkCount={folderBookmarks.length}
+                          onEdit={handleGoalEdit}
+                          onDelete={handleGoalDelete}
+                          onAddBookmark={handleGoalAddBookmark}
+                          onDrop={handleGoalDrop}
+                          onDragOver={handleGoalDragOver}
+                          onClick={() => {
+                            console.log('Goal folder clicked:', folder);
+                            showNotification(`Opened goal folder: ${folder.name}`);
+                          }}
                         />
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Deadline</span>
-                        <span className="font-medium">
-                          {folder.deadline_date ? new Date(folder.deadline_date).toLocaleDateString() : 'No deadline'}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Priority</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          folder.goal_priority === 'high' ? 'bg-red-100 text-red-800' :
-                          folder.goal_priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {folder.goal_priority}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Status</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          folder.goal_status === 'completed' ? 'bg-green-100 text-green-800' :
-                          folder.goal_status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                          folder.goal_status === 'overdue' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {folder.goal_status?.replace('_', ' ')}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Bookmarks</span>
-                        <span className="font-medium">{folderBookmarks.length}</span>
-                      </div>
-                    </div>
-                    
-                    {folder.goal_notes && (
-                      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600">{folder.goal_notes}</p>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </SortableContext>
+              </DndContext>
+            </ClientOnlyDndProvider>
             
             <FolderFormDialog
               open={goalDialogOpen}
@@ -2781,6 +3124,9 @@ export default function Dashboard() {
           // Reset editing state when modal closes
           setEditingField(null)
           setEditingValue('')
+          setActiveBookmarkTab('overview') // Reset tab when modal closes
+          setHasVisitedMediaTab(false) // Reset media tab visit tracking
+          console.log('Modal closed - reset hasVisitedMediaTab to false')
         }
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
@@ -2832,7 +3178,7 @@ export default function Dashboard() {
                 </div>
               </DialogHeader>
 
-              <Tabs defaultValue="overview" className="mt-6">
+              <Tabs value={activeBookmarkTab} onValueChange={handleTabChange} className="mt-6">
                 <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="overview">OVERVIEW</TabsTrigger>
                   <TabsTrigger value="notification">NOTIFICATION</TabsTrigger>
@@ -3204,7 +3550,13 @@ export default function Dashboard() {
                 </TabsContent>
 
                 <TabsContent value="media" className="h-[600px]">
-                  <MediaHub />
+                  {hasVisitedMediaTab ? (
+                    <MediaHub />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <p>Click the MEDIA tab to load media library</p>
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="comment" className="space-y-6">

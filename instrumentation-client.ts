@@ -23,6 +23,10 @@ if (typeof window !== 'undefined' && !window.__SENTRY_INITIALIZED__) {
         maskAllText: false,
         blockAllMedia: false,
       }),
+      // Console logging integration for structured logs
+      Sentry.consoleLoggingIntegration({ 
+        levels: ['error', 'warn'] 
+      }),
     ],
 
     // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
