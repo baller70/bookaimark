@@ -19,7 +19,8 @@ import {
   Users,
   FolderOpen,
   Dna,
-  ShoppingCart
+  ShoppingCart,
+  Brain
 } from 'lucide-react'
 
 export function ShadcnSidebar() {
@@ -30,6 +31,7 @@ export function ShadcnSidebar() {
   const navigationItems = [
     { id: 'Dashboard', name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { id: 'DNA Profile', name: 'DNA Profile', icon: Dna, href: '/dna-profile' },
+    { id: 'AI LinkPilot', name: 'AI LinkPilot', icon: Brain, href: '/settings/ai' },
     { id: 'Marketplace', name: 'Marketplace', icon: ShoppingCart, href: '/marketplace' },
     { id: 'Setting', name: 'Setting', icon: Settings, href: '/settings' },
   ]
