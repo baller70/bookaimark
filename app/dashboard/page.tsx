@@ -380,69 +380,7 @@ export default function Dashboard() {
     }
   ]);
 
-  // Reset compact view mode when switching away from compact/list view
-  useEffect(() => {
-    if (viewMode !== 'compact' && viewMode !== 'list') {
-      setCompactViewMode('folders')
-      setSelectedFolder(null)
-    }
-  }, [viewMode])
-
-  // Client-side only effect
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  // Load user profile picture as default logo from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Always check for the latest profile avatar from settings
-      const savedSettings = localStorage.getItem('userSettings')
-      if (savedSettings) {
-        try {
-          const settings = JSON.parse(savedSettings)
-          if (settings.profile?.avatar) {
-            setUserDefaultLogo(settings.profile.avatar)
-            console.log('Profile avatar loaded as default bookmark logo:', settings.profile.avatar)
-          }
-        } catch (error) {
-          console.log('Error loading profile avatar as default logo:', error)
-        }
-      }
-      
-      // Listen for storage changes to update when settings change
-      const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === 'userSettings' && e.newValue) {
-          try {
-            const settings = JSON.parse(e.newValue)
-            if (settings.profile?.avatar) {
-              setUserDefaultLogo(settings.profile.avatar)
-              console.log('Profile avatar updated from settings change:', settings.profile.avatar)
-            }
-          } catch (error) {
-            console.log('Error updating profile avatar from storage change:', error)
-          }
-        }
-      }
-      
-      window.addEventListener('storage', handleStorageChange)
-      return () => window.removeEventListener('storage', handleStorageChange)
-    }
-  }, [])
-
-  // Drag and drop sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
-  // Exact bookmark data from the reference website - now as state for drag and drop
+  // --- Bookmark data state (must come before category ordering logic) ---
   const [bookmarks, setBookmarks] = useState([
     {
       id: 1,
@@ -600,7 +538,86 @@ export default function Dashboard() {
         status: "Active"
       }
     }
-  ])
+  ]);
+
+  // ---- Folder category ordering state (for compact & list views) ----
+  const [folderCategories, setFolderCategories] = useState<string[]>([]);
+
+  // Initialize / sync folderCategories with current bookmark categories while preserving user-defined order
+  useEffect(() => {
+    const currentCategories = Array.from(new Set(bookmarks.map((b) => b.category)));
+
+    setFolderCategories((prev) => {
+      if (prev.length === 0) {
+        return currentCategories; // initial load
+      }
+      const missing = currentCategories.filter((c) => !prev.includes(c));
+      if (missing.length === 0) return prev;
+      return [...prev, ...missing];
+    });
+  }, [bookmarks]);
+
+  // Reset compact view mode when switching away from compact/list view
+  useEffect(() => {
+    if (viewMode !== 'compact' && viewMode !== 'list') {
+      setCompactViewMode('folders')
+      setSelectedFolder(null)
+    }
+  }, [viewMode])
+
+  // Client-side only effect
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // Load user profile picture as default logo from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Always check for the latest profile avatar from settings
+      const savedSettings = localStorage.getItem('userSettings')
+      if (savedSettings) {
+        try {
+          const settings = JSON.parse(savedSettings)
+          if (settings.profile?.avatar) {
+            setUserDefaultLogo(settings.profile.avatar)
+            console.log('Profile avatar loaded as default bookmark logo:', settings.profile.avatar)
+          }
+        } catch (error) {
+          console.log('Error loading profile avatar as default logo:', error)
+        }
+      }
+      
+      // Listen for storage changes to update when settings change
+      const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === 'userSettings' && e.newValue) {
+          try {
+            const settings = JSON.parse(e.newValue)
+            if (settings.profile?.avatar) {
+              setUserDefaultLogo(settings.profile.avatar)
+              console.log('Profile avatar updated from settings change:', settings.profile.avatar)
+            }
+          } catch (error) {
+            console.log('Error updating profile avatar from storage change:', error)
+          }
+        }
+      }
+      
+      window.addEventListener('storage', handleStorageChange)
+      return () => window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // Available bookmarks that can be added to the workspace
   const availableBookmarks = [
@@ -1095,6 +1112,16 @@ export default function Dashboard() {
           return
         }
       }
+
+      // Handle category folder reordering for Compact & List folder views
+      if ((viewMode === 'compact' || viewMode === 'list') && compactViewMode === 'folders') {
+        const activeCatIndex = folderCategories.findIndex((cat) => cat === active.id)
+        const overCatIndex = folderCategories.findIndex((cat) => cat === over.id)
+        if (activeCatIndex !== -1 && overCatIndex !== -1) {
+          setFolderCategories((items) => arrayMove(items, activeCatIndex, overCatIndex))
+          return
+        }
+      }
     }
   }
 
@@ -1250,7 +1277,7 @@ export default function Dashboard() {
                 if (navigator.share) {
                   navigator.share(shareData).catch(console.error)
                 } else {
-                  navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.url}`).then(() => {
+                  navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.description}\n${selectedBookmark.url}`).then(() => {
                     showNotification('Bookmark details copied to clipboard!')
                   }).catch(() => {
                     showNotification('Failed to share bookmark')
@@ -2166,7 +2193,7 @@ export default function Dashboard() {
       case 'compact':
         if (compactViewMode === 'folders') {
           // Show folder view - group bookmarks by category
-          const categories = [...new Set(bookmarks.map(bookmark => bookmark.category))]
+          const categories = folderCategories
           return (
             <ClientOnlyDndProvider>
               <DndContext
@@ -2242,7 +2269,7 @@ export default function Dashboard() {
       case 'list':
         if (compactViewMode === 'folders') {
           // Show folder view for list - group bookmarks by category
-          const categories = [...new Set(bookmarks.map(bookmark => bookmark.category))]
+          const categories = folderCategories
           return (
             <ClientOnlyDndProvider>
               <DndContext
