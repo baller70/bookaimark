@@ -1078,15 +1078,6 @@ export default function Dashboard() {
         return
       }
 
-      // Handle mockFolders reordering (Folder 2.0)
-      const activeFolderIndex = mockFolders.findIndex((item) => item.id === active.id)
-      const overFolderIndex = mockFolders.findIndex((item) => item.id === over.id)
-      
-      if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
-        setMockFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
-        return
-      }
-
       // Handle mockGoalFolders reordering (Goal 2.0) - only in goal2 view
       if (viewMode === 'goal2') {
         const activeGoalIndex = mockGoalFolders.findIndex((item) => item.id === active.id)
@@ -1111,6 +1102,15 @@ export default function Dashboard() {
           console.log('🎉 Goal 2.0 drag-and-drop completed successfully!')
           return
         }
+      }
+
+      // Handle mockFolders reordering (Folder 2.0)
+      const activeFolderIndex = mockFolders.findIndex((item) => item.id === active.id)
+      const overFolderIndex = mockFolders.findIndex((item) => item.id === over.id)
+      
+      if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
+        setMockFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
+        return
       }
 
       // Handle category folder reordering for Compact & List folder views
