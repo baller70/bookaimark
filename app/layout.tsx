@@ -1,4 +1,4 @@
-import './globals.css'
+import '../src/app/globals.css'
 import { Saira, Audiowide } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { GlobalSettingsProvider } from '@/components/providers/ThemeProvider'

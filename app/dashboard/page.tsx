@@ -2485,7 +2485,7 @@ export default function Dashboard() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext items={mockFolders.map(f => f.id)} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 density-gap">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 density-gap">
                     {mockFolders.map((folder) => {
                       const folderBookmarks = bookmarks.filter(bookmark => 
                         bookmark.category.toLowerCase() === folder.name.toLowerCase()
@@ -2748,7 +2748,7 @@ export default function Dashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 density-gap mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 density-gap mb-8">
             {/* Learning Card - Spans 2 columns - Exact copy from screenshot */}
             <Card className="md:col-span-2 relative overflow-hidden bg-gradient-to-br from-white via-blue-50/10 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
               <CardContent className="density-p relative">
