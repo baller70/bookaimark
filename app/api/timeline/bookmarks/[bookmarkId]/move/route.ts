@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { bookmarkId: string } }
+  { params }: { params: Promise<{ bookmarkId: string }> }
 ) {
   try {
-    const { bookmarkId } = params;
+    const { bookmarkId } = await params;
     const { newBoardId, newOrder } = await request.json();
     
     // Mock move operation - return moved bookmark

@@ -2,6 +2,7 @@ import '../src/app/globals.css'
 import { Saira, Audiowide } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { GlobalSettingsProvider } from '@/components/providers/ThemeProvider'
+import OracleBlob from '@/components/oracle/oracle-blob'
 
 const saira = Saira({ subsets: ['latin'] })
 const audiowide = Audiowide({ 
@@ -28,6 +29,9 @@ export default function RootLayout({
             <div className="min-h-screen flex flex-col">
               {children}
             </div>
+            
+            {/* Oracle Blob - Available on all pages */}
+            <OracleBlob />
           </GlobalSettingsProvider>
         </ThemeProvider>
       </body>

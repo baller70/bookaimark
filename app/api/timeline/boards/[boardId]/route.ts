@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
-    const { boardId } = params;
+    const { boardId } = await params;
     const updates = await request.json();
     
     // Mock update - return updated board
@@ -30,10 +30,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: any
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
-    const { boardId } = params;
+    const { boardId } = await params;
     
     // Mock deletion - just return success
     return NextResponse.json({ 

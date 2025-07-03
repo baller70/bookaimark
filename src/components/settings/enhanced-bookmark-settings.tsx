@@ -993,6 +993,12 @@ export default function EnhancedBookmarkSettings() {
   }
 
   const handleSectionChange = (section: string) => {
+    // Special handling for Oracle - navigate directly to Oracle settings
+    if (section === 'oracle') {
+      router.push('/settings/oracle');
+      return;
+    }
+    
     if (hasChanges) {
       setPendingSection(section);
       setShowSwitchPrompt(true);
@@ -1085,7 +1091,8 @@ export default function EnhancedBookmarkSettings() {
                     { id: 'notifications', label: 'Notifications', icon: Bell },
                     { id: 'privacy', label: 'Privacy & Security', icon: Shield },
                     { id: 'backup', label: 'Backup & Export', icon: Database },
-                    { id: 'billing', label: 'Billing & Subscription', icon: Star }
+                    { id: 'billing', label: 'Billing & Subscription', icon: Star },
+                    { id: 'oracle', label: 'Oracle AI Chat Bot', icon: Settings }
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
@@ -2088,6 +2095,8 @@ export default function EnhancedBookmarkSettings() {
                 </CardContent>
               </Card>
             )}
+
+
           </div>
         </div>
       </div>

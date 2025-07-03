@@ -7,9 +7,9 @@ const jobs = new Map();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
-  const jobId = params.jobId;
+  const { jobId } = await params;
   
   if (!jobId) {
     return NextResponse.json(

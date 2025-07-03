@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { ChatSidebar } from '@/components/dashboard/ChatSidebar'
 import { ShadcnSidebar } from '@/components/dashboard/ShadcnSidebar'
 import { DashboardProvider } from '@/components/dashboard/DashboardContext'
+import OracleBlob from '@/components/oracle/oracle-blob'
 
 export default function DashboardLayout({
   children,
@@ -70,6 +71,9 @@ export default function DashboardLayout({
 
         {/* Chat Sidebar */}
         <ChatSidebar />
+        
+        {/* Oracle Blob */}
+        <OracleBlob />
       </div>
     </DashboardProvider>
   )
