@@ -32,6 +32,102 @@ export interface Database {
           updated_at?: string
         }
       }
+      oracle_conversations: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          created_at: string
+          updated_at: string
+          last_message_at: string
+          message_count: number
+          is_active: boolean
+          metadata: Json
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          created_at?: string
+          updated_at?: string
+          last_message_at?: string
+          message_count?: number
+          is_active?: boolean
+          metadata?: Json
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          created_at?: string
+          updated_at?: string
+          last_message_at?: string
+          message_count?: number
+          is_active?: boolean
+          metadata?: Json
+        }
+      }
+      oracle_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          user_id: string
+          content: string
+          role: 'user' | 'assistant' | 'system'
+          created_at: string
+          updated_at: string
+          audio_url: string | null
+          metadata: Json
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          user_id: string
+          content: string
+          role: 'user' | 'assistant' | 'system'
+          created_at?: string
+          updated_at?: string
+          audio_url?: string | null
+          metadata?: Json
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          user_id?: string
+          content?: string
+          role?: 'user' | 'assistant' | 'system'
+          created_at?: string
+          updated_at?: string
+          audio_url?: string | null
+          metadata?: Json
+        }
+      }
+      oracle_settings: {
+        Row: {
+          id: string
+          user_id: string
+          setting_type: 'appearance' | 'behavior' | 'voice' | 'context' | 'tools' | 'advanced'
+          settings_data: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          setting_type: 'appearance' | 'behavior' | 'voice' | 'context' | 'tools' | 'advanced'
+          settings_data: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          setting_type?: 'appearance' | 'behavior' | 'voice' | 'context' | 'tools' | 'advanced'
+          settings_data?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
       community_posts: {
         Row: {
           id: string

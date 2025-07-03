@@ -55,28 +55,28 @@ interface OracleAppearanceSettings {
 }
 
 const defaultSettings: OracleAppearanceSettings = {
-  primaryColor: '#00d4ff',
-  secondaryColor: '#6366f1',
+  primaryColor: '#3B82F6',
+  secondaryColor: '#8B5CF6',
   gradientDirection: 'linear',
   gradientIntensity: 80,
   
-  blobSize: 200,
+  blobSize: 60,
   blobFluidness: 60,
   blobRoundness: 75,
   morphingSpeed: 50,
   
   voiceVisualization: true,
-  voiceBarsCount: 7,
-  voiceBarsHeight: 40,
-  voiceBarsSpacing: 8,
-  voiceReactivity: 70,
+  voiceBarsCount: 6,
+  voiceBarsHeight: 30,
+  voiceBarsSpacing: 3,
+  voiceReactivity: 80,
   
   idleAnimation: true,
   idleAnimationSpeed: 30,
   pulseEffect: true,
   pulseIntensity: 20,
   glowEffect: true,
-  glowIntensity: 30,
+  glowIntensity: 50,
   
   floatingBehavior: true,
   floatingRange: 10,
@@ -86,7 +86,7 @@ const defaultSettings: OracleAppearanceSettings = {
   blobOpacity: 95,
   backgroundBlur: 5,
   
-  adaptToSystemTheme: true,
+  adaptToSystemTheme: false,
   darkModeAdjustment: 15
 }
 
@@ -129,10 +129,10 @@ export default function OracleAppearancePage() {
   }
 
   const presetColors = [
+    { name: 'Default', primary: '#3B82F6', secondary: '#8B5CF6' },
     { name: 'Ocean', primary: '#00d4ff', secondary: '#6366f1' },
     { name: 'Sunset', primary: '#ff6b6b', secondary: '#ffd93d' },
     { name: 'Forest', primary: '#4ecdc4', secondary: '#44a08d' },
-    { name: 'Purple', primary: '#a8edea', secondary: '#fed6e3' },
     { name: 'Fire', primary: '#ff9a9e', secondary: '#fecfef' },
     { name: 'Aurora', primary: '#a18cd1', secondary: '#fbc2eb' }
   ]
@@ -146,7 +146,6 @@ export default function OracleAppearancePage() {
       background: `${direction} ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
       opacity: settings.blobOpacity / 100,
       filter: `blur(${settings.backgroundBlur}px)`,
-      transform: `scale(${settings.blobSize / 200})`,
       borderRadius: `${settings.blobRoundness}%`
     }
   }
@@ -202,8 +201,10 @@ export default function OracleAppearancePage() {
                 style={getGradientStyle()}
               >
                 <div 
-                  className="w-48 h-48 relative overflow-hidden"
+                  className="relative overflow-hidden"
                   style={{
+                    width: `${settings.blobSize}px`,
+                    height: `${settings.blobSize}px`,
                     borderRadius: `${settings.blobRoundness}% ${settings.blobRoundness - 10}% ${settings.blobRoundness + 5}% ${settings.blobRoundness - 5}%`,
                     animation: settings.idleAnimation ? `oracleFloat ${3000 / (settings.idleAnimationSpeed / 30)}ms ease-in-out infinite` : 'none'
                   }}
@@ -251,7 +252,7 @@ export default function OracleAppearancePage() {
             <span>Blob Colors & Gradients</span>
           </CardTitle>
           <CardDescription>
-            Customize the Oracle's color scheme and gradient effects
+            Customize the Oracle&apos;s color scheme and gradient effects
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -336,7 +337,7 @@ export default function OracleAppearancePage() {
             <span>Blob Shape & Morphing</span>
           </CardTitle>
           <CardDescription>
-            Control the Oracle's organic shape and fluid animations
+            Control the Oracle&apos;s organic shape and fluid animations
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -346,9 +347,9 @@ export default function OracleAppearancePage() {
               <Slider
                 value={[settings.blobSize]}
                 onValueChange={(value) => updateSetting('blobSize', value[0])}
-                max={300}
-                min={100}
-                step={10}
+                max={100}
+                min={30}
+                step={5}
                 className="w-full"
               />
             </div>
@@ -480,7 +481,7 @@ export default function OracleAppearancePage() {
             <span>Animation & Effects</span>
           </CardTitle>
           <CardDescription>
-            Control the Oracle's movement and visual effects
+            Control the Oracle&apos;s movement and visual effects
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

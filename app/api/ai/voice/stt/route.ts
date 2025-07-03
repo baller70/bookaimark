@@ -2,128 +2,208 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import * as Sentry from "@sentry/nextjs"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
 export async function POST(req: Request) {
-  try {
-    // Testing mode bypass for development
-    const isTestingMode = process.env.NODE_ENV === 'development' || process.env.STT_TESTING_MODE === 'true'
-    
-    if (isTestingMode) {
-      console.log('🧪 TESTING MODE: STT Authentication bypassed')
-    } else {
-      // Production authentication
-      const supabase = createRouteHandlerClient({ cookies })
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError || !user) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        )
-      }
+  return await Sentry.startSpan(
+    {
+      op: "api.stt",
+      name: "Speech to Text API",
+    },
+    async (span) => {
+      try {
+        console.log('🎤 STT API called')
+        
+        // Testing mode bypass for development
+        const isTestingMode = process.env.NODE_ENV === 'development' || process.env.STT_TESTING_MODE === 'true'
+        
+        if (isTestingMode) {
+          console.log('🧪 TESTING MODE: STT Authentication bypassed')
+        } else {
+          // Authentication check for production
+          const supabase = createRouteHandlerClient({ cookies })
+          const { data: { session } } = await supabase.auth.getSession()
 
-      // Check if user has enough credits
-      const { data: credits, error: creditsError } = await supabase
-        .from('user_credits')
-        .select('credits')
-        .eq('user_id', user.id)
-        .single()
+          if (!session) {
+            return NextResponse.json(
+              { error: 'Authentication required' },
+              { status: 401 }
+            )
+          }
+        }
 
-      if (creditsError) {
-        console.error('Error fetching credits:', creditsError)
-        return NextResponse.json(
-          { error: 'Error checking credits' },
-          { status: 500 }
-        )
-      }
+        // Enhanced Content-Type and FormData handling
+        const contentType = req.headers.get('content-type') || ''
+        console.log('📋 Request Content-Type:', contentType)
+        
+        let formData: FormData
+        let audioFile: File | null = null
+        let language = 'en'
+        let prompt = ''
 
-      if (!credits || credits.credits < 1) {
-        return NextResponse.json(
-          { error: 'Insufficient credits' },
-          { status: 402 }
-        )
-      }
-    }
-
-    const formData = await req.formData()
-    const audioFile = formData.get('audio') as File
-    const language = formData.get('language') as string || 'en'
-    const prompt = formData.get('prompt') as string || ''
-
-    if (!audioFile) {
-      return NextResponse.json(
-        { error: 'No audio file provided' },
-        { status: 400 }
-      )
-    }
-
-    // Convert File to the format expected by OpenAI
-    const audioBuffer = await audioFile.arrayBuffer()
-    const audioBlob = new Blob([audioBuffer], { type: audioFile.type })
-    
-    // Create a File object that OpenAI expects
-    const file = new File([audioBlob], audioFile.name || 'audio.webm', {
-      type: audioFile.type || 'audio/webm'
-    })
-
-    // Use OpenAI Whisper for transcription
-    const transcription = await openai.audio.transcriptions.create({
-      file: file,
-      model: 'whisper-1',
-      language: language,
-      prompt: prompt,
-      response_format: 'json',
-      temperature: 0.2
-    })
-
-    // Deduct credits in production
-    if (!isTestingMode) {
-      const supabase = createRouteHandlerClient({ cookies })
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        await supabase
-          .from('user_credits')
-          .update({
-            credits: supabase.rpc('decrement_credits', { user_id: user.id, amount: 1 }),
-            updated_at: new Date().toISOString(),
+        try {
+          // Parse FormData with better error handling
+          if (!contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded')) {
+            console.log('⚠️ Unexpected Content-Type, attempting FormData parsing anyway...')
+          }
+          
+          formData = await req.formData()
+          audioFile = formData.get('audio') as File
+          language = formData.get('language') as string || 'en'
+          prompt = formData.get('prompt') as string || ''
+          
+        } catch (formDataError) {
+          console.error('❌ FormData parsing failed:', formDataError)
+          
+          Sentry.captureException(formDataError, {
+            tags: { component: 'stt-api', action: 'formdata-parse-error' },
+            extra: { 
+              contentType,
+              errorMessage: formDataError instanceof Error ? formDataError.message : 'Unknown error'
+            }
           })
-          .eq('user_id', user.id)
-      }
-    }
+          
+          return NextResponse.json(
+            { 
+              error: 'Invalid request format. Expected multipart/form-data with audio file.',
+              details: formDataError instanceof Error ? formDataError.message : 'Unknown parsing error'
+            },
+            { status: 400 }
+          )
+        }
 
-    return NextResponse.json({
-      text: transcription.text,
-      language: language,
-      duration: transcription.duration || 0
-    })
+        // Validate audio file
+        if (!audioFile || audioFile.size === 0) {
+          console.log('❌ No audio file provided or file is empty')
+          return NextResponse.json(
+            { error: 'No audio file provided or file is empty' },
+            { status: 400 }
+          )
+        }
 
-  } catch (error) {
-    console.error('Error in STT route:', error)
-    
-    // More specific error handling
-    if (error instanceof Error) {
-      if (error.message.includes('audio')) {
+        console.log('📋 STT Request details:', {
+          audioFileName: audioFile.name || 'null',
+          audioFileSize: audioFile.size,
+          audioFileType: audioFile.type,
+          language,
+          promptLength: prompt.length
+        })
+
+        // Check file size (25MB limit)
+        const maxSize = 25 * 1024 * 1024 // 25MB
+        if (audioFile.size > maxSize) {
+          console.log('❌ Audio file too large:', audioFile.size, 'bytes')
+          return NextResponse.json(
+            { error: 'Audio file too large. Maximum size is 25MB.' },
+            { status: 413 }
+          )
+        }
+
+        // Validate audio format
+        const supportedFormats = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm']
+        const fileExtension = audioFile.name?.split('.').pop()?.toLowerCase()
+        const mimeType = audioFile.type.toLowerCase()
+        
+        console.log('🎵 Audio format check:', {
+          fileName: audioFile.name,
+          fileExtension,
+          mimeType,
+          supportedFormats
+        })
+
+        // Check if format is supported
+        const isFormatSupported = supportedFormats.some(format => 
+          mimeType.includes(format) || fileExtension === format
+        )
+
+        if (!isFormatSupported) {
+          console.log('⚠️ Potentially unsupported audio type:', mimeType)
+        }
+
+        // Convert File to Buffer for OpenAI
+        const audioBuffer = await audioFile.arrayBuffer()
+        console.log('📊 Audio buffer size:', audioBuffer.byteLength, 'bytes')
+
+        if (audioBuffer.byteLength === 0) {
+          console.log('❌ Audio buffer is empty')
+          return NextResponse.json(
+            { error: 'Audio file appears to be empty or corrupted' },
+            { status: 400 }
+          )
+        }
+
+        // Create a File object with proper name and type for OpenAI
+        const fileName = audioFile.name || `audio.${fileExtension || 'webm'}`
+        const file = new File([audioBuffer], fileName, { 
+          type: audioFile.type || 'audio/webm' 
+        })
+
+        console.log('🔄 Sending to OpenAI Whisper...')
+
+        span.setAttribute("audio_size", audioFile.size)
+        span.setAttribute("audio_type", audioFile.type)
+        span.setAttribute("language", language)
+
+        // Use OpenAI Whisper for transcription with optimized settings
+        const transcription = await openai.audio.transcriptions.create({
+          file: file,
+          model: 'whisper-1',
+          language: language === 'auto' ? undefined : language,
+          prompt: prompt || 'Oracle, wake word, voice assistant, hey Oracle, Oracle AI',
+          response_format: 'text',
+          temperature: 0.0 // Use 0 for most consistent results
+        })
+
+        console.log('✅ Transcription successful:', transcription.substring(0, 100) + '...')
+
+        span.setAttribute("transcription_length", transcription.length)
+        span.setStatus({ code: 1, message: "Success" })
+
+        return NextResponse.json({
+          transcription: transcription,
+          language: language,
+          confidence: 0.95 // Whisper doesn't provide confidence, so we use a default
+        })
+
+      } catch (error) {
+        console.error('❌ Error in STT route:', error)
+        
+        let errorMessage = 'Speech-to-text processing failed'
+        let statusCode = 500
+        
+        if (error instanceof Error) {
+          if (error.message.includes('Unrecognized file format')) {
+            errorMessage = '🎵 Audio format error: ' + error.message
+            statusCode = 400
+            console.log(errorMessage)
+          } else if (error.message.includes('rate limit')) {
+            errorMessage = 'Rate limit exceeded. Please try again later.'
+            statusCode = 429
+          } else if (error.message.includes('timeout')) {
+            errorMessage = 'Request timeout. Please try with a shorter audio file.'
+            statusCode = 408
+          }
+        }
+
+        Sentry.captureException(error, {
+          tags: { component: 'stt-api', action: 'transcription-error' },
+          extra: { 
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            statusCode
+          }
+        })
+
+        span.setStatus({ code: 2, message: errorMessage })
+
         return NextResponse.json(
-          { error: 'Invalid audio file format' },
-          { status: 400 }
+          { error: errorMessage },
+          { status: statusCode }
         )
       }
-      if (error.message.includes('rate limit')) {
-        return NextResponse.json(
-          { error: 'Rate limit exceeded. Please try again later.' },
-          { status: 429 }
-        )
-      }
     }
-
-    return NextResponse.json(
-      { error: 'Error processing speech-to-text request' },
-      { status: 500 }
-    )
-  }
+  )
 } 
