@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import * as Sentry from '@sentry/nextjs';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -45,6 +46,44 @@ interface ProcessingResult {
   warnings: string[];
   processingTime: number;
 }
+
+// File-based storage types and helper functions
+interface BookmarkData {
+  id: number;
+  user_id: string;
+  title: string;
+  url: string;
+  description: string;
+  category: string;
+  tags: string[];
+  ai_summary: string;
+  ai_tags: string[];
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const bookmarksFilePath = path.join(process.cwd(), 'data', 'bookmarks.json');
+
+const loadBookmarks = async (): Promise<BookmarkData[]> => {
+  try {
+    const data = await fs.readFile(bookmarksFilePath, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.log('No existing bookmarks file found, creating new one');
+    return [];
+  }
+};
+
+const saveBookmarks = async (bookmarks: BookmarkData[]): Promise<void> => {
+  try {
+    await fs.mkdir(path.dirname(bookmarksFilePath), { recursive: true });
+    await fs.writeFile(bookmarksFilePath, JSON.stringify(bookmarks, null, 2));
+  } catch (error) {
+    console.error('Error saving bookmarks:', error);
+    throw error;
+  }
+};
 
 // Helper functions
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -203,66 +242,76 @@ const fetchMetadata = async (url: string): Promise<{ title?: string; description
   }
 };
 
-const checkDuplicates = async (supabase: SupabaseClient, userId: string, urls: string[]): Promise<Set<string>> => {
+const checkDuplicates = async (userId: string, urls: string[]): Promise<Set<string>> => {
   try {
-    const { data: existingBookmarks } = await supabase
-      .from('user_bookmarks')
-      .select('url')
-      .eq('user_id', userId)
-      .in('url', urls);
-
-    return new Set(existingBookmarks?.map((bookmark: any) => bookmark.url) || []);
+    const allBookmarks = await loadBookmarks();
+    const userBookmarks = allBookmarks.filter(bookmark => bookmark.user_id === userId);
+    
+    const existingUrls = userBookmarks.map(bookmark => bookmark.url);
+    const duplicateUrls = urls.filter(url => existingUrls.includes(url));
+    
+    return new Set(duplicateUrls);
   } catch (error) {
     console.warn('Failed to check duplicates:', error);
     return new Set();
   }
 };
 
-const saveLinksToDatabase = async (supabase: any, userId: string, links: BulkLink[], settings: BulkUploaderSettings) => {
+const saveLinksToDatabase = async (userId: string, links: BulkLink[]) => {
   const linksToSave = links.filter(link => link.selected && (link.status === 'processed' || link.status === 'saved'));
   
-  for (const link of linksToSave) {
-    try {
-      // Simple bookmark data that matches the actual database schema
+  if (linksToSave.length === 0) {
+    return;
+  }
+  
+  try {
+    // Load existing bookmarks
+    const allBookmarks = await loadBookmarks();
+    
+    // Get the highest existing ID
+    const maxId = allBookmarks.length > 0 ? Math.max(...allBookmarks.map(b => b.id)) : 0;
+    let nextId = maxId + 1;
+    
+    // Create new bookmarks
+    const newBookmarks = linksToSave.map((link) => {
       const bookmarkData = {
+        id: nextId++,
         user_id: userId,
-        url: link.url,
         title: link.title || new URL(link.url).hostname,
+        url: link.url,
         description: link.notes || `${link.linkType} resource - ${link.predictedTags.join(', ')}`,
-        created_at: new Date().toISOString()
+        category: link.predictedFolder,
+        tags: link.predictedTags,
+        ai_summary: `Auto-categorized ${link.linkType} resource`,
+        ai_tags: link.predictedTags,
+        notes: link.notes || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
-      // Insert bookmark into database
-      console.log(`🔍 Attempting to insert bookmark for user ${userId}:`, {
-        title: bookmarkData.title,
-        url: bookmarkData.url,
-        user_id: bookmarkData.user_id
-      });
-
-      console.log('📋 Inserting bookmark data:', bookmarkData);
-
-      const { data, error } = await supabase
-        .from('bookmarks')
-        .insert(bookmarkData)
-        .select()
-        .single();
-        
-      if (error) {
-        console.error('Database insert error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        throw new Error(`Database error: ${error.message || error.hint || error.details || error.code || 'Unknown error'}`);
-      }
-      
       link.status = 'saved';
-      link.id = data.id; // Update with database ID
+      link.id = bookmarkData.id.toString();
       
-      console.log(`✅ Successfully saved bookmark: ${link.title} (${link.url}) with ID: ${data.id}`);
+      console.log(`✅ Successfully prepared bookmark: ${link.title} (${link.url}) with ID: ${bookmarkData.id}`);
       
-    } catch (error) {
-      console.error(`Failed to save bookmark ${link.url}:`, error);
+      return bookmarkData;
+    });
+    
+    // Add new bookmarks to existing ones
+    const updatedBookmarks = [...allBookmarks, ...newBookmarks];
+    
+    // Save to file
+    await saveBookmarks(updatedBookmarks);
+    
+    console.log(`✅ Successfully saved ${newBookmarks.length} bookmarks to file storage`);
+    
+  } catch (error) {
+    console.error('Failed to save bookmarks:', error);
+    // Mark all links as failed
+    linksToSave.forEach(link => {
       link.status = 'failed';
-      link.error = error instanceof Error ? error.message : 'Database error';
-    }
+      link.error = error instanceof Error ? error.message : 'File storage error';
+    });
   }
 };
 
@@ -315,41 +364,11 @@ export async function POST(request: NextRequest) {
       try {
         console.log('🔗 Bulk Uploader API called (POST)');
 
-        let supabase;
-        let userId;
-
-        // Production mode - bypass authentication for testing but use real database
-        if (process.env.AI_BULK_UPLOADER_TESTING !== 'true') {
-          console.log('🚀 PRODUCTION MODE: Authentication bypassed for bulk operations');
-          
-          // Use service role to bypass RLS for demo user
-          supabase = createServiceClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          );
-          
-          // Get the first available user from profiles table
-          const { data: profiles, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .limit(1);
-            
-          if (profileError || !profiles || profiles.length === 0) {
-            console.error('❌ No users found in profiles table:', profileError?.message);
-            return NextResponse.json({ 
-              error: 'No users available for bulk upload. Please ensure at least one user profile exists.' 
-            }, { status: 400 });
-          }
-          
-          userId = profiles[0].id; // Use the first available user
-          console.log('💾 Using service role client for user:', userId);
-        } else {
-          // Fallback - should not happen in production
-          console.error('❌ No service role key available');
-          return NextResponse.json({ 
-            error: 'Service configuration error' 
-          }, { status: 500 });
-        }
+        // Use file-based storage with user ID from query parameters or default
+        const { searchParams } = new URL(request.url);
+        const userId = searchParams.get('user_id') || '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f';
+        
+        console.log('🚀 FILE STORAGE MODE: Using file-based storage for user:', userId);
         
         const body = await request.json();
         const { links, settings } = body;
@@ -389,7 +408,7 @@ export async function POST(request: NextRequest) {
 
         // Step 1: Validate and clean URLs
         console.log('🔍 Step 1: Validating URLs...');
-        const validLinks = links.filter((linkData: any) => {
+        const validLinks = links.filter((linkData: string | { url: string }) => {
           const url = typeof linkData === 'string' ? linkData : linkData.url;
           if (!validateUrl(url)) {
             errors.push(`Invalid URL: ${url}`);
@@ -408,11 +427,11 @@ export async function POST(request: NextRequest) {
 
         // Step 2: Check for duplicates
         console.log('🔍 Step 2: Checking for duplicates...');
-        const urls = validLinks.map((linkData: any) => 
+        const urls = validLinks.map((linkData: string | { url: string }) => 
           cleanUrl(typeof linkData === 'string' ? linkData : linkData.url)
         );
         
-        const duplicates = await checkDuplicates(supabase, userId, urls);
+        const duplicates = await checkDuplicates(userId, urls);
         
         if (duplicates.size > 0) {
           warnings.push(`Found ${duplicates.size} duplicate URLs`);
@@ -424,7 +443,7 @@ export async function POST(request: NextRequest) {
         for (let i = 0; i < validLinks.length; i += processingSettings.batchSize) {
           const batch = validLinks.slice(i, i + processingSettings.batchSize);
           
-          const batchPromises = batch.map(async (linkData: any) => {
+          const batchPromises = batch.map(async (linkData: string | { url: string; title?: string; notes?: string }) => {
             const url = typeof linkData === 'string' ? linkData : linkData.url;
             const cleanedUrl = cleanUrl(url);
             
@@ -482,11 +501,9 @@ export async function POST(request: NextRequest) {
           console.log(`✅ Processed batch ${Math.floor(i / processingSettings.batchSize) + 1}/${Math.ceil(validLinks.length / processingSettings.batchSize)}`);
         }
 
-        // Step 4: Save to database
-        if (supabase) {
-          console.log('💾 Step 4: Saving to database...');
-          await saveLinksToDatabase(supabase, userId, processedLinks, processingSettings);
-        }
+        // Step 4: Save to file storage
+        console.log('💾 Step 4: Saving to file storage...');
+        await saveLinksToDatabase(userId, processedLinks);
 
         // Update counters after database operations
         totalSuccessful = processedLinks.filter(link => link.status === 'saved').length;

@@ -383,13 +383,16 @@ export default function Dashboard() {
   // --- Bookmark data state (fetched from database) ---
   const [bookmarks, setBookmarks] = useState<any[]>([]);
   const [isLoadingBookmarks, setIsLoadingBookmarks] = useState(true);
+  
+  // User ID for API calls
+  const userId = '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f';
 
   // Fetch bookmarks from database
   useEffect(() => {
     const fetchBookmarks = async () => {
       try {
         setIsLoadingBookmarks(true);
-        const response = await fetch('/api/bookmarks?user_id=48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f');
+        const response = await fetch(`/api/bookmarks?user_id=${userId}`);
         const data = await response.json();
         
         if (data.success) {
@@ -913,6 +916,28 @@ export default function Dashboard() {
     setTimeout(() => setNotification(null), 3000)
   }
 
+  const deleteBookmark = async (bookmarkId: number) => {
+    try {
+      const response = await fetch(`/api/bookmarks?id=${bookmarkId}&user_id=${userId}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove bookmark from local state
+        setBookmarks(prev => prev.filter(b => b.id !== bookmarkId));
+        showNotification('Bookmark deleted successfully!');
+      } else {
+        showNotification('Failed to delete bookmark');
+        console.error('Delete failed:', data.error);
+      }
+    } catch (error) {
+      showNotification('Error deleting bookmark');
+      console.error('Delete error:', error);
+    }
+  }
+
   const handleSetDefaultLogo = () => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('userDefaultLogo', newDefaultLogo)
@@ -1173,8 +1198,7 @@ export default function Dashboard() {
                 e.stopPropagation()
                 // Delete bookmark with confirmation
                 if (confirm(`Are you sure you want to delete "${bookmark.title}"?`)) {
-                  setBookmarks(prev => prev.filter(b => b.id !== bookmark.id))
-                  showNotification('Bookmark deleted successfully!')
+                  deleteBookmark(bookmark.id)
                 }
               }}
             >
@@ -1250,6 +1274,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        
+        {/* Action Icons for Grid View */}
+        <BookmarkActionIcons bookmark={bookmark} />
         
         <div className="mb-4 flex justify-center">
           <div className="relative">
@@ -2026,11 +2053,11 @@ export default function Dashboard() {
     }
 
     // Prevent click event when dragging
-    const handleClick = () => {
+    const handleClick = (e: React.MouseEvent) => {
       if (isDragging) {
         return;
       }
-      onClick?.();
+      onClick?.(e);
     }
 
     return (
@@ -2076,6 +2103,24 @@ export default function Dashboard() {
     const bookmarkIds = filteredBookmarks.map(bookmark => bookmark.id)
     
     switch (viewMode) {
+      case 'grid':
+        return (
+          <ClientOnlyDndProvider>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={bookmarkIds} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredBookmarks.map((bookmark) => (
+                    <SortableGridBookmarkCard key={bookmark.id} bookmark={bookmark} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </ClientOnlyDndProvider>
+        )
       case 'compact':
         if (compactViewMode === 'folders') {
           // Show folder view - group bookmarks by category

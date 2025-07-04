@@ -303,17 +303,191 @@ function RecommendationContent() {
     setSelectedItems(newSelected)
   }
 
-  const addSelectedToBookmarks = () => {
+  const addSelectedToBookmarks = async () => {
     const count = selectedItems.size
     if (count === 0) return
-    
-    setSelectedItems(new Set())
-    
-    if (settings.autoBundle && count > 1) {
-      toast.success(`✓ ${count} bookmarks added to new collection "AI Recommendations ${new Date().toLocaleDateString()}"`)
-    } else {
-      toast.success(`✓ ${count} new bookmark${count > 1 ? 's' : ''} added to 'Inbox'`)
+
+    try {
+      // Get selected recommendations
+      const selectedRecommendations = recommendations.filter(rec => selectedItems.has(rec.id))
+      
+      // Create bookmarks with auto-generated metadata
+      const bookmarksToCreate = selectedRecommendations.map(rec => ({
+        url: rec.url,
+        title: rec.title,
+        description: rec.description,
+        category: generateCategoryFromRecommendation(rec),
+        tags: generateTagsFromRecommendation(rec),
+        ai_summary: rec.description,
+        ai_tags: rec.why.map(reason => extractKeywordsFromReason(reason)).flat(),
+        ai_category: generateCategoryFromRecommendation(rec),
+        confidence_score: rec.confidence,
+        recommendation_id: rec.id,
+        recommendation_context: {
+          readTime: rec.readTime,
+          confidence: rec.confidence,
+          reasons: rec.why,
+          favicon: rec.favicon,
+          generatedAt: new Date().toISOString(),
+          settings: settings
+        },
+        notes: `AI Recommendation - ${Math.round(rec.confidence * 100)}% match\nReasons: ${rec.why.join('; ')}`
+      }))
+
+      console.log('🔗 Creating bookmarks from AI recommendations:', bookmarksToCreate)
+
+      // Call the API to create bookmarks (using same user ID as dashboard)
+      const response = await fetch('/api/ai/recommendations/to-bookmarks?user_id=48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookmarks: bookmarksToCreate,
+          settings: {
+            autoBundle: settings.autoBundle,
+            bundleName: settings.autoBundle ? `AI Recommendations ${new Date().toLocaleDateString()}` : null
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      const result = await response.json()
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create bookmarks')
+      }
+
+      console.log('✅ Bookmarks created successfully:', result)
+
+      // Clear selected items
+      setSelectedItems(new Set())
+      
+      // Show success message
+      if (settings.autoBundle && count > 1) {
+        toast.success(`✅ ${count} bookmarks added to collection "${result.collectionName}"`)
+      } else {
+        toast.success(`✅ ${count} bookmark${count > 1 ? 's' : ''} added with auto-generated tags and categories`)
+      }
+
+      // Remove processed recommendations from the list (optional)
+      setRecommendations(prev => prev.filter(rec => !selectedItems.has(rec.id)))
+
+    } catch (error) {
+      console.error('❌ Failed to create bookmarks:', error)
+      toast.error(`Failed to create bookmarks: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
+  }
+
+  // Helper function to generate category from recommendation
+  const generateCategoryFromRecommendation = (rec: RecommendationItem): string => {
+    const title = rec.title.toLowerCase()
+    const description = rec.description.toLowerCase()
+    const text = `${title} ${description}`
+
+    // AI/ML related
+    if (text.includes('ai') || text.includes('machine learning') || text.includes('neural') || 
+        text.includes('artificial intelligence') || text.includes('openai') || text.includes('chatgpt')) {
+      return 'AI/ML'
+    }
+    
+    // Development related
+    if (text.includes('react') || text.includes('javascript') || text.includes('typescript') || 
+        text.includes('node') || text.includes('api') || text.includes('code') || 
+        text.includes('programming') || text.includes('development')) {
+      return 'Development'
+    }
+    
+    // Design related
+    if (text.includes('design') || text.includes('ui') || text.includes('ux') || 
+        text.includes('figma') || text.includes('interface')) {
+      return 'Design'
+    }
+    
+    // Tools & Productivity
+    if (text.includes('tool') || text.includes('productivity') || text.includes('extension') || 
+        text.includes('automation') || text.includes('workflow')) {
+      return 'Tools & Productivity'
+    }
+    
+    // Learning & Education
+    if (text.includes('tutorial') || text.includes('course') || text.includes('learn') || 
+        text.includes('guide') || text.includes('documentation') || text.includes('education')) {
+      return 'Learning & Education'
+    }
+    
+    // News & Articles
+    if (text.includes('news') || text.includes('article') || text.includes('blog') || 
+        text.includes('update') || text.includes('trend')) {
+      return 'News & Articles'
+    }
+
+    // Default fallback
+    return 'General'
+  }
+
+  // Helper function to generate tags from recommendation
+  const generateTagsFromRecommendation = (rec: RecommendationItem): string[] => {
+    const tags = new Set<string>()
+    const text = `${rec.title} ${rec.description}`.toLowerCase()
+
+    // Technology tags
+    const techTerms = ['react', 'javascript', 'typescript', 'node', 'python', 'ai', 'ml', 
+                      'api', 'css', 'html', 'vue', 'angular', 'nextjs', 'express']
+    techTerms.forEach(term => {
+      if (text.includes(term)) {
+        tags.add(term.charAt(0).toUpperCase() + term.slice(1))
+      }
+    })
+
+    // Content type tags
+    if (rec.readTime.includes('min')) {
+      const minutes = parseInt(rec.readTime.match(/\d+/)?.[0] || '0')
+      if (minutes <= 5) tags.add('Quick Read')
+      else if (minutes <= 15) tags.add('Medium Read')
+      else tags.add('Long Read')
+    }
+
+    // Confidence-based tags
+    if (rec.confidence >= 0.9) tags.add('Highly Relevant')
+    else if (rec.confidence >= 0.7) tags.add('Relevant')
+
+    // Source-based tags
+    if (text.includes('github')) tags.add('GitHub')
+    if (text.includes('youtube')) tags.add('Video')
+    if (text.includes('documentation') || text.includes('docs')) tags.add('Documentation')
+    if (text.includes('tutorial')) tags.add('Tutorial')
+    if (text.includes('tool')) tags.add('Tool')
+
+    // AI recommendation tag
+    tags.add('AI Recommended')
+    tags.add('Auto-Generated')
+
+    return Array.from(tags).slice(0, 8) // Limit to 8 tags
+  }
+
+  // Helper function to extract keywords from reasoning
+  const extractKeywordsFromReason = (reason: string): string[] => {
+    const keywords = new Set<string>()
+    const lowerReason = reason.toLowerCase()
+
+    // Extract common technical terms
+    const patterns = [
+      /\b(react|javascript|typescript|python|ai|ml|api|css|html|vue|angular|nextjs)\b/g,
+      /\b(development|design|productivity|learning|tutorial|tool)\b/g,
+      /\b(trending|popular|engagement|recent|new)\b/g
+    ]
+
+    patterns.forEach(pattern => {
+      const matches = lowerReason.match(pattern) || []
+      matches.forEach((match: string) => keywords.add(match.charAt(0).toUpperCase() + match.slice(1)))
+    })
+
+    return Array.from(keywords)
   }
 
   const toggleSection = (section: keyof typeof collapsedSections) => {

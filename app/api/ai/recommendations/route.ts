@@ -3,6 +3,9 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import OpenAI from 'openai'
 import * as Sentry from "@sentry/nextjs"
+import { createClient } from '@supabase/supabase-js'
+import fs from 'fs'
+import path from 'path'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -77,10 +80,125 @@ const mockUserContext: UserContext = {
   interests: ['web development', 'artificial intelligence', 'user experience', 'productivity tools']
 }
 
-async function getUserContext(userId: string): Promise<UserContext> {
-  // In a real implementation, this would fetch actual user data from Supabase
-  // For now, return mock data
-  return mockUserContext
+async function getUserContext(_userId: string): Promise<UserContext> {
+  void _userId; // parameter currently unused but preserved for future implementation
+  
+  try {
+    // Create Supabase client for server-side access
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Load enhanced context from JSON file
+    let enhancedContext = null
+    try {
+      const contextPath = path.join(process.cwd(), 'dev-user-context.json')
+      if (fs.existsSync(contextPath)) {
+        const contextData = fs.readFileSync(contextPath, 'utf8')
+        enhancedContext = JSON.parse(contextData)
+        console.log('✅ Enhanced context loaded from file')
+      }
+    } catch (fileError) {
+      console.log('📄 No enhanced context file found, using basic context')
+    }
+
+    // Try to fetch real bookmarks data
+    let realBookmarks = []
+    try {
+      const { data: bookmarksData, error: bookmarksError } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .limit(10)
+        .order('created_at', { ascending: false })
+
+      if (!bookmarksError && bookmarksData) {
+        realBookmarks = bookmarksData.map(bookmark => ({
+          url: bookmark.url,
+          title: bookmark.title,
+          description: bookmark.description,
+          tags: bookmark.ai_tags || [],
+          createdAt: bookmark.created_at
+        }))
+        console.log('✅ Real bookmarks loaded:', realBookmarks.length)
+      }
+    } catch (dbError) {
+      console.log('📊 No real bookmarks available, using mock data')
+    }
+
+    // Combine real data with enhanced context
+    const userContext: UserContext = {
+      recentBookmarks: realBookmarks.length > 0 ? realBookmarks : 
+        enhancedContext?.recentBookmarks?.map(bookmark => ({
+          url: bookmark.url,
+          title: bookmark.title,
+          description: bookmark.category,
+          tags: bookmark.ai_tags || [],
+          createdAt: new Date().toISOString()
+        })) || mockUserContext.recentBookmarks,
+      
+      topCategories: enhancedContext ? 
+        extractTopCategoriesFromContext(enhancedContext) : 
+        mockUserContext.topCategories,
+      
+      browsingPatterns: {
+        preferredReadTime: '5-10 minutes',
+        activeHours: ['9-11 AM', '2-4 PM'],
+        deviceTypes: ['desktop', 'mobile']
+      },
+      
+      interests: enhancedContext?.topInterests?.map(interest => interest.name) || 
+        mockUserContext.interests
+    }
+
+    console.log('✅ Sophisticated user context loaded:', {
+      recentBookmarksCount: userContext.recentBookmarks.length,
+      topCategories: userContext.topCategories,
+      interestsCount: userContext.interests.length,
+      contextSource: enhancedContext ? 'enhanced + real data' : 'mock data'
+    })
+
+    return userContext
+  } catch (error) {
+    console.error('❌ Error in getUserContext:', error)
+    // Fall back to mock data if anything goes wrong
+    return mockUserContext
+  }
+}
+
+// Helper function to extract top categories from enhanced context
+function extractTopCategoriesFromContext(contextData: {
+  recentBookmarks?: Array<{category?: string, ai_category?: string}>
+  recentBrowsing?: Array<{categories?: string[]}>
+  topInterests?: Array<{name?: string}>
+}): string[] {
+  const categories = new Set<string>()
+  
+  // Add categories from bookmarks
+  if (contextData.recentBookmarks) {
+    contextData.recentBookmarks.forEach((bookmark) => {
+      if (bookmark.category) categories.add(bookmark.category)
+      if (bookmark.ai_category) categories.add(bookmark.ai_category)
+    })
+  }
+  
+  // Add categories from browsing history
+  if (contextData.recentBrowsing) {
+    contextData.recentBrowsing.forEach((browsing) => {
+      if (browsing.categories) {
+        browsing.categories.forEach((cat: string) => categories.add(cat))
+      }
+    })
+  }
+  
+  // Add categories from interests
+  if (contextData.topInterests) {
+    contextData.topInterests.forEach((interest) => {
+      if (interest.name) categories.add(interest.name)
+    })
+  }
+  
+  return Array.from(categories).slice(0, 5) // Return top 5 categories
 }
 
 function createRecommendationPrompt(settings: RecommendationSettings, userContext: UserContext): string {
@@ -179,14 +297,26 @@ export async function POST(request: NextRequest) {
         }
 
         // Production authentication
-        const supabase = createRouteHandlerClient({ cookies })
+        const supabase = createRouteHandlerClient({ cookies: () => cookies() })
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
+        // Check if authentication bypass is enabled (independent of dev mode)
+        const bypassAuth = process.env.BYPASS_AUTHENTICATION === 'true'
+        const isDevelopment = process.env.NODE_ENV === 'development' || process.env.DEV_MODE === 'true'
+        let userId = user?.id
+        
         if (authError || !user) {
-          return NextResponse.json(
-            { error: 'Authentication required' },
-            { status: 401 }
-          )
+          if (bypassAuth || isDevelopment) {
+            // Use a dev user ID when authentication is bypassed
+            userId = process.env.DEV_USER_ID || 'dev-user-123'
+            console.log('🔓 AUTH BYPASS: Using development user ID:', userId)
+            console.log('🏭 Production mode:', !isDevelopment ? 'ENABLED' : 'DISABLED')
+          } else {
+            return NextResponse.json(
+              { error: 'Authentication required' },
+              { status: 401 }
+            )
+          }
         }
 
         // Verify OpenAI API key
@@ -218,7 +348,7 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        console.log('📝 Processing recommendation request for user:', user.id)
+        console.log('📝 Processing recommendation request for user:', userId)
         console.log('⚙️ Settings:', {
           suggestionsPerRefresh: settings.suggestionsPerRefresh,
           serendipityLevel: settings.serendipityLevel,
@@ -227,7 +357,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Get user context
-        const userContext = await getUserContext(user.id)
+        const userContext = await getUserContext(userId)
         console.log('👤 User context loaded:', {
           recentBookmarksCount: userContext.recentBookmarks.length,
           topCategories: userContext.topCategories,
@@ -237,7 +367,7 @@ export async function POST(request: NextRequest) {
         // Create recommendation prompt
         const prompt = createRecommendationPrompt(settings, userContext)
 
-        span.setAttribute("user_id", user.id)
+        span.setAttribute("user_id", userId)
         span.setAttribute("suggestions_count", settings.suggestionsPerRefresh)
         span.setAttribute("serendipity_level", settings.serendipityLevel)
         span.setAttribute("include_trending", settings.includeTrending)
@@ -274,10 +404,22 @@ export async function POST(request: NextRequest) {
 
         console.log('🤖 OpenAI response received:', response.substring(0, 200) + '...')
 
+        // Strip markdown code blocks if present
+        let cleanedResponse = response
+        if (response.startsWith('```json')) {
+          cleanedResponse = response
+            .replace(/^```json\s*/, '')  // Remove opening ```json
+            .replace(/\s*```$/, '')      // Remove closing ```
+        } else if (response.startsWith('```')) {
+          cleanedResponse = response
+            .replace(/^```\s*/, '')      // Remove opening ```
+            .replace(/\s*```$/, '')      // Remove closing ```
+        }
+
         // Parse the JSON response
         let recommendations: RecommendationItem[]
         try {
-          recommendations = JSON.parse(response)
+          recommendations = JSON.parse(cleanedResponse)
           
           // Validate the response structure
           if (!Array.isArray(recommendations)) {
@@ -293,13 +435,15 @@ export async function POST(request: NextRequest) {
 
         } catch (parseError) {
           console.error('❌ Failed to parse OpenAI response:', parseError)
-          console.error('Raw response:', response)
+          console.error('📄 Raw OpenAI response (first 1000 chars):', response?.substring(0, 1000))
+          console.error('📄 Full OpenAI response length:', response?.length)
+          console.error('📄 Response type:', typeof response)
           
           Sentry.captureException(parseError, {
             tags: { component: 'ai-recommendations', action: 'parse-error' },
             extra: { 
               rawResponse: response,
-              userId: user.id,
+              userId: userId,
               settings
             }
           })

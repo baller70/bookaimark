@@ -1,64 +1,104 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { writeFile, readFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
-// Initialize Supabase client with service role for server-side access
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// File-based storage for persistent bookmarks (until Supabase credentials are fixed)
+const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+interface Bookmark {
+  id: number;
+  user_id: string;
+  title: string;
+  url: string;
+  description: string;
+  category: string;
+  tags?: string[];
+  ai_summary?: string;
+  ai_tags?: string[];
+  ai_category?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Ensure data directory exists
+async function ensureDataDirectory() {
+  const dataDir = join(process.cwd(), 'data');
+  if (!existsSync(dataDir)) {
+    await mkdir(dataDir, { recursive: true });
+  }
+}
+
+// Load bookmarks from file
+async function loadBookmarks(): Promise<Bookmark[]> {
+  try {
+    await ensureDataDirectory();
+    if (!existsSync(BOOKMARKS_FILE)) {
+      return [];
+    }
+    const data = await readFile(BOOKMARKS_FILE, 'utf-8');
+    return JSON.parse(data) as Bookmark[];
+  } catch (error) {
+    console.error('❌ Error loading bookmarks:', error);
+    return [];
+  }
+}
+
+// Save bookmarks to file
+async function saveBookmarks(bookmarks: Bookmark[]): Promise<void> {
+  try {
+    await ensureDataDirectory();
+    await writeFile(BOOKMARKS_FILE, JSON.stringify(bookmarks, null, 2));
+  } catch (error) {
+    console.error('❌ Error saving bookmarks:', error);
+    throw error;
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('📖 Fetching bookmarks from database...');
+    console.log('📖 Fetching bookmarks from file storage...');
     
-    // Get user_id from query params (for now we'll use the test user)
+    // Get user_id from query params
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('user_id') || '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f';
+    const userId = searchParams.get('user_id') || 'dev-user-123';
     
-    // Fetch bookmarks from database
-    const { data: bookmarks, error } = await supabase
-      .from('bookmarks')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    // Load bookmarks from file
+    const allBookmarks = await loadBookmarks();
     
-    if (error) {
-      console.error('❌ Database error:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch bookmarks', details: error.message },
-        { status: 500 }
-      );
-    }
+    // Filter bookmarks by user ID
+    const userBookmarks = allBookmarks.filter(bookmark => bookmark.user_id === userId);
     
-    console.log(`✅ Successfully fetched ${bookmarks?.length || 0} bookmarks`);
+    console.log(`✅ Successfully loaded ${userBookmarks.length} bookmarks for user ${userId}`);
     
-    // Transform database bookmarks to match frontend format
-    const transformedBookmarks = bookmarks?.map((bookmark, index) => ({
-      id: index + 1, // Use sequential IDs for frontend
+    // Transform bookmarks to match frontend format
+    const transformedBookmarks = userBookmarks.map((bookmark, index) => ({
+      id: index + 1,
       title: bookmark.title?.toUpperCase() || 'UNTITLED',
       url: bookmark.url,
       description: bookmark.description || 'No description available',
       category: bookmark.category || 'General',
-      tags: [], // Tags can be added later
-      priority: 'medium', // Default priority
-      isFavorite: false, // Default favorite status
-      visits: Math.floor(Math.random() * 50) + 1, // Random visits for now
+      tags: bookmark.tags || [],
+      priority: 'medium',
+      isFavorite: false,
+      visits: Math.floor(Math.random() * 50) + 1,
       lastVisited: new Date(bookmark.created_at).toLocaleDateString(),
       dateAdded: new Date(bookmark.created_at).toLocaleDateString(),
       favicon: bookmark.title?.charAt(0)?.toUpperCase() || 'B',
       screenshot: "/placeholder.svg",
       circularImage: "/placeholder.svg",
-      logo: "", // Background logo can be added later
-      notes: 'Imported from bulk uploader',
+      logo: "",
+      notes: bookmark.notes || 'No notes',
       timeSpent: '0m',
       weeklyVisits: Math.floor(Math.random() * 20) + 1,
       siteHealth: 'good',
       project: {
-        name: "IMPORTED",
+        name: bookmark.ai_category || "GENERAL",
         progress: Math.floor(Math.random() * 100),
         status: "Active"
       }
-    })) || [];
+    }));
     
     return NextResponse.json({
       success: true,
@@ -78,7 +118,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, url, description, category, user_id } = body;
+    const { title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes } = body;
     
     // Validate required fields
     if (!title || !url) {
@@ -88,39 +128,99 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const userId = user_id || '00000000-0000-0000-0000-000000000000';
+    // Use dev user ID for bypass mode
+    const userId = process.env.DEV_USER_ID || 'dev-user-123';
+    console.log('📝 Creating bookmark in file storage for user:', userId);
     
-    // Insert new bookmark
-    const { data, error } = await supabase
-      .from('bookmarks')
-      .insert([{
-        user_id: userId,
-        title,
-        url,
-        description: description || '',
-        category: category || 'General',
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
+    // Load existing bookmarks
+    const allBookmarks = await loadBookmarks();
     
-    if (error) {
-      console.error('❌ Failed to create bookmark:', error);
-      return NextResponse.json(
-        { error: 'Failed to create bookmark', details: error.message },
-        { status: 500 }
-      );
-    }
+    // Generate new ID
+    const newId = Math.max(0, ...allBookmarks.map(b => b.id)) + 1;
     
-    console.log('✅ Successfully created bookmark:', data);
+    // Create new bookmark
+    const newBookmark: Bookmark = {
+      id: newId,
+      user_id: userId,
+      title,
+      url,
+      description: description || '',
+      category: category || 'General',
+      tags: tags || [],
+      ai_summary,
+      ai_tags: ai_tags || [],
+      ai_category,
+      notes: notes || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    // Add to bookmarks array
+    allBookmarks.push(newBookmark);
+    
+    // Save to file
+    await saveBookmarks(allBookmarks);
+    
+    console.log('✅ Successfully created bookmark:', newBookmark);
     
     return NextResponse.json({
       success: true,
-      bookmark: data
+      bookmark: newBookmark,
+      message: 'Bookmark created successfully'
     });
     
   } catch (error) {
     console.error('❌ Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: (error as Error).message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const bookmarkId = searchParams.get('id');
+    const userId = searchParams.get('user_id') || 'dev-user-123';
+    
+    if (!bookmarkId) {
+      return NextResponse.json(
+        { error: 'Bookmark ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    console.log(`🗑️ Deleting bookmark ${bookmarkId} for user ${userId}`);
+    
+    // Load existing bookmarks
+    const allBookmarks = await loadBookmarks();
+    
+    // Find bookmark to delete
+    const bookmarkToDelete = allBookmarks.find(b => b.id === parseInt(bookmarkId) && b.user_id === userId);
+    
+    if (!bookmarkToDelete) {
+      return NextResponse.json(
+        { error: 'Bookmark not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Remove bookmark from array
+    const updatedBookmarks = allBookmarks.filter(b => !(b.id === parseInt(bookmarkId) && b.user_id === userId));
+    
+    // Save updated bookmarks to file
+    await saveBookmarks(updatedBookmarks);
+    
+    console.log(`✅ Successfully deleted bookmark: ${bookmarkToDelete.title}`);
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Bookmark deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error deleting bookmark:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
