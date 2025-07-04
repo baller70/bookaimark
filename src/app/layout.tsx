@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { Toaster } from '@/components/ui/toaster'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,6 +20,8 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen antialiased`} suppressHydrationWarning>
         <ThemeProvider>
           {children}
+          {/* Global toast notifications */}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

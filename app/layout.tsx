@@ -3,6 +3,7 @@ import { Saira, Audiowide } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { GlobalSettingsProvider } from '@/components/providers/ThemeProvider'
 import OracleBlob from '@/components/oracle/oracle-blob'
+import { Toaster } from '@/components/ui/toaster'
 
 const saira = Saira({ subsets: ['latin'] })
 const audiowide = Audiowide({ 
@@ -33,6 +34,8 @@ export default function RootLayout({
             {/* Oracle Blob - Available on all pages */}
             <OracleBlob />
           </GlobalSettingsProvider>
+          {/* Global toast notifications */}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
