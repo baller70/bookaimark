@@ -91,6 +91,7 @@ import { FolderOrgChartView } from '@/src/components/ui/folder-org-chart-view'
 import { FolderCard, type BookmarkWithRelations } from '@/src/components/ui/FolderCard'
 import { FolderFormDialog, type Folder } from '@/src/components/ui/FolderFormDialog'
 import { KanbanView } from '@/src/components/ui/BookmarkKanban'
+import { SyncButton } from '@/components/SyncButton'
 
 // Import React Flow components for custom background
 import ReactFlow, {
@@ -612,6 +613,27 @@ export default function Dashboard() {
     return matchesSearch && matchesCategory
   })
 
+  // Utility functions for title and URL formatting
+  // GRID CARD CHARACTER LIMIT STANDARD:
+  // - Grid cards (GridBookmarkCard & CompactBookmarkCard): 14 characters max
+  // - This ensures proper spacing from right edge (~1 character buffer)
+  // - Use truncateTitle(title, 14) for all grid view cards
+  const truncateTitle = (title: string, maxLength: number = 20) => {
+    if (title.length <= maxLength) return title;
+    return title.substring(0, maxLength) + '...';
+  };
+
+  const extractDomain = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.replace('www.', '');
+    } catch {
+      // If URL parsing fails, try to extract domain manually
+      const match = url.match(/(?:https?:\/\/)?(?:www\.)?([^\/]+)/);
+      return match ? match[1] : url;
+    }
+  };
+
   const handleAddBookmark = () => {
     // Validate required fields
     if (!newBookmark.title.trim()) {
@@ -799,7 +821,7 @@ export default function Dashboard() {
     setEditingValue('')
   }
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!selectedBookmark || !editingField) return
 
     let newValue: string | string[] = editingValue
@@ -809,46 +831,138 @@ export default function Dashboard() {
       newValue = editingValue.toUpperCase()
     }
 
-    // Update the bookmark in the bookmarks array
-    setBookmarks(prev => prev.map(bookmark => 
-      bookmark.id === selectedBookmark.id 
-        ? { ...bookmark, [editingField]: newValue }
-        : bookmark
-    ))
+    // Create updated bookmark object
+    const updatedBookmark = { ...selectedBookmark, [editingField]: newValue }
 
-    // Update the selected bookmark for immediate UI update
-    setSelectedBookmark(prev => prev ? { ...prev, [editingField]: newValue } : prev)
+    try {
+      // Save to Supabase via MCP service
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          table: 'bookmarks',
+          payload: {
+            id: updatedBookmark.id,
+            url: updatedBookmark.url,
+            title: updatedBookmark.title,
+            description: updatedBookmark.description || '',
+            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
+            category: updatedBookmark.category || '',
+            isFavorite: updatedBookmark.isFavorite || false,
+            priority: updatedBookmark.priority || 'medium',
+            siteHealth: updatedBookmark.siteHealth || 'good',
+            usage: updatedBookmark.usage || 0,
+            updated_at: new Date().toISOString()
+          }
+        })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        // Update the bookmark in the bookmarks array only after successful save
+        setBookmarks(prev => prev.map(bookmark => 
+          bookmark.id === selectedBookmark.id 
+            ? updatedBookmark
+            : bookmark
+        ))
+
+        // Update the selected bookmark for immediate UI update
+        setSelectedBookmark(updatedBookmark)
+        
+        showNotification(`${editingField} updated successfully!`)
+      } else {
+        showNotification('Failed to save changes')
+        console.error('Save failed:', result.error)
+      }
+    } catch (error) {
+      showNotification('Error saving changes')
+      console.error('Save error:', error)
+    }
 
     setEditingField(null)
     setEditingValue('')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      saveEdit()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      cancelEditing()
+    // Only handle special keys if we're in an input field for editing
+    const target = e.target as HTMLElement
+    const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+    
+    if (isInputField) {
+      // Allow normal text editing in input fields
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        saveEdit()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        cancelEditing()
+      }
+      // For all other keys (including backspace), let them work normally in the input
+      // Stop propagation to prevent other handlers from interfering
+      if (e.key === 'Backspace' || e.key === 'Delete' || e.key.length === 1) {
+        e.stopPropagation()
+      }
     }
   }
 
-  const toggleFavorite = () => {
+  const toggleFavorite = async () => {
     if (!selectedBookmark) return
 
     const newFavoriteStatus = !selectedBookmark.isFavorite
+    const updatedBookmark = { ...selectedBookmark, isFavorite: newFavoriteStatus }
 
-    // Update the bookmark in the bookmarks array
-    setBookmarks(prev => prev.map(bookmark => 
-      bookmark.id === selectedBookmark.id 
-        ? { ...bookmark, isFavorite: newFavoriteStatus }
-        : bookmark
-    ))
+    try {
+      // Save to Supabase via MCP service
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          table: 'bookmarks',
+          payload: {
+            id: updatedBookmark.id,
+            url: updatedBookmark.url,
+            title: updatedBookmark.title,
+            description: updatedBookmark.description || '',
+            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
+            category: updatedBookmark.category || '',
+            isFavorite: updatedBookmark.isFavorite,
+            priority: updatedBookmark.priority || 'medium',
+            siteHealth: updatedBookmark.siteHealth || 'good',
+            usage: updatedBookmark.usage || 0,
+            updated_at: new Date().toISOString()
+          }
+        })
+      })
 
-    // Update the selected bookmark for immediate UI update
-    setSelectedBookmark(prev => prev ? { ...prev, isFavorite: newFavoriteStatus } : prev)
+      const result = await response.json()
+      
+      if (result.success) {
+        // Update the bookmark in the bookmarks array only after successful save
+        setBookmarks(prev => prev.map(bookmark => 
+          bookmark.id === selectedBookmark.id 
+            ? updatedBookmark
+            : bookmark
+        ))
 
-    showNotification(newFavoriteStatus ? 'Added to favorites!' : 'Removed from favorites!')
+        // Update the selected bookmark for immediate UI update
+        setSelectedBookmark(updatedBookmark)
+        
+        showNotification(newFavoriteStatus ? 'Added to favorites!' : 'Removed from favorites!')
+      } else {
+        showNotification('Failed to update favorite status')
+        console.error('Save failed:', result.error)
+      }
+    } catch (error) {
+      showNotification('Error updating favorite status')
+      console.error('Save error:', error)
+    }
   }
 
   const shareBookmark = async () => {
@@ -1249,16 +1363,20 @@ export default function Dashboard() {
       className="group hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer bg-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
       onClick={() => handleBookmarkClick(bookmark)}
     >
-      {/* Background Logo with 12% opacity */}
-      {bookmark.logo && (
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
-          style={{
-            backgroundImage: `url(${bookmark.logo})`,
-            opacity: 0.05
-          }}
-        />
-      )}
+      {/* Background Website Logo with 5% opacity */}
+      {(() => {
+        const domain = extractDomain(bookmark.url);
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+        return (
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
+            style={{
+              backgroundImage: `url(${faviconUrl})`,
+              opacity: 0.10
+            }}
+          />
+        );
+      })()}
       
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/3 via-transparent to-purple-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       
@@ -1269,8 +1387,29 @@ export default function Dashboard() {
               {bookmark.favicon}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-gray-900 truncate font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h3>
-              <p className="text-sm text-blue-600 hover:underline truncate font-medium mt-1">{bookmark.url}</p>
+              {editingField === 'title' && selectedBookmark?.id === bookmark.id ? (
+                <input
+                  type="text"
+                  value={editingValue}
+                  onChange={(e) => setEditingValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={saveEdit}
+                  className="font-bold text-gray-900 font-audiowide uppercase text-lg bg-transparent border-b-2 border-blue-500 outline-none w-full"
+                  autoFocus
+                />
+              ) : (
+                <h3 
+                  className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300 truncate cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBookmark(bookmark);
+                    startEditing('title', bookmark.title);
+                  }}
+                >
+                  {truncateTitle(bookmark.title, 14)}
+                </h3>
+              )}
+              <p className="text-sm text-blue-600 hover:underline font-medium mt-1">{extractDomain(bookmark.url)}</p>
             </div>
           </div>
         </div>
@@ -1387,16 +1526,20 @@ export default function Dashboard() {
     >
       {/* Square Box Design matching folder cards - SAME SIZE */}
       <div className="aspect-square w-full bg-white border border-black relative overflow-hidden rounded-lg">
-        {/* Background Default Logo with 5% opacity */}
-        {userDefaultLogo && (
-          <div 
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-            style={{
-              backgroundImage: `url(${userDefaultLogo})`,
-              opacity: 0.05
-            }}
-          />
-        )}
+        {/* Background Website Logo with 5% opacity */}
+        {(() => {
+          const domain = extractDomain(bookmark.url);
+          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+          return (
+            <div 
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url(${faviconUrl})`,
+                opacity: 0.10
+              }}
+            />
+          );
+        })()}
         <div className="p-2 h-full flex flex-col justify-between relative z-10">
           {/* Top section with favicon and title */}
           <div>
@@ -1407,10 +1550,10 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <h3 className="font-bold text-gray-900 font-audiowide uppercase text-base leading-tight ml-1 truncate">
-              {bookmark.title}
+            <h3 className="font-bold text-gray-900 font-audiowide uppercase text-base leading-tight ml-1">
+              {truncateTitle(bookmark.title, 14)}
             </h3>
-            <p className="text-xs text-blue-600 truncate ml-1 mt-1">{bookmark.url}</p>
+            <p className="text-xs text-blue-600 ml-1 mt-1">{extractDomain(bookmark.url)}</p>
           </div>
           
           {/* Middle section with badges */}
@@ -1679,16 +1822,20 @@ export default function Dashboard() {
       className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-white border border-black hover:border-blue-600 backdrop-blur-sm relative overflow-hidden rounded-lg"
       onClick={() => handleBookmarkClick(bookmark)}
     >
-      {/* Background Default Logo with 5% opacity */}
-      {userDefaultLogo && (
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: `url(${userDefaultLogo})`,
-            opacity: 0.05
-          }}
-        />
-      )}
+      {/* Background Website Logo with 5% opacity */}
+      {(() => {
+        const domain = extractDomain(bookmark.url);
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+        return (
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${faviconUrl})`,
+              opacity: 0.10
+            }}
+          />
+        );
+      })()}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
       
       <CardContent className="p-6 relative z-10">
@@ -1701,7 +1848,7 @@ export default function Dashboard() {
               </div>
               <div className="flex-1">
                 <div className="flex items-center space-x-4 mb-1">
-                  <h3 className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300">{bookmark.title}</h3>
+                  <h3 className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300">{truncateTitle(bookmark.title, 25)}</h3>
                   <Badge className={`text-sm border-2 shadow-sm px-3 py-1 ${getPriorityColor(bookmark.priority)}`}>
                     {bookmark.priority}
                   </Badge>
@@ -1728,7 +1875,7 @@ export default function Dashboard() {
         
         {/* Middle Section: URL and Description */}
         <div className="mb-4">
-          <p className="text-sm text-blue-600 hover:underline font-medium mb-2">{bookmark.url}</p>
+          <p className="text-sm text-blue-600 hover:underline font-medium mb-2">{extractDomain(bookmark.url)}</p>
           <p className="text-sm text-gray-600 leading-relaxed">{bookmark.description}</p>
         </div>
         
@@ -1796,7 +1943,7 @@ export default function Dashboard() {
               <FolderIcon className="h-5 w-5 text-blue-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-sm truncate font-audiowide uppercase">{bookmark.title}</h3>
+              <h3 className="font-medium text-sm font-audiowide uppercase">{truncateTitle(bookmark.title, 15)}</h3>
               <p className="text-xs text-gray-500 truncate">{bookmark.category}</p>
             </div>
           </div>
@@ -1846,7 +1993,7 @@ export default function Dashboard() {
                 <div className="text-blue-600 font-bold text-lg">{bookmark.favicon}</div>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm truncate font-audiowide uppercase">{bookmark.title}</h3>
+                <h3 className="font-medium text-sm font-audiowide uppercase">{truncateTitle(bookmark.title, 15)}</h3>
                 <p className="text-xs text-gray-500 truncate">{bookmark.category}</p>
               </div>
             </div>
@@ -2668,6 +2815,7 @@ export default function Dashboard() {
                   <SelectItem value="entertainment">Entertainment</SelectItem>
                 </SelectContent>
               </Select>
+              <SyncButton />
               <Button 
                 onClick={() => setShowAddBookmark(true)}
                 className="bg-blue-600 hover:bg-blue-700"
@@ -3097,9 +3245,50 @@ export default function Dashboard() {
                       <AvatarImage src={selectedBookmark.favicon} alt={selectedBookmark.title} />
                       <AvatarFallback className="bg-black text-white">{selectedBookmark.title[0]}</AvatarFallback>
                     </Avatar>
-                    <div>
-                      <DialogTitle className="text-2xl font-audiowide uppercase">{selectedBookmark.title}</DialogTitle>
-                      <p className="text-base text-muted-foreground">{selectedBookmark.url}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        {editingField === 'title' ? (
+                          <div className="flex-1 space-y-2">
+                            <Input
+                              value={editingValue}
+                              onChange={(e) => setEditingValue(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              onBlur={saveEdit}
+                              className="text-2xl font-audiowide uppercase bg-transparent border-b-2 border-blue-500 outline-none"
+                              placeholder="Enter title..."
+                              autoFocus
+                            />
+                            <div className="flex space-x-2">
+                              <Button size="sm" onClick={saveEdit} className="h-7">
+                                <Check className="h-3 w-3 mr-1" />
+                                Save
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={cancelEditing} className="h-7">
+                                <X className="h-3 w-3 mr-1" />
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <DialogTitle 
+                              className="text-2xl font-audiowide uppercase cursor-pointer hover:bg-gray-50 rounded px-2 py-1 transition-colors"
+                              onClick={() => startEditing('title', selectedBookmark.title)}
+                            >
+                              {selectedBookmark.title}
+                            </DialogTitle>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditing('title', selectedBookmark.title)}
+                              className="h-6 w-6 p-0 hover:bg-gray-100"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-base text-muted-foreground mt-1">{selectedBookmark.url}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">

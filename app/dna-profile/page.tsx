@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { 
   User, 
@@ -25,73 +25,124 @@ import { ChatSidebar } from '@/components/dashboard/ChatSidebar'
 import { NewSidebarComponent } from '@/src/components/ui/new-sidebar'
 
 // Default profile data
-const defaultProfileData = {
-  name: 'John Doe',
-  business: 'Software Engineer',
-  bio: 'Passionate about technology and innovation',
-  avatar: '/avatars/default.png',
-  tier: 'Pro' as const
+const getProfileData = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}')
+      const profilePicture = localStorage.getItem('profilePicture')
+      
+      return {
+        name: userSettings.profile?.name || 'John Doe',
+        business: userSettings.profile?.business || 'Software Engineer',
+        bio: userSettings.profile?.bio || 'Passionate about technology and innovation',
+        avatar: userSettings.profile?.avatar || profilePicture || '/avatars/default.png',
+        tier: 'Pro' as const
+      }
+    } catch (error) {
+      console.error('Error loading profile data:', error)
+    }
+  }
+  
+  return {
+    name: 'John Doe',
+    business: 'Software Engineer',
+    bio: 'Passionate about technology and innovation',
+    avatar: '/default-profile.png',
+    tier: 'Pro' as const
+  }
 }
 
-// Wrapper component for DNAProfileOverview
-const DnaProfileOverviewWrapper = () => <DNAProfileOverview profileData={defaultProfileData} />
+const defaultProfileData = getProfileData()
 
-const dnaProfileTabs = [
-  {
-    id: 'profile',
-    label: 'DNA Profile',
-    icon: User,
-    description: 'Personal info & interests',
-    component: DnaProfileOverviewWrapper,
-    badge: null
-  },
-  {
-    id: 'favorites',
-    label: 'Favorites',
-    icon: Heart,
-    description: 'Bookmarked content',
-    component: DnaFavorites,
-    badge: '1.2K'
-  },
-  {
-    id: 'playlists',
-    label: 'Playlists',
-    icon: Music,
-    description: 'Curated collections',
-    component: DnaPlaylists,
-    badge: '12'
-  },
-  {
-    id: 'search',
-    label: 'Search',
-    icon: Search,
-    description: 'AI-enhanced search',
-    component: DnaSearch,
-    badge: null
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    icon: BarChart3,
-    description: 'Usage insights',
-    component: DnaAnalytics,
-    badge: null
-  },
-  {
-    id: 'time-capsule',
-    label: 'Time Capsule',
-    icon: Clock,
-    description: 'Versioned snapshots',
-    component: DnaTimeCapsule,
-    badge: '8'
-  }
-].filter(tab => tab.label !== 'AI-Copolit' && tab.id !== 'ai-copolit')
+// Wrapper component for DNAProfileOverview will be defined inline
+
+// Tab definitions will be created inside the component
 
 export default function DnaProfilePage() {
   const [activeTab, setActiveTab] = useState('profile')
+  const [profileData, setProfileData] = useState(defaultProfileData)
   const router = useRouter();
   const loading = false
   const hasChanges = false
+
+  // Profile update handler
+  const handleProfileUpdate = (updatedProfile: any) => {
+    setProfileData(updatedProfile)
+  }
+
+  // Load profile data from localStorage on mount
+  useEffect(() => {
+    const loadProfileData = () => {
+      try {
+        const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}')
+        const profilePicture = localStorage.getItem('profilePicture')
+        
+        setProfileData({
+          name: userSettings.profile?.name || 'John Doe',
+          business: userSettings.profile?.business || 'Software Engineer',
+          bio: userSettings.profile?.bio || 'Passionate about technology and innovation',
+          avatar: userSettings.profile?.avatar || profilePicture || '/default-profile.png',
+          tier: 'Pro' as const
+        })
+      } catch (error) {
+        console.error('Error loading profile data:', error)
+      }
+    }
+    
+    loadProfileData()
+  }, [])
+
+  // Define tabs with current profile data
+  const dnaProfileTabs = [
+    {
+      id: 'profile',
+      label: 'DNA Profile',
+      icon: User,
+      description: 'Personal info & interests',
+      component: () => <DNAProfileOverview profileData={profileData} onProfileUpdate={handleProfileUpdate} />,
+      badge: null
+    },
+    {
+      id: 'favorites',
+      label: 'Favorites',
+      icon: Heart,
+      description: 'Bookmarked content',
+      component: DnaFavorites,
+      badge: '1.2K'
+    },
+    {
+      id: 'playlists',
+      label: 'Playlists',
+      icon: Music,
+      description: 'Curated collections',
+      component: DnaPlaylists,
+      badge: '12'
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      icon: Search,
+      description: 'AI-enhanced search',
+      component: DnaSearch,
+      badge: null
+    },
+    {
+      id: 'analytics',
+      label: 'Analytics',
+      icon: BarChart3,
+      description: 'Usage insights',
+      component: DnaAnalytics,
+      badge: null
+    },
+    {
+      id: 'time-capsule',
+      label: 'Time Capsule',
+      icon: Clock,
+      description: 'Versioned snapshots',
+      component: DnaTimeCapsule,
+      badge: '8'
+    }
+  ].filter(tab => tab.label !== 'AI-Copolit' && tab.id !== 'ai-copolit')
 
   // Sidebar sections for DNA Profile
   const sidebarSections = dnaProfileTabs.map(tab => ({

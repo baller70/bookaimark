@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Mic, Volume2, Settings, Play, Square, Headphones, Save, RotateCcw } from 'lucide-react'
+import { Mic, Volume2, Settings, Play, Square, Headphones, RotateCcw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getOracleSetting, saveOracleSetting } from '@/lib/user-settings-service'
+import { getOracleSetting } from '@/lib/user-settings-service'
+import SaveButton from '../../../../components/SaveButton'
 
 interface VoiceSettings {
   speechToText: boolean
@@ -80,26 +81,9 @@ export default function VoicePage() {
     })()
   }, [])
 
-  const updateSetting = (key: keyof VoiceSettings, value: unknown) => {
+  const updateSetting = <K extends keyof VoiceSettings>(key: K, value: VoiceSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }))
     setHasUnsavedChanges(true)
-  }
-
-  const saveSettings = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (user) {
-      try {
-        await saveOracleSetting<VoiceSettings>(user.id, 'voice', settings)
-      } catch (error) {
-        console.error('Failed to save voice settings:', error)
-        toast.error('Failed to save voice settings')
-        return
-      }
-    }
-    setHasUnsavedChanges(false)
-    toast.success('Voice settings saved successfully')
   }
 
   const resetSettings = () => {
@@ -141,14 +125,7 @@ export default function VoicePage() {
     { code: 'zh-TW', name: 'Chinese (Traditional)' }
   ]
 
-  const voiceDescriptions = {
-    alloy: 'Balanced and versatile voice',
-    echo: 'Deep and resonant tone',
-    fable: 'Warm and storytelling style',
-    onyx: 'Professional and authoritative',
-    nova: 'Bright and energetic',
-    shimmer: 'Smooth and calming'
-  }
+
 
   return (
     <div className="space-y-6">
@@ -167,14 +144,16 @@ export default function VoicePage() {
             <RotateCcw className="h-4 w-4 mr-2" />
             Reset
           </Button>
-          <Button 
-            size="sm" 
-            onClick={saveSettings}
-            disabled={!hasUnsavedChanges}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save Changes
-          </Button>
+          {hasUnsavedChanges && (
+            <SaveButton
+              table="oracle_settings"
+              payload={{
+                setting_key: 'voice',
+                setting_value: settings,
+                updated_at: new Date().toISOString()
+              }}
+            />
+          )}
         </div>
       </div>
 

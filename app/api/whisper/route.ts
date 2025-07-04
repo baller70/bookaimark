@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import OpenAI from 'openai'
+import { isOracleEnabled, createOracleDisabledResponse } from '@/lib/oracle-state'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if Oracle is enabled before processing
+    const oracleEnabled = await isOracleEnabled()
+    if (!oracleEnabled) {
+      console.log('🚫 Whisper API blocked - Oracle is disabled')
+      return NextResponse.json(
+        createOracleDisabledResponse(),
+        { status: 403 }
+      )
+    }
+
     // Get the form data from the request
     const formData = await req.formData()
     const file = formData.get('file') as File

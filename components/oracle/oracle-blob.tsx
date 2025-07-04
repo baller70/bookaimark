@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import * as Sentry from "@sentry/nextjs"
 import { supabase } from '@/lib/supabase'
 import { getOracleSetting } from '@/lib/user-settings-service'
+import { useOracle } from '@/components/providers/OracleProvider'
 
 // Oracle Appearance Settings Interface
 interface OracleAppearanceSettings {
@@ -116,6 +117,19 @@ const defaultVoiceSettings: OracleVoiceSettings = {
 }
 
 export default function OracleBlob() {
+  // Check Oracle global state
+  const { settings: oracleGlobalSettings, isLoading: oracleLoading } = useOracle()
+  
+  // If Oracle is disabled, don't render anything
+  if (oracleLoading) {
+    return null // Don't show blob while loading Oracle settings
+  }
+  
+  if (!oracleGlobalSettings.enabled) {
+    console.log('🚫 Oracle is disabled, hiding Oracle blob')
+    return null
+  }
+
   const [isOpen, setIsOpen] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])

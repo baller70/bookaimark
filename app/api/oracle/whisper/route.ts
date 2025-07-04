@@ -2,31 +2,25 @@ import { OpenAI } from 'openai'
 import { Readable } from 'stream'
 import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
+import { isOracleEnabled, createOracleDisabledResponse } from '@/lib/oracle-state'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
-export async function POST(req: Request) {
-  const formData = await req.formData()
-  const audio = formData.get('audio') as Blob
-  if (!audio) return NextResponse.json({ error: 'No file' }, { status: 400 })
-
-  const buffer = Buffer.from(await audio.arrayBuffer())
-  const stream = Readable.from(buffer)
-
-  const result = await openai.audio.transcriptions.create({
-    file: stream as any,
-    model: 'whisper-1',
-    response_format: 'json',
-  })
-
-  return NextResponse.json(result)
-}
-
-export async function POST_old(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     console.log('🎤 Oracle Whisper API called')
     
-    Sentry.startSpan(
+    // Check if Oracle is enabled before processing
+    const oracleEnabled = await isOracleEnabled()
+    if (!oracleEnabled) {
+      console.log('🚫 Oracle Whisper API blocked - Oracle is disabled')
+      return NextResponse.json(
+        createOracleDisabledResponse(),
+        { status: 403 }
+      )
+    }
+    
+    return await Sentry.startSpan(
       {
         op: "oracle.whisper",
         name: "Oracle Whisper Transcription",
@@ -57,7 +51,7 @@ export async function POST_old(request: NextRequest) {
         const stream = Readable.from(buffer)
         
         const transcription = await openai.audio.transcriptions.create({
-          file: stream as any,
+          file: stream as unknown as File,
           model: 'whisper-1',
           response_format: 'json',
         })

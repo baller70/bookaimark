@@ -43,6 +43,7 @@ import {
   Atom
 } from 'lucide-react'
 import { toast } from 'sonner'
+import SyncService from '@/lib/sync-service'
 
 interface ProfileData {
   name: string
@@ -65,6 +66,7 @@ interface Topic {
 
 interface DNAProfileOverviewProps {
   profileData: ProfileData
+  onProfileUpdate?: (updatedProfile: ProfileData) => void
 }
 
 const commonTopics: Topic[] = [
@@ -82,7 +84,7 @@ const commonTopics: Topic[] = [
   { id: '12', name: 'Science', icon: <Microscope className="h-4 w-4" />, category: 'Education', strength: 4, bookmarkCount: 89 }
 ]
 
-export function DNAProfileOverview({ profileData }: DNAProfileOverviewProps) {
+export function DNAProfileOverview({ profileData, onProfileUpdate }: DNAProfileOverviewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedProfile, setEditedProfile] = useState({
     name: profileData.name || '',
@@ -99,13 +101,109 @@ export function DNAProfileOverview({ profileData }: DNAProfileOverviewProps) {
   const [onboardingStep, setOnboardingStep] = useState(1)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [expandedTopics, setExpandedTopics] = useState<{[key: string]: string[]}>({})
+  const [uploading, setUploading] = useState(false)
 
   const maxTopics = profileData.tier === 'Free' ? 1 : profileData.tier === 'Pro' ? 3 : 5
   const availableSlots = maxTopics - selectedTopics.length
 
-  const handleSaveProfile = () => {
-    setIsEditing(false)
-    toast.success('Profile updated successfully!')
+  const handleSaveProfile = async () => {
+    // Save to localStorage for persistence
+    try {
+      const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}')
+      userSettings.profile = {
+        ...userSettings.profile,
+        name: editedProfile.name,
+        business: editedProfile.business,
+        bio: editedProfile.bio,
+        avatar: editedProfile.avatar
+      }
+      localStorage.setItem('userSettings', JSON.stringify(userSettings))
+      
+      // Also save avatar separately for backward compatibility
+      if (editedProfile.avatar) {
+        localStorage.setItem('profilePicture', editedProfile.avatar)
+      }
+      
+      // Sync to Supabase and other services
+      const syncResult = await SyncService.syncProfileData(editedProfile)
+      
+      setIsEditing(false)
+      
+      if (syncResult.success) {
+        toast.success('Profile updated and synced successfully!')
+      } else {
+        toast.warning('Profile updated locally, but sync failed')
+      }
+      
+      // Notify parent component of the update
+      if (onProfileUpdate) {
+        onProfileUpdate(editedProfile)
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      toast.error('Failed to save profile changes')
+    }
+  }
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB')
+      return
+    }
+
+    setUploading(true)
+    const uploadToast = toast.loading('Uploading profile picture...')
+
+    try {
+      // Create FormData for the upload
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('public_id', `profile_${Date.now()}`)
+      formData.append('resource_type', 'image')
+
+      // Upload to Cloudinary via our MCP service
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Upload failed')
+      }
+
+      const result = await response.json()
+      
+      if (result.success && result.url) {
+        // Update the avatar URL
+        setEditedProfile({
+          ...editedProfile,
+          avatar: result.url
+        })
+        
+        toast.dismiss(uploadToast)
+        toast.success('Profile picture updated successfully!')
+      } else {
+        throw new Error(result.error || 'Upload failed')
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      toast.dismiss(uploadToast)
+      toast.error('Failed to upload image. Please try again.')
+    } finally {
+      setUploading(false)
+      // Clear the input
+      event.target.value = ''
+    }
   }
 
   const handleTopicSelect = (topic: Topic) => {
@@ -220,15 +318,39 @@ export function DNAProfileOverview({ profileData }: DNAProfileOverviewProps) {
                     </AvatarFallback>
                   </Avatar>
                   {isEditing && (
-                    <Button
-                      size="sm"
-                      className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0"
-                    >
-                      <Upload className="h-4 w-4" />
-                    </Button>
+                    <div className="absolute -bottom-2 -right-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        id="avatar-upload"
+                        disabled={uploading}
+                      />
+                      <label 
+                        htmlFor="avatar-upload"
+                        className={`inline-flex items-center justify-center rounded-full h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-colors ${
+                          uploading ? 'pointer-events-none opacity-50' : ''
+                        }`}
+                        title="Upload profile picture"
+                      >
+                        {uploading ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                      </label>
+                    </div>
                   )}
                 </div>
               </div>
+              {isEditing && (
+                <p className="text-sm text-gray-600 text-center lg:text-left">
+                  Click the upload button to change your profile picture
+                  <br />
+                  <span className="text-xs text-gray-500">Supports JPG, PNG, GIF up to 5MB</span>
+                </p>
+              )}
             </div>
             
             <div className="space-y-4">

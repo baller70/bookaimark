@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { isOracleEnabled, createOracleDisabledResponse } from '@/lib/oracle-state'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,6 +10,16 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
+    // Check if Oracle is enabled before processing
+    const oracleEnabled = await isOracleEnabled()
+    if (!oracleEnabled) {
+      console.log('🚫 TTS API blocked - Oracle is disabled')
+      return NextResponse.json(
+        createOracleDisabledResponse(),
+        { status: 403 }
+      )
+    }
+    
     // Testing mode bypass for development
     const isTestingMode = process.env.NODE_ENV === 'development' || process.env.TTS_TESTING_MODE === 'true'
     

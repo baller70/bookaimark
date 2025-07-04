@@ -2,6 +2,7 @@ import '../src/app/globals.css'
 import { Saira, Audiowide } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { GlobalSettingsProvider } from '@/components/providers/ThemeProvider'
+import { OracleProvider } from '@/components/providers/OracleProvider'
 import OracleBlob from '@/components/oracle/oracle-blob'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -27,12 +28,14 @@ export default function RootLayout({
       <body className={`${saira.className} ${audiowide.variable} min-h-screen antialiased`} suppressHydrationWarning>
         <ThemeProvider>
           <GlobalSettingsProvider>
-            <div className="min-h-screen flex flex-col">
-              {children}
-            </div>
-            
-            {/* Oracle Blob - Available on all pages */}
-            <OracleBlob />
+            <OracleProvider>
+              <div className="min-h-screen flex flex-col">
+                {children}
+              </div>
+              
+              {/* Oracle Blob - Available on all pages when enabled */}
+              <OracleBlob />
+            </OracleProvider>
           </GlobalSettingsProvider>
           {/* Global toast notifications */}
           <Toaster />

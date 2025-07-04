@@ -24,7 +24,7 @@ const nextConfig = {
   i18n: {
     locales: ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'ar', 'hi'],
     defaultLocale: 'en',
-    localeDetection: true,
+    localeDetection: false,
   },
   
   // Minimal experimental features - removed problematic optimizeCss

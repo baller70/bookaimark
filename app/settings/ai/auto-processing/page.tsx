@@ -43,10 +43,11 @@ import {
   EyeOff
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
-import { supabase } from '@/lib/supabase'
+// Removed Supabase import - now using API route approach
 import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 import { useTranslation } from '@/hooks/use-translation'
 import { LanguageSelector } from '@/components/ui/language-selector'
+import SaveButton from '@/components/SaveButton'
 
 // TypeScript Interfaces
 interface Rule {
@@ -134,6 +135,7 @@ interface AutoProcessingContextType {
   hasUnsavedChanges: boolean
   saveSettings: () => void
   resetSettings: () => void
+  setPersistedSettings: (settings: AutoProcessingSettings) => void
 }
 
 const AutoProcessingContext = createContext<AutoProcessingContextType | null>(null)
@@ -157,14 +159,29 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [settings, setSettings] = useState<AutoProcessingSettings>(defaultSettings)
   const [persistedSettings, setPersistedSettings] = useState<AutoProcessingSettings>(defaultSettings)
 
-  // Load settings via tri-store once user session is known
+  // Load settings from Supabase MCP API on component mount
   useEffect(() => {
     const fetchAndSet = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const stored = defaultSettings // Temporarily use defaults until we fix the storage
-      setSettings(stored)
-      setPersistedSettings(stored)
+      try {
+        // Load saved settings from API
+        const response = await fetch('/api/save?table=bookmarks&title=Auto-Processing Settings')
+        const result = await response.json()
+        
+        if (result.success && result.data.found) {
+          console.log('✅ Loaded saved settings:', result.data.settings)
+          setSettings(result.data.settings)
+          setPersistedSettings(result.data.settings)
+        } else {
+          console.log('📭 No saved settings found, using defaults')
+          setSettings(defaultSettings)
+          setPersistedSettings(defaultSettings)
+        }
+      } catch (error) {
+        console.error('❌ Failed to load settings:', error)
+        // Fall back to defaults if loading fails
+        setSettings(defaultSettings)
+        setPersistedSettings(defaultSettings)
+      }
     }
     fetchAndSet()
   }, [])
@@ -174,13 +191,8 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [settings, persistedSettings])
 
   const saveSettings = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      toast.error('You must be signed in to save settings')
-      return
-    }
-    // Temporarily disabled until we fix the storage
-    console.log('Would save settings:', settings)
+    // Settings are now saved via SaveButton component using API route
+    console.log('Settings will be saved via SaveButton component:', settings)
     setPersistedSettings(settings)
     toast.success('Settings saved successfully')
   }, [settings])
@@ -196,7 +208,8 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setSettings,
       hasUnsavedChanges,
       saveSettings,
-      resetSettings
+      resetSettings,
+      setPersistedSettings
     }}>
       {children}
     </AutoProcessingContext.Provider>
@@ -213,7 +226,7 @@ export default function AutoProcessingPage() {
 
 function AutoProcessingContent() {
   const { t, locale } = useTranslation()
-  const { settings, setSettings, hasUnsavedChanges, saveSettings, resetSettings } = useAutoProcessingSettings()
+  const { settings, setSettings, hasUnsavedChanges, saveSettings, resetSettings, setPersistedSettings } = useAutoProcessingSettings()
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<Rule | null>(null)
@@ -303,10 +316,15 @@ function AutoProcessingContent() {
                   <RotateCcw className="h-4 w-4 mr-1" />
                   {t('common.reset')}
                 </Button>
-                <Button size="sm" onClick={saveSettings}>
-                  <Save className="h-4 w-4 mr-1" />
-                  {t('common.save')}
-                </Button>
+                <SaveButton
+                  table="bookmarks"
+                  payload={{
+                    url: 'https://settings.example.com/auto-processing',
+                    title: 'Auto-Processing Settings',
+                    description: JSON.stringify(settings),
+                    created_at: new Date().toISOString()
+                  }}
+                />
               </div>
             </AlertDescription>
           </Alert>

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import * as Sentry from "@sentry/nextjs"
+import { isOracleEnabled, createOracleDisabledResponse } from '@/lib/oracle-state'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -17,6 +18,16 @@ export async function POST(req: Request) {
     async (span) => {
       try {
         console.log('🎤 STT API called')
+        
+        // Check if Oracle is enabled before processing
+        const oracleEnabled = await isOracleEnabled()
+        if (!oracleEnabled) {
+          console.log('🚫 STT API blocked - Oracle is disabled')
+          return NextResponse.json(
+            createOracleDisabledResponse(),
+            { status: 403 }
+          )
+        }
         
         // Testing mode bypass for development
         const isTestingMode = process.env.NODE_ENV === 'development' || process.env.STT_TESTING_MODE === 'true'

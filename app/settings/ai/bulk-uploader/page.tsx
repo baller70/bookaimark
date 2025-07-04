@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase'
 import { getAISetting } from '@/lib/user-settings-service'
+import SaveButton from '../../../../components/SaveButton'
 
 // Types
 type BulkLinkStatus = 'queued' | 'validating' | 'processing' | 'saved' | 'duplicate' | 'failed';
@@ -348,12 +349,7 @@ const UnsavedChangesBar: React.FC = () => {
     toast.success('Settings reset to defaults');
   };
 
-  const handleSave = () => {
-    // Save to localStorage
-    localStorage.setItem('bulkUploaderPrefs', JSON.stringify(state.prefs));
-    dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false });
-    toast.success('Settings saved successfully');
-  };
+
 
   return (
     <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6" role="alert" aria-live="polite">
@@ -374,14 +370,14 @@ const UnsavedChangesBar: React.FC = () => {
             <RotateCcw className="h-4 w-4 mr-1" />
             Reset
           </Button>
-          <Button 
-            size="sm" 
-            onClick={handleSave}
-            className="bg-amber-600 hover:bg-amber-700 text-white"
-          >
-            <Save className="h-4 w-4 mr-1" />
-            Save Changes
-          </Button>
+          <SaveButton
+            table="user_preferences"
+            payload={{
+              preference_key: 'bulk_uploader',
+              preference_value: state.prefs,
+              updated_at: new Date().toISOString()
+            }}
+          />
         </div>
       </div>
     </div>

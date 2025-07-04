@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { isOracleEnabled, createOracleDisabledResponse } from '@/lib/oracle-state'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -103,6 +104,16 @@ Safety Level: ${settings.safetyLevel} - Be helpful while maintaining appropriate
 export async function POST(request: NextRequest) {
   try {
     console.log('🤖 Oracle Chat API called')
+
+    // Check if Oracle is enabled before processing
+    const oracleEnabled = await isOracleEnabled()
+    if (!oracleEnabled) {
+      console.log('🚫 Oracle Chat API blocked - Oracle is disabled')
+      return NextResponse.json(
+        createOracleDisabledResponse(),
+        { status: 403 }
+      )
+    }
 
     if (TESTING_MODE) {
       console.log('🧪 TESTING MODE: Chat Authentication bypassed')
