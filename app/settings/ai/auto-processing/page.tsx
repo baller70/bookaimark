@@ -43,6 +43,10 @@ import {
   EyeOff
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
+import { supabase } from '@/lib/supabase'
+import { getAutoProcessingSettings, saveAutoProcessingSettings } from '@/lib/linkpilot-service'
+import { useTranslation } from '@/hooks/use-translation'
+import { LanguageSelector } from '@/components/ui/language-selector'
 
 // TypeScript Interfaces
 interface Rule {
@@ -153,25 +157,29 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [settings, setSettings] = useState<AutoProcessingSettings>(defaultSettings)
   const [persistedSettings, setPersistedSettings] = useState<AutoProcessingSettings>(defaultSettings)
 
+  // Load settings via tri-store once user session is known
   useEffect(() => {
-    const saved = localStorage.getItem('autoProcessingSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-        setPersistedSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse saved settings:', error)
-      }
+    const fetchAndSet = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const stored = await getAutoProcessingSettings(user.id)
+      setSettings(stored)
+      setPersistedSettings(stored)
     }
+    fetchAndSet()
   }, [])
 
   const hasUnsavedChanges = useMemo(() => {
     return JSON.stringify(settings) !== JSON.stringify(persistedSettings)
   }, [settings, persistedSettings])
 
-  const saveSettings = useCallback(() => {
-    localStorage.setItem('autoProcessingSettings', JSON.stringify(settings))
+  const saveSettings = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      toast.error('You must be signed in to save settings')
+      return
+    }
+    await saveAutoProcessingSettings(user.id, settings)
     setPersistedSettings(settings)
     toast.success('Settings saved successfully')
   }, [settings])
@@ -203,6 +211,7 @@ export default function AutoProcessingPage() {
 }
 
 function AutoProcessingContent() {
+  const { t, locale } = useTranslation()
   const { settings, setSettings, hasUnsavedChanges, saveSettings, resetSettings } = useAutoProcessingSettings()
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false)
@@ -264,19 +273,20 @@ function AutoProcessingContent() {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Auto-Processing Control Panel</h1>
+            <h1 className="text-2xl font-bold">{t('autoProcessing.title')}</h1>
             <p className="text-muted-foreground">
-              Configure how AI LinkPilot automatically processes your bookmarks and links
+              {t('autoProcessing.description')}
             </p>
           </div>
           <div className="flex items-center space-x-2">
+            <LanguageSelector currentLocale={locale} />
             <Button
               variant="outline"
               size="sm"
               onClick={() => setHistoryDrawerOpen(true)}
             >
               <History className="h-4 w-4 mr-2" />
-              History
+              {t('autoProcessing.history')}
             </Button>
           </div>
         </div>
@@ -286,15 +296,15 @@ function AutoProcessingContent() {
           <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between w-full">
-              <span>You have unsaved changes</span>
+              <span>{t('autoProcessing.unsavedChanges')}</span>
               <div className="flex space-x-2">
                 <Button variant="outline" size="sm" onClick={resetSettings}>
                   <RotateCcw className="h-4 w-4 mr-1" />
-                  Reset
+                  {t('common.reset')}
                 </Button>
                 <Button size="sm" onClick={saveSettings}>
                   <Save className="h-4 w-4 mr-1" />
-                  Save Changes
+                  {t('common.save')}
                 </Button>
               </div>
             </AlertDescription>

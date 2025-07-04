@@ -53,7 +53,7 @@ describe('MarketplaceService', () => {
       await service.getListings(filters, 2, 10);
 
       expect(fetch).toHaveBeenCalledWith(
-        '/api/marketplace/listings?page=2&limit=10&search=web%20development&category=development&minPrice=1000&maxPrice=5000'
+        '/api/marketplace/listings?page=2&limit=10&search=web+development&category=development&minPrice=1000&maxPrice=5000'
       );
     });
   });

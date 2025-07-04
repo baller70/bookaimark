@@ -43,6 +43,8 @@ import {
   EyeOff
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
+import { supabase } from '@/lib/supabase'
+import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 
 // TypeScript Interfaces
 interface Rule {
@@ -154,27 +156,39 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [persistedSettings, setPersistedSettings] = useState<AutoProcessingSettings>(defaultSettings)
 
   useEffect(() => {
-    const saved = localStorage.getItem('autoProcessingSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-        setPersistedSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse saved settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getAISetting<AutoProcessingSettings>(user.id, 'auto_processing', defaultSettings)
+          setSettings(remote)
+        } catch (error) {
+          console.error('Failed to load auto-processing settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const hasUnsavedChanges = useMemo(() => {
     return JSON.stringify(settings) !== JSON.stringify(persistedSettings)
   }, [settings, persistedSettings])
 
-  const saveSettings = useCallback(() => {
-    localStorage.setItem('autoProcessingSettings', JSON.stringify(settings))
-    setPersistedSettings(settings)
-    toast.success('Settings saved successfully')
-  }, [settings])
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveAISetting<AutoProcessingSettings>(user.id, 'auto_processing', settings)
+        toast.success('Auto-processing settings saved successfully')
+      } catch (error) {
+        console.error('Failed to save auto-processing settings:', error)
+        toast.error('Failed to save auto-processing settings')
+      }
+    }
+  }
 
   const resetSettings = useCallback(() => {
     setSettings(persistedSettings)

@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { Eye, Palette, Waves, Zap, Volume2, Sparkles, Save, RotateCcw } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting, saveOracleSetting } from '@/lib/user-settings-service'
 
 interface OracleAppearanceSettings {
   // Blob Colors & Gradients
@@ -95,15 +97,23 @@ export default function OracleAppearancePage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('oracleAppearanceSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse Oracle appearance settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<OracleAppearanceSettings>(
+            user.id,
+            'appearance',
+            defaultSettings,
+          )
+          setSettings(remote)
+        } catch (error) {
+          console.error('Failed to load Oracle appearance settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const updateSetting = (key: keyof OracleAppearanceSettings, value: string | number | boolean) => {
@@ -111,15 +121,29 @@ export default function OracleAppearancePage() {
     setHasUnsavedChanges(true)
   }
 
-  const saveSettings = () => {
-    localStorage.setItem('oracleAppearanceSettings', JSON.stringify(settings))
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveOracleSetting<OracleAppearanceSettings>(user.id, 'appearance', settings)
+      } catch (error) {
+        console.error('Failed to save Oracle appearance settings:', error)
+        toast.error('Failed to save Oracle appearance settings')
+        return
+      }
+    }
+
     setHasUnsavedChanges(false)
     toast.success('Oracle appearance settings saved successfully')
-    
+
     // Trigger Oracle blob update by dispatching a custom event
-    window.dispatchEvent(new CustomEvent('oracleSettingsUpdated', { 
-      detail: settings 
-    }))
+    window.dispatchEvent(
+      new CustomEvent('oracleSettingsUpdated', {
+        detail: settings,
+      }),
+    )
   }
 
   const resetSettings = () => {

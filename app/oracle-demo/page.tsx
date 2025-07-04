@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -14,14 +14,16 @@ import {
   Mic, 
   MicOff, 
   Volume2, 
-  VolumeX, 
   Send, 
   Settings,
-  Zap,
   Brain,
   MessageSquare,
   Sparkles
 } from 'lucide-react'
+import OracleVoiceChat from '@/components/oracle/oracle-voice-chat'
+import OracleWhisper from '@/components/oracle/oracle-whisper'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting } from '@/lib/user-settings-service'
 
 interface Message {
   id: string
@@ -58,25 +60,26 @@ export default function OracleDemoPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
 
+  // Load settings from Supabase
   useEffect(() => {
-    // Load voice settings from localStorage
-    const saved = localStorage.getItem('oracleVoiceSettings')
-    if (saved) {
-      try {
-        setVoiceSettings(JSON.parse(saved))
-      } catch (error) {
-        console.error('Failed to parse voice settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+                     const remoteVoice = await getOracleSetting<{voiceModel?: string}>(user.id, 'voice', {})
+           
+           if (remoteVoice.voiceModel) {
+             setVoiceId(remoteVoice.voiceModel)
+           }
+          
+          console.log('✅ Oracle Demo settings loaded from Supabase')
+        } catch (error) {
+          console.error('Failed to load Oracle Demo settings:', error)
+        }
       }
-    }
-
-    // Add welcome message
-    const welcomeMessage: Message = {
-      id: 'welcome',
-      text: "Hello! I'm Oracle AI. I can communicate through text or voice. Try speaking to me by clicking the microphone button, or type your message below. How can I assist you today?",
-      isUser: false,
-      timestamp: new Date()
-    }
-    setMessages([welcomeMessage])
+    })()
   }, [])
 
   useEffect(() => {
@@ -461,6 +464,69 @@ export default function OracleDemoPage() {
                   </Badge>
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Simple Oracle Voice Chat */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Sparkles className="h-5 w-5 text-green-600" />
+              <span>Simple Oracle Voice Chat</span>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              A simplified voice chat interface using react-speech-kit for instant conversation
+            </p>
+          </CardHeader>
+          <CardContent>
+            <OracleVoiceChat />
+          </CardContent>
+        </Card>
+
+        {/* Oracle Whisper - Native TTS */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Brain className="h-5 w-5 text-indigo-600" />
+              <span>Oracle Whisper (Native TTS)</span>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Direct voice-to-voice conversation using native browser speech synthesis
+            </p>
+          </CardHeader>
+          <CardContent>
+            <OracleWhisper />
+          </CardContent>
+        </Card>
+
+        {/* Oracle Realtime - OpenAI Realtime API */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Sparkles className="h-5 w-5 text-red-600" />
+              <span>Oracle Realtime (OpenAI Realtime API)</span>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+                             Real-time voice conversation using OpenAI&apos;s Realtime API - requires API key
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 border rounded-lg bg-gradient-to-r from-red-50 to-pink-50">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="font-semibold text-red-700">Real-time Voice Chat</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                                 Experience ultra-low latency voice conversation with OpenAI&apos;s cutting-edge Realtime API.
+              </p>
+              <Button 
+                onClick={() => window.open('/oracle-realtime', '_blank')}
+                className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Open Oracle Realtime Chat
+              </Button>
             </div>
           </CardContent>
         </Card>

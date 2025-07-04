@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { BrainCircuit, Database, Clock, Users, FileText, Trash2, Save, RotateCcw } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting, saveOracleSetting } from '@/lib/user-settings-service'
 
 interface ContextSettings {
   memoryEnabled: boolean
@@ -66,15 +68,19 @@ export default function ContextPage() {
   const [newCategory, setNewCategory] = useState('')
 
   useEffect(() => {
-    const saved = localStorage.getItem('oracleContextSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse context settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<ContextSettings>(user.id, 'context', defaultSettings)
+          setSettings(remote)
+        } catch (error) {
+          console.error('Failed to load context settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const updateSetting = (key: keyof ContextSettings, value: unknown) => {
@@ -82,8 +88,19 @@ export default function ContextPage() {
     setHasUnsavedChanges(true)
   }
 
-  const saveSettings = () => {
-    localStorage.setItem('oracleContextSettings', JSON.stringify(settings))
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveOracleSetting<ContextSettings>(user.id, 'context', settings)
+      } catch (error) {
+        console.error('Failed to save context settings:', error)
+        toast.error('Failed to save context settings')
+        return
+      }
+    }
     setHasUnsavedChanges(false)
     toast.success('Context settings saved successfully')
   }

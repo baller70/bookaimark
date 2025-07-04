@@ -5,7 +5,7 @@ const nextConfig = {
   reactStrictMode: true,
   pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
   
-  // Performance optimizations
+  // Basic optimizations only
   compress: true,
   poweredByHeader: false,
   
@@ -20,47 +20,20 @@ const nextConfig = {
     ],
   },
   
-  // Experimental optimizations
+  // Internationalization configuration
+  i18n: {
+    locales: ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'ar', 'hi'],
+    defaultLocale: 'en',
+    localeDetection: true,
+  },
+  
+  // Minimal experimental features - removed problematic optimizeCss
   experimental: {
-    optimizeCss: true,
-    optimizeServerReact: true,
     serverMinification: true,
   },
   
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  
-  // Webpack optimizations
-  webpack: (config, { dev, isServer }) => {
-    // Production optimizations
-    if (!dev) {
-      // Tree shaking
-      config.optimization.usedExports = true;
-      config.optimization.sideEffects = false;
-      
-      // Bundle splitting for better caching
-      if (!isServer) {
-        config.optimization.splitChunks = {
-          chunks: 'all',
-          cacheGroups: {
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-            },
-            common: {
-              name: 'common',
-              minChunks: 2,
-              chunks: 'all',
-              enforce: true,
-            },
-          },
-        };
-      }
-    }
-    
-    return config;
   },
 }
 

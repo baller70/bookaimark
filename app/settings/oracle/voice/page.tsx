@@ -11,6 +11,8 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Mic, Volume2, Settings, Play, Square, Headphones, Save, RotateCcw } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting, saveOracleSetting } from '@/lib/user-settings-service'
 
 interface VoiceSettings {
   speechToText: boolean
@@ -63,15 +65,19 @@ export default function VoicePage() {
   const [isRecording, setIsRecording] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('oracleVoiceSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse voice settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<VoiceSettings>(user.id, 'voice', defaultSettings)
+          setSettings(remote)
+        } catch (error) {
+          console.error('Failed to load voice settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const updateSetting = (key: keyof VoiceSettings, value: unknown) => {
@@ -79,8 +85,19 @@ export default function VoicePage() {
     setHasUnsavedChanges(true)
   }
 
-  const saveSettings = () => {
-    localStorage.setItem('oracleVoiceSettings', JSON.stringify(settings))
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveOracleSetting<VoiceSettings>(user.id, 'voice', settings)
+      } catch (error) {
+        console.error('Failed to save voice settings:', error)
+        toast.error('Failed to save voice settings')
+        return
+      }
+    }
     setHasUnsavedChanges(false)
     toast.success('Voice settings saved successfully')
   }

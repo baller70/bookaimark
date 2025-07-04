@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Wrench, Code, Search, Calculator, Globe, Database, Image, FileText, Calendar, Mail, Save, RotateCcw, Plus, Trash2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting, saveOracleSetting } from '@/lib/user-settings-service'
 
 interface ToolsSettings {
   webSearch: boolean
@@ -76,15 +78,19 @@ export default function ToolsPage() {
   const [showApiKeys, setShowApiKeys] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('oracleToolsSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse tools settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<ToolsSettings>(user.id, 'tools', defaultSettings)
+          setSettings(remote)
+        } catch (error) {
+          console.error('Failed to load tools settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const updateSetting = (key: keyof ToolsSettings, value: unknown) => {
@@ -92,8 +98,19 @@ export default function ToolsPage() {
     setHasUnsavedChanges(true)
   }
 
-  const saveSettings = () => {
-    localStorage.setItem('oracleToolsSettings', JSON.stringify(settings))
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveOracleSetting<ToolsSettings>(user.id, 'tools', settings)
+      } catch (error) {
+        console.error('Failed to save tools settings:', error)
+        toast.error('Failed to save tools settings')
+        return
+      }
+    }
     setHasUnsavedChanges(false)
     toast.success('Tools settings saved successfully')
   }

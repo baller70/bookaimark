@@ -1,11 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { MessageSquare, Settings, X, Mic, MicOff, Volume2, VolumeX, Send, Zap, BookOpen, Search, Calendar, FileText, Sparkles, Pause, Play, Square } from 'lucide-react'
+import { MessageSquare, Settings, X, Mic, MicOff, Volume2, VolumeX, Send, Zap, BookOpen, Search, Calendar, FileText, Sparkles, Pause, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting } from '@/lib/user-settings-service'
 
 interface OracleAppearanceSettings {
   primaryColor: string
@@ -132,7 +134,6 @@ export function OracleBlobEnhanced() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([])
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
   const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null)
@@ -140,51 +141,47 @@ export function OracleBlobEnhanced() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Load settings from localStorage
+  // Load settings from Supabase
   useEffect(() => {
-    const savedAppearanceSettings = localStorage.getItem('oracleAppearanceSettings')
-    const savedVoiceSettings = localStorage.getItem('oracleVoiceSettings')
-    
-    if (savedAppearanceSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedAppearanceSettings)
-        setAppearanceSettings({ ...defaultAppearanceSettings, ...parsedSettings })
-      } catch (error) {
-        console.error('Failed to parse Oracle appearance settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const [remoteAppearance, remoteVoice] = await Promise.all([
+            getOracleSetting<OracleAppearanceSettings>(user.id, 'appearance', defaultAppearanceSettings),
+            getOracleSetting<VoiceSettings>(user.id, 'voice', defaultVoiceSettings)
+          ])
+          
+          setAppearanceSettings({ ...defaultAppearanceSettings, ...remoteAppearance })
+          setVoiceSettings({ ...defaultVoiceSettings, ...remoteVoice })
+          
+          console.log('✅ Oracle Enhanced settings loaded from Supabase')
+        } catch (error) {
+          console.error('Failed to load Oracle Enhanced settings:', error)
+        }
       }
-    }
-    
-    if (savedVoiceSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedVoiceSettings)
-        setVoiceSettings({ ...defaultVoiceSettings, ...parsedSettings })
-      } catch (error) {
-        console.error('Failed to parse Oracle voice settings:', error)
-      }
-    }
+    })()
   }, [])
 
   // Listen for settings updates
   useEffect(() => {
-    const handleSettingsUpdate = () => {
-      const savedAppearanceSettings = localStorage.getItem('oracleAppearanceSettings')
-      const savedVoiceSettings = localStorage.getItem('oracleVoiceSettings')
-      
-      if (savedAppearanceSettings) {
+    const handleSettingsUpdate = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
         try {
-          const parsedSettings = JSON.parse(savedAppearanceSettings)
-          setAppearanceSettings({ ...defaultAppearanceSettings, ...parsedSettings })
+          const [remoteAppearance, remoteVoice] = await Promise.all([
+            getOracleSetting<OracleAppearanceSettings>(user.id, 'appearance', defaultAppearanceSettings),
+            getOracleSetting<VoiceSettings>(user.id, 'voice', defaultVoiceSettings)
+          ])
+          
+          setAppearanceSettings({ ...defaultAppearanceSettings, ...remoteAppearance })
+          setVoiceSettings({ ...defaultVoiceSettings, ...remoteVoice })
         } catch (error) {
-          console.error('Failed to parse updated Oracle appearance settings:', error)
-        }
-      }
-      
-      if (savedVoiceSettings) {
-        try {
-          const parsedSettings = JSON.parse(savedVoiceSettings)
-          setVoiceSettings({ ...defaultVoiceSettings, ...parsedSettings })
-        } catch (error) {
-          console.error('Failed to parse updated Oracle voice settings:', error)
+          console.error('Failed to parse updated Oracle settings:', error)
         }
       }
     }

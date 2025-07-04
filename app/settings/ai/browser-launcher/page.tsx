@@ -29,6 +29,8 @@ import {
   Play,
   Globe
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase'
+import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 
 // Types
 interface BrowserLauncherPrefs {
@@ -781,6 +783,37 @@ const BrowserLauncherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       source.close();
     };
   }, [jobId, dispatch]);
+
+  useEffect(() => {
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<BrowserLauncherPrefs>(user.id, 'browser_launcher', defaultPrefs)
+          dispatch({ type: 'SET_PREFS', payload: remote })
+        } catch (error) {
+          console.error('Failed to load browser launcher settings:', error)
+        }
+      }
+    })()
+  }, [])
+
+  const savePreferences = async (prefs: BrowserLauncherPrefs) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveAISetting<BrowserLauncherPrefs>(user.id, 'browser_launcher', prefs)
+        toast.success('Browser launcher preferences saved')
+      } catch (error) {
+        console.error('Failed to save browser launcher preferences:', error)
+        toast.error('Failed to save preferences')
+      }
+    }
+  }
 
   return (
     <BrowserLauncherContext.Provider value={{ state, dispatch }}>

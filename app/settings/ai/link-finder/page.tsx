@@ -40,11 +40,12 @@ import {
   Target,
   Globe,
   Zap,
-  Filter,
   BookOpen,
   Eye,
   Heart
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase'
+import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 
 // Types
 type LinkType = 'article' | 'video' | 'pdf' | 'repo' | 'dataset';
@@ -1047,6 +1048,37 @@ const LinkFinderProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
   }, []);
+
+  useEffect(() => {
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<LinkFinderPrefs>(user.id, 'link_finder', defaultPrefs)
+          dispatch({ type: 'SET_PREFS', payload: remote })
+        } catch (error) {
+          console.error('Failed to load link finder settings:', error)
+        }
+      }
+    })()
+  }, [])
+
+  const savePreferences = async (prefs: LinkFinderPrefs) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveAISetting<LinkFinderPrefs>(user.id, 'link_finder', prefs)
+        toast.success('Link finder preferences saved')
+      } catch (error) {
+        console.error('Failed to save link finder preferences:', error)
+        toast.error('Failed to save preferences')
+      }
+    }
+  }
 
   return (
     <LinkFinderContext.Provider value={{ state, dispatch }}>

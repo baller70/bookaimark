@@ -34,6 +34,8 @@ import {
   RotateCcw,
   Save
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase'
+import { getAISetting } from '@/lib/user-settings-service'
 
 // Types
 type BulkLinkStatus = 'queued' | 'validating' | 'processing' | 'saved' | 'duplicate' | 'failed';
@@ -719,7 +721,7 @@ const SidebarControls: React.FC = () => {
             
             <Dialog open={showPresetModal} onOpenChange={setShowPresetModal}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="sm">
                   <Star className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
@@ -945,69 +947,148 @@ const ImportButton: React.FC = () => {
       } 
     });
 
-    // Simulate processing
-    for (let i = 0; i < selectedLinks.length; i++) {
-      const link = selectedLinks[i];
-      
-      // Update link status
-      dispatch({ 
-        type: 'UPDATE_LINK', 
-        payload: { 
-          id: link.id, 
-          updates: { status: 'processing' } 
-        } 
-      });
+    try {
+      // Prepare API request
+      const apiRequest = {
+        links: selectedLinks.map(link => ({
+          url: link.url,
+          title: link.title,
+          notes: link.notes
+        })),
+        settings: {
+          batchSize: state.currentSettings.batchSize,
+          extraTag: state.currentSettings.extraTag,
+          forceFolderId: state.currentSettings.forceFolderId,
+          privacy: state.currentSettings.privacy,
+          autoCategorize: state.currentSettings.autoCategorize,
+          duplicateHandling: state.currentSettings.duplicateHandling,
+          backgroundMode: state.currentSettings.backgroundMode,
+          language: 'english' // TODO: Get from user settings
+        }
+      };
 
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-
-      // Random success/failure
-      const success = Math.random() > 0.1; // 90% success rate
-      
-      dispatch({ 
-        type: 'UPDATE_LINK', 
-        payload: { 
-          id: link.id, 
-          updates: { 
-            status: success ? 'saved' : 'failed',
-            error: success ? undefined : 'Network timeout'
+      // Update all selected links to processing status
+      selectedLinks.forEach(link => {
+        dispatch({ 
+          type: 'UPDATE_LINK', 
+          payload: { 
+            id: link.id, 
+            updates: { status: 'processing' } 
           } 
-        } 
+        });
       });
 
       dispatch({ 
         type: 'SET_JOB_STATE', 
         payload: { 
-          completed: i + 1,
-          failed: selectedLinks.slice(0, i + 1).filter(l => !success).length,
-          eta: (selectedLinks.length - i - 1) * 2,
+          logs: [...state.jobState.logs, '🔗 Sending links to AI processing...']
+        } 
+      });
+
+      // Call the bulk uploader API
+      const response = await fetch('/api/ai/bulk-uploader', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiRequest),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'API processing failed');
+      }
+
+             // Update links with API results
+       result.processedLinks.forEach((processedLink: BulkLink) => {
+        const originalLink = selectedLinks.find(l => l.url === processedLink.url);
+        if (originalLink) {
+          dispatch({ 
+            type: 'UPDATE_LINK', 
+            payload: { 
+              id: originalLink.id, 
+              updates: {
+                status: processedLink.status,
+                title: processedLink.title || originalLink.title,
+                notes: processedLink.notes || originalLink.notes,
+                predictedTags: processedLink.predictedTags || originalLink.predictedTags,
+                predictedFolder: processedLink.predictedFolder || originalLink.predictedFolder,
+                error: processedLink.error
+              }
+            } 
+          });
+        }
+      });
+
+      dispatch({ 
+        type: 'SET_JOB_STATE', 
+        payload: { 
+          isRunning: false,
+          completed: result.totalProcessed,
+          failed: result.totalFailed,
           logs: [
             ...state.jobState.logs,
-            `${success ? '✓' : '✗'} ${link.url} - ${success ? 'saved' : 'failed'}`
+            `✅ Processing completed in ${result.processingTime}ms`,
+            `📊 Results: ${result.totalSuccessful} successful, ${result.totalFailed} failed`,
+            ...result.warnings.map((w: string) => `⚠️ ${w}`),
+            ...result.errors.map((e: string) => `❌ ${e}`)
           ]
         } 
       });
-    }
 
-    dispatch({ 
-      type: 'SET_JOB_STATE', 
-      payload: { 
-        isRunning: false,
-        logs: [...state.jobState.logs, 'Import completed!']
-      } 
-    });
-
-    const successCount = selectedLinks.filter(l => l.status === 'saved').length;
-    const failedCount = selectedLinks.filter(l => l.status === 'failed').length;
-    
-    toast.success(`✓ ${successCount} saved${failedCount > 0 ? ` · ${failedCount} failed` : ''}`, {
-      action: {
-        label: 'View Report',
-        onClick: () => {
-          // Open success report modal
+      // Show success toast
+      const successMessage = `✅ ${result.totalSuccessful} links processed successfully`;
+      const failureMessage = result.totalFailed > 0 ? ` · ${result.totalFailed} failed` : '';
+      
+      toast.success(`${successMessage}${failureMessage}`, {
+        action: {
+          label: 'View Details',
+          onClick: () => {
+            // Could open a detailed report modal
+            console.log('Full processing result:', result);
+          }
         }
-      }
-    });
+      });
+
+    } catch (error) {
+      console.error('Bulk import error:', error);
+      
+      // Update all processing links to failed
+      selectedLinks.forEach(link => {
+        if (link.status === 'processing') {
+          dispatch({ 
+            type: 'UPDATE_LINK', 
+            payload: { 
+              id: link.id, 
+              updates: { 
+                status: 'failed',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              } 
+            } 
+          });
+        }
+      });
+
+      dispatch({ 
+        type: 'SET_JOB_STATE', 
+        payload: { 
+          isRunning: false,
+          failed: selectedCount,
+          logs: [
+            ...state.jobState.logs,
+            `❌ Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          ]
+        } 
+      });
+
+      toast.error(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -1046,7 +1127,7 @@ const BulkUploaderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       backgroundMode: defaultPrefs.backgroundModeDefault
     },
     links: [],
-    selectedLinks: new Set(),
+    selectedLinks: new Set<string>(),
     jobState: {
       isRunning: false,
       total: 0,
@@ -1070,6 +1151,24 @@ const BulkUploaderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
   }, []);
+
+  useEffect(() => {
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getAISetting<BulkUploaderPrefs>(user.id, 'bulk_uploader', defaultPrefs)
+          dispatch({ type: 'SET_PREFS', payload: remote })
+        } catch (error) {
+          console.error('Failed to load bulk uploader settings:', error)
+        }
+      }
+    })()
+  }, [])
+
+
 
   return (
     <BulkUploaderContext.Provider value={{ state, dispatch }}>

@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
@@ -34,11 +33,10 @@ import {
   Zap,
   Target,
   BookOpen,
-  Eye,
-  Archive,
-  Calendar,
-  Globe
+  Calendar
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 
 // TypeScript Interfaces
 interface RecommendationSettings {
@@ -97,78 +95,97 @@ const useRecommendationSettings = () => {
 
 const useRecAPI = () => {
   const fetchRecommendations = useCallback(async (params: Partial<RecommendationSettings>): Promise<RecommendationItem[]> => {
-    // Mock API response for now
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    console.log('🎯 Fetching AI recommendations with params:', params)
     
-    const mockItems: RecommendationItem[] = [
-      {
-        id: '1',
-        url: 'https://example.com/ai-breakthroughs',
-        title: 'Latest AI Breakthroughs in 2024',
-        description: 'Comprehensive overview of the most significant artificial intelligence developments this year.',
-        favicon: '🤖',
-        readTime: '≈5 min read',
-        confidence: 0.87,
-        why: ['Matches your AI interest tags', 'Popular in your network', 'Recent publication']
-      },
-      {
-        id: '2',
-        url: 'https://example.com/typescript-tips',
-        title: 'Advanced TypeScript Patterns You Should Know',
-        description: 'Deep dive into powerful TypeScript patterns for better code organization.',
-        favicon: '📘',
-        readTime: '≈8 min read',
-        confidence: 0.92,
-        why: ['Similar to your saved articles', 'High engagement rate', 'Trending in tech']
-      },
-      {
-        id: '3',
-        url: 'https://example.com/design-systems',
-        title: 'Building Scalable Design Systems',
-        description: 'Best practices for creating and maintaining design systems at scale.',
-        favicon: '🎨',
-        readTime: '≈12 min read',
-        confidence: 0.79,
-        why: ['Complements your UX bookmarks', 'Recommended by similar users']
-      },
-      {
-        id: '4',
-        url: 'https://example.com/react-performance',
-        title: 'React Performance Optimization Techniques',
-        description: 'Advanced strategies for optimizing React applications for better performance.',
-        favicon: '⚛️',
-        readTime: '≈6 min read',
-        confidence: 0.84,
-        why: ['Matches your React tags', 'Frequently shared', 'High quality content']
-      },
-      {
-        id: '5',
-        url: 'https://example.com/web-security',
-        title: 'Modern Web Security Best Practices',
-        description: 'Essential security practices every web developer should implement.',
-        favicon: '🔒',
-        readTime: '≈7 min read',
-        confidence: 0.88,
-        why: ['Important topic gap in your library', 'Expert author', 'Recently updated']
+    try {
+      // Call the real AI recommendations API
+      const response = await fetch('/api/ai/recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            suggestionsPerRefresh: params.suggestionsPerRefresh || 5,
+            serendipityLevel: params.serendipityLevel || 3,
+            autoIncludeOnSelect: params.autoIncludeOnSelect || true,
+            autoBundle: params.autoBundle || false,
+            includeTLDR: params.includeTLDR || true,
+            domainBlacklist: params.domainBlacklist || [],
+            revisitNudgeDays: params.revisitNudgeDays || 14,
+            includeTrending: params.includeTrending || false
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
-    ]
-    
-    return mockItems.slice(0, params.suggestionsPerRefresh || 5)
+
+      const data = await response.json()
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate recommendations')
+      }
+
+      console.log('✅ AI recommendations received:', {
+        count: data.recommendations.length,
+        totalGenerated: data.totalGenerated,
+        totalFiltered: data.totalFiltered,
+        model: data.model
+      })
+
+      return data.recommendations
+      
+    } catch (error) {
+      console.error('❌ Failed to fetch AI recommendations:', error)
+      
+      // Return fallback mock data on error
+      console.log('🔄 Falling back to mock data')
+      
+      const mockItems: RecommendationItem[] = [
+        {
+          id: 'fallback-1',
+          url: 'https://example.com/ai-breakthroughs',
+          title: 'Latest AI Breakthroughs in 2024',
+          description: 'Comprehensive overview of the most significant artificial intelligence developments this year.',
+          favicon: '🤖',
+          readTime: '≈5 min read',
+          confidence: 0.87,
+          why: ['Matches your AI interest tags', 'Popular in your network', 'Recent publication']
+        },
+        {
+          id: 'fallback-2',
+          url: 'https://example.com/typescript-tips',
+          title: 'Advanced TypeScript Patterns You Should Know',
+          description: 'Deep dive into powerful TypeScript patterns for better code organization.',
+          favicon: '📘',
+          readTime: '≈8 min read',
+          confidence: 0.92,
+          why: ['Similar to your saved articles', 'High engagement rate', 'Trending in tech']
+        },
+        {
+          id: 'fallback-3',
+          url: 'https://example.com/design-systems',
+          title: 'Building Scalable Design Systems',
+          description: 'Best practices for creating and maintaining design systems at scale.',
+          favicon: '🎨',
+          readTime: '≈12 min read',
+          confidence: 0.79,
+          why: ['Complements your UX bookmarks', 'Recommended by similar users']
+        }
+      ]
+      
+      // Return fallback data on error (don't throw to prevent UI breaking)
+      return mockItems.slice(0, (params.suggestionsPerRefresh || 5))
+    }
   }, [])
   
   return { fetchRecommendations }
 }
 
-// Helper Functions
-const calcReadTime = (wordCount: number): string => {
-  const wordsPerMinute = 200
-  const minutes = Math.ceil(wordCount / wordsPerMinute)
-  return `≈${minutes} min read`
-}
-
-const whyThisLink = (reasons: string[]): string[] => {
-  return reasons
-}
+// Helper Functions (removed unused functions)
 
 // Provider Component
 const RecommendationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -176,27 +193,41 @@ const RecommendationProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [persistedSettings, setPersistedSettings] = useState<RecommendationSettings>(defaultSettings)
 
   useEffect(() => {
-    const saved = localStorage.getItem('recommendationSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-        setPersistedSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse saved settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getAISetting<RecommendationSettings>(user.id, 'recommendations', defaultSettings)
+          setSettings(remote)
+          setPersistedSettings(remote)
+        } catch (error) {
+          console.error('Failed to load recommendation settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const hasUnsavedChanges = useMemo(() => {
     return JSON.stringify(settings) !== JSON.stringify(persistedSettings)
   }, [settings, persistedSettings])
 
-  const saveSettings = useCallback(() => {
-    localStorage.setItem('recommendationSettings', JSON.stringify(settings))
-    setPersistedSettings(settings)
-    toast.success('Recommendation settings saved successfully')
-  }, [settings])
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveAISetting<RecommendationSettings>(user.id, 'recommendations', settings)
+        setPersistedSettings(settings)
+        toast.success('Recommendation settings saved successfully')
+      } catch (error) {
+        console.error('Failed to save recommendation settings:', error)
+        toast.error('Failed to save recommendation settings')
+      }
+    }
+  }
 
   const resetSettings = useCallback(() => {
     setSettings(persistedSettings)
@@ -238,7 +269,7 @@ function RecommendationContent() {
     revisit: false
   })
 
-  const updateSetting = (path: keyof RecommendationSettings, value: any) => {
+  const updateSetting = <K extends keyof RecommendationSettings>(path: K, value: RecommendationSettings[K]) => {
     setSettings({ ...settings, [path]: value })
   }
 
@@ -364,7 +395,7 @@ function RecommendationContent() {
                         </div>
                         <Slider
                           value={[settings.suggestionsPerRefresh]}
-                          onValueChange={([value]) => updateSetting('suggestionsPerRefresh', value as any)}
+                          onValueChange={([value]) => updateSetting('suggestionsPerRefresh', value as RecommendationSettings['suggestionsPerRefresh'])}
                           min={1}
                           max={10}
                           step={1}
@@ -386,7 +417,7 @@ function RecommendationContent() {
                         </div>
                         <Slider
                           value={[settings.serendipityLevel]}
-                          onValueChange={([value]) => updateSetting('serendipityLevel', value as any)}
+                          onValueChange={([value]) => updateSetting('serendipityLevel', value as RecommendationSettings['serendipityLevel'])}
                           min={0}
                           max={10}
                           step={1}
@@ -508,7 +539,7 @@ function RecommendationContent() {
                         </div>
                         <Slider
                           value={[settings.revisitNudgeDays]}
-                          onValueChange={([value]) => updateSetting('revisitNudgeDays', value as any)}
+                          onValueChange={([value]) => updateSetting('revisitNudgeDays', value as RecommendationSettings['revisitNudgeDays'])}
                           min={1}
                           max={30}
                           step={1}

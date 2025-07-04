@@ -35,6 +35,8 @@ import {
   Filter
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis } from 'recharts';
+import { supabase } from '@/lib/supabase'
+import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 
 // Types
 type HealthStatus = 'ok' | 'redirect' | 'broken' | 'timeout' | 'phishing';
@@ -353,7 +355,7 @@ const UnsavedChangesBar: React.FC = () => {
   };
 
   const handleSave = () => {
-    localStorage.setItem('linkValidatorPrefs', JSON.stringify(state.prefs));
+    savePreferences(state.prefs);
     dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false });
     toast.success('Settings saved successfully');
   };
@@ -1050,16 +1052,35 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Load preferences from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('linkValidatorPrefs');
-    if (saved) {
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<LinkValidatorPrefs>(user.id, 'link_validator', defaultPrefs)
+          dispatch({ type: 'SET_PREFS', payload: remote })
+        } catch (error) {
+          console.error('Failed to load link validator settings:', error)
+        }
+      }
+    })()
+  }, [])
+
+  const savePreferences = async (prefs: LinkValidatorPrefs) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
       try {
-        const prefs = JSON.parse(saved);
-        dispatch({ type: 'SET_PREFS', payload: prefs });
+        await saveAISetting<LinkValidatorPrefs>(user.id, 'link_validator', prefs)
+        toast.success('Link validator preferences saved')
       } catch (error) {
-        console.error('Failed to load link validator preferences:', error);
+        console.error('Failed to save link validator preferences:', error)
+        toast.error('Failed to save preferences')
       }
     }
-  }, []);
+  }
 
   return (
     <LinkValidatorContext.Provider value={{ state, dispatch }}>

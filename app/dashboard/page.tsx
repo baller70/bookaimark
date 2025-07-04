@@ -380,165 +380,37 @@ export default function Dashboard() {
     }
   ]);
 
-  // --- Bookmark data state (must come before category ordering logic) ---
-  const [bookmarks, setBookmarks] = useState([
-    {
-      id: 1,
-      title: "GITHUB",
-      url: "https://github.com",
-      description: "Development platform for version control and collaboration",
-      category: "Development",
-      tags: [], // REMOVED ALL TAGS
-      priority: "high",
-      isFavorite: true,
-      visits: 45,
-      lastVisited: "2024-01-15",
-      dateAdded: "2024-01-10",
-      favicon: "G",
-      screenshot: "/placeholder.svg",
-      circularImage: "/placeholder.svg",
-      logo: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png", // Background logo
-      notes: "Main repository hosting platform for all projects. Contains personal and work repositories.",
-      timeSpent: "2h 30m",
-      weeklyVisits: 45,
-      siteHealth: "excellent",
-      project: {
-        name: "Web Development",
-        progress: 75,
-        status: "Active"
+  // --- Bookmark data state (fetched from database) ---
+  const [bookmarks, setBookmarks] = useState<any[]>([]);
+  const [isLoadingBookmarks, setIsLoadingBookmarks] = useState(true);
+
+  // Fetch bookmarks from database
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      try {
+        setIsLoadingBookmarks(true);
+        const response = await fetch('/api/bookmarks?user_id=48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f');
+        const data = await response.json();
+        
+        if (data.success) {
+          setBookmarks(data.bookmarks);
+          console.log(`✅ Loaded ${data.bookmarks.length} bookmarks from database`);
+        } else {
+          console.error('❌ Failed to fetch bookmarks:', data.error);
+          // Fallback to empty array
+          setBookmarks([]);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching bookmarks:', error);
+        // Fallback to empty array
+        setBookmarks([]);
+      } finally {
+        setIsLoadingBookmarks(false);
       }
-    },
-    {
-      id: 2,
-      title: "FIGMA",
-      url: "https://figma.com",
-      description: "Collaborative design tool for UI/UX design",
-      category: "Design",
-      tags: [], // REMOVED ALL TAGS
-      priority: "high",
-      isFavorite: false,
-      visits: 32,
-      lastVisited: "2024-01-14",
-      dateAdded: "2024-01-08",
-      favicon: "F",
-      screenshot: "/placeholder.svg",
-      circularImage: "/placeholder.svg",
-      logo: "https://cdn.sanity.io/images/599r6htc/localized/46a76c802176eb17b04e12108de7e7e0f3736dc6-1024x1024.png?w=804&h=804&q=75&fit=max&auto=format", // Background logo
-      notes: "Primary design tool for creating wireframes, prototypes, and design systems.",
-      timeSpent: "1h 45m",
-      weeklyVisits: 32,
-      siteHealth: "good",
-      project: {
-        name: "Design System",
-        progress: 60,
-        status: "Active"
-      }
-    },
-    {
-      id: 3,
-      title: "STACK OVERFLOW",
-      url: "https://stackoverflow.com",
-      description: "Q&A platform for developers",
-      category: "Development",
-      tags: [], // REMOVED ALL TAGS
-      priority: "medium",
-      isFavorite: true,
-      visits: 28,
-      lastVisited: "2024-01-13",
-      dateAdded: "2024-01-05",
-      favicon: "SO",
-      screenshot: "/placeholder.svg",
-      circularImage: "/placeholder.svg",
-      logo: "https://cdn.sstatic.net/Sites/stackoverflow/Img/apple-touch-icon.png", // Background logo
-      notes: "Go-to resource for programming questions and solutions. Excellent community support.",
-      timeSpent: "3h 15m",
-      weeklyVisits: 28,
-      siteHealth: "excellent",
-      project: {
-        name: "Learning Hub",
-        progress: 40,
-        status: "Active"
-      }
-    },
-    {
-      id: 4,
-      title: "NOTION",
-      url: "https://notion.so",
-      description: "All-in-one workspace for notes and project management",
-      category: "Productivity",
-      tags: [], // REMOVED ALL TAGS
-      priority: "high",
-      isFavorite: false,
-      visits: 67,
-      lastVisited: "2024-01-16",
-      dateAdded: "2024-01-02",
-      favicon: "N",
-      screenshot: "/placeholder.svg",
-      circularImage: "/placeholder.svg",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/4/45/Notion_app_logo.png", // Background logo
-      notes: "Central hub for project documentation, meeting notes, and task management.",
-      timeSpent: "4h 20m",
-      weeklyVisits: 67,
-      siteHealth: "excellent",
-      project: {
-        name: "Project Management",
-        progress: 85,
-        status: "Active"
-      }
-    },
-    {
-      id: 5,
-      title: "DRIBBBLE",
-      url: "https://dribbble.com",
-      description: "Design inspiration and portfolio showcase",
-      category: "Design",
-      tags: [], // REMOVED ALL TAGS
-      priority: "low",
-      isFavorite: false,
-      visits: 15,
-      lastVisited: "2024-01-12",
-      dateAdded: "2024-01-07",
-      favicon: "D",
-      screenshot: "/placeholder.svg",
-      circularImage: "/placeholder.svg",
-      logo: "https://cdn.dribbble.com/assets/dribbble-ball-mark-2bd45f09c2fb58dbbfb44766d5d1d07c5a12972d602ef8b32204d28fa3dda554.svg", // Background logo
-      notes: "Source of design inspiration and trends. Great for discovering new design patterns.",
-      timeSpent: "45m",
-      weeklyVisits: 15,
-      siteHealth: "good",
-      project: {
-        name: "Design Inspiration",
-        progress: 25,
-        status: "Active"
-      }
-    },
-    {
-      id: 6,
-      title: "LINEAR",
-      url: "https://linear.app",
-      description: "Modern issue tracking for software teams",
-      category: "Development",
-      tags: [], // REMOVED ALL TAGS
-      priority: "medium",
-      isFavorite: true,
-      visits: 23,
-      lastVisited: "2024-01-11",
-      dateAdded: "2024-01-04",
-      favicon: "L",
-      screenshot: "/placeholder.svg",
-      circularImage: "/placeholder.svg",
-      logo: "https://asset.brandfetch.io/idZAyF9rlg/idkmvDNPVH.png", // Background logo
-      notes: "Issue tracking for development projects. Clean interface and fast performance.",
-      timeSpent: "1h 30m",
-      weeklyVisits: 23,
-      siteHealth: "excellent",
-      project: {
-        name: "Bug Tracking",
-        progress: 50,
-        status: "Active"
-      }
-    }
-  ]);
+    };
+
+    fetchBookmarks();
+  }, []);
 
   // ---- Folder category ordering state (for compact & list views) ----
   const [folderCategories, setFolderCategories] = useState<string[]>([]);
@@ -1941,7 +1813,23 @@ export default function Dashboard() {
               <div className="w-1 h-1 bg-gray-400 rounded-full ml-1"></div>
             </div>
           </div>
-          <FolderCard bookmark={bookmark} />
+          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-300 hover:border-blue-600" onClick={() => handleBookmarkClick(bookmark)}>
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <div className="text-blue-600 font-bold text-lg">{bookmark.favicon}</div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-sm truncate font-audiowide uppercase">{bookmark.title}</h3>
+                <p className="text-xs text-gray-500 truncate">{bookmark.category}</p>
+              </div>
+            </div>
+            
+            {/* Action Icons */}
+            <BookmarkActionIcons bookmark={bookmark} />
+            
+            {/* Usage Percentage Hexagon */}
+            <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
+          </Card>
         </div>
       </div>
     )
@@ -2017,7 +1905,7 @@ export default function Dashboard() {
     onAddBookmark: (folderId: string) => void;
     onDrop: (folderId: string, bookmark: BookmarkWithRelations) => void;
     onDragOver: (event: React.DragEvent) => void;
-    onClick?: () => void;
+    onClick?: (e: React.MouseEvent) => void;
   }) => {
     return (
       <div 
@@ -2120,7 +2008,7 @@ export default function Dashboard() {
     onAddBookmark: (folderId: string) => void;
     onDrop: (folderId: string, bookmark: BookmarkWithRelations) => void;
     onDragOver: (event: React.DragEvent) => void;
-    onClick?: () => void;
+    onClick?: (e: React.MouseEvent) => void;
   }) => {
     const {
       attributes,
@@ -2138,10 +2026,8 @@ export default function Dashboard() {
     }
 
     // Prevent click event when dragging
-    const handleClick = (e: React.MouseEvent) => {
+    const handleClick = () => {
       if (isDragging) {
-        e.preventDefault();
-        e.stopPropagation();
         return;
       }
       onClick?.();
@@ -2588,9 +2474,9 @@ export default function Dashboard() {
                           onAddBookmark={handleGoalAddBookmark}
                           onDrop={handleGoalDrop}
                           onDragOver={handleGoalDragOver}
-                          onClick={() => {
-                            console.log('Goal folder clicked:', folder);
-                            showNotification(`Opened goal folder: ${folder.name}`);
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleGoalSubmit(folder);
                           }}
                         />
                       );

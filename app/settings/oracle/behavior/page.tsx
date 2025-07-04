@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Bot, Brain, Zap, MessageSquare, Clock, Target, Save, RotateCcw } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting, saveOracleSetting } from '@/lib/user-settings-service'
 
 interface BehaviorSettings {
   personality: 'professional' | 'friendly' | 'casual' | 'creative' | 'analytical'
@@ -62,15 +64,19 @@ export default function BehaviorPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('oracleBehaviorSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse behavior settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<BehaviorSettings>(user.id, 'behavior', defaultSettings)
+          setSettings(remote)
+        } catch (error) {
+          console.error('Failed to load behavior settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const updateSetting = (key: keyof BehaviorSettings, value: any) => {
@@ -78,8 +84,19 @@ export default function BehaviorPage() {
     setHasUnsavedChanges(true)
   }
 
-  const saveSettings = () => {
-    localStorage.setItem('oracleBehaviorSettings', JSON.stringify(settings))
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveOracleSetting<BehaviorSettings>(user.id, 'behavior', settings)
+      } catch (error) {
+        console.error('Failed to save behavior settings:', error)
+        toast.error('Failed to save behavior settings')
+        return
+      }
+    }
     setHasUnsavedChanges(false)
     toast.success('Behavior settings saved successfully')
   }

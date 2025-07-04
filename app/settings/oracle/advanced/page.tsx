@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Sparkles, Shield, Zap, Database, Code, Brain, Globe, AlertTriangle, Save, RotateCcw, Download, Upload, Trash2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting, saveOracleSetting } from '@/lib/user-settings-service'
 
 interface AdvancedSettings {
   debugMode: boolean
@@ -104,15 +106,19 @@ export default function AdvancedPage() {
   const [showDangerZone, setShowDangerZone] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('oracleAdvancedSettings')
-    if (saved) {
-      try {
-        const parsedSettings = JSON.parse(saved)
-        setSettings(parsedSettings)
-      } catch (error) {
-        console.error('Failed to parse advanced settings:', error)
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+          const remote = await getOracleSetting<AdvancedSettings>(user.id, 'advanced', defaultSettings)
+          setSettings(remote)
+        } catch (error) {
+          console.error('Failed to load advanced settings:', error)
+        }
       }
-    }
+    })()
   }, [])
 
   const updateSetting = (key: keyof AdvancedSettings, value: unknown) => {
@@ -142,8 +148,19 @@ export default function AdvancedPage() {
     setHasUnsavedChanges(true)
   }
 
-  const saveSettings = () => {
-    localStorage.setItem('oracleAdvancedSettings', JSON.stringify(settings))
+  const saveSettings = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      try {
+        await saveOracleSetting<AdvancedSettings>(user.id, 'advanced', settings)
+      } catch (error) {
+        console.error('Failed to save advanced settings:', error)
+        toast.error('Failed to save advanced settings')
+        return
+      }
+    }
     setHasUnsavedChanges(false)
     toast.success('Advanced settings saved successfully')
   }
@@ -183,16 +200,24 @@ export default function AdvancedPage() {
     }
   }
 
-  const clearAllData = () => {
-    localStorage.removeItem('oracleAdvancedSettings')
-    localStorage.removeItem('oracleAppearanceSettings')
-    localStorage.removeItem('oracleBehaviorSettings')
-    localStorage.removeItem('oracleVoiceSettings')
-    localStorage.removeItem('oracleContextSettings')
-    localStorage.removeItem('oracleToolsSettings')
+  const clearAllData = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    // reset all categories to default locally and remote
+    const merged = {
+      appearance: defaultSettings,
+      behavior: {},
+      voice: {},
+      context: {},
+      tools: {},
+      advanced: defaultSettings,
+    }
+    await saveOracleSetting(user.id, 'advanced', defaultSettings)
+    toast.success('All Oracle AI data cleared')
     setSettings(defaultSettings)
     setHasUnsavedChanges(false)
-    toast.success('All Oracle AI data cleared')
   }
 
   return (

@@ -24,6 +24,8 @@ import {
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import * as Sentry from "@sentry/nextjs"
+import { supabase } from '@/lib/supabase'
+import { getOracleSetting } from '@/lib/user-settings-service'
 
 // Oracle Appearance Settings Interface
 interface OracleAppearanceSettings {
@@ -194,84 +196,53 @@ export default function OracleBlob() {
     }
   }
 
-  // Load settings from localStorage
+  // Load settings from Supabase
   useEffect(() => {
-    const savedAppearance = localStorage.getItem('oracleAppearanceSettings')
-    const savedVoice = localStorage.getItem('oracleVoiceSettings')
-    
-    if (savedAppearance) {
-      try {
-        const parsed = JSON.parse(savedAppearance)
-        const normalizedSettings = normalizeSettings(parsed)
-        setAppearanceSettings(normalizedSettings)
-        console.log('✅ Oracle appearance settings loaded and normalized:', normalizedSettings)
-      } catch (error) {
-        console.error('❌ Error parsing appearance settings:', error)
-        Sentry.captureException(error, {
-          tags: { component: 'oracle-blob', action: 'load-appearance-settings' }
-        })
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        try {
+                     const [remoteAppearance, remoteVoice] = await Promise.all([
+             getOracleSetting<OracleAppearanceSettings>(user.id, 'appearance', defaultAppearanceSettings),
+             getOracleSetting<OracleVoiceSettings>(user.id, 'voice', defaultVoiceSettings)
+           ])
+          
+          const normalizedAppearance = normalizeSettings(remoteAppearance)
+          setAppearanceSettings(normalizedAppearance)
+          setVoiceSettings(remoteVoice)
+          
+          console.log('✅ Oracle settings loaded from Supabase')
+        } catch (error) {
+          console.error('Failed to load Oracle settings:', error)
+          Sentry.captureException(error, {
+            tags: { component: 'oracle-blob', action: 'load-settings' }
+          })
+        }
       }
-    }
-    
-    if (savedVoice) {
-      try {
-        const parsed = JSON.parse(savedVoice)
-        setVoiceSettings(parsed)
-        console.log('✅ Oracle voice settings loaded:', parsed)
-      } catch (error) {
-        console.error('❌ Error parsing voice settings:', error)
-        Sentry.captureException(error, {
-          tags: { component: 'oracle-blob', action: 'load-voice-settings' }
-        })
-      }
-    }
+    })()
   }, [])
 
   // Listen for settings updates
   useEffect(() => {
-    const handleSettingsUpdate = () => {
-      const savedAppearance = localStorage.getItem('oracleAppearanceSettings')
-      const savedVoice = localStorage.getItem('oracleVoiceSettings')
-      
-      if (savedAppearance) {
+    const handleSettingsUpdate = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
         try {
-          const parsed = JSON.parse(savedAppearance)
+          const [remoteAppearance, remoteVoice] = await Promise.all([
+            getOracleSetting<OracleAppearanceSettings>(user.id, 'appearance', defaultAppearanceSettings),
+            getOracleSetting<OracleVoiceSettings>(user.id, 'voice', defaultVoiceSettings)
+          ])
           
-          // Normalize settings to match Oracle blob expected format
-          const normalizedSettings: OracleAppearanceSettings = {
-            primaryColor: parsed.primaryColor || defaultAppearanceSettings.primaryColor,
-            secondaryColor: parsed.secondaryColor || defaultAppearanceSettings.secondaryColor,
-            gradientDirection: parsed.gradientDirection || defaultAppearanceSettings.gradientDirection,
-            blobSize: parsed.blobSize || defaultAppearanceSettings.blobSize,
-            voiceVisualization: parsed.voiceVisualization !== undefined ? parsed.voiceVisualization : defaultAppearanceSettings.voiceVisualization,
-            voiceBarsCount: parsed.voiceBarsCount || defaultAppearanceSettings.voiceBarsCount,
-            // Convert percentage-based voiceBarsHeight (40) to decimal (0.4)
-            voiceBarsHeight: parsed.voiceBarsHeight > 1 ? parsed.voiceBarsHeight / 100 : (parsed.voiceBarsHeight || defaultAppearanceSettings.voiceBarsHeight),
-            voiceBarsSpacing: parsed.voiceBarsSpacing || defaultAppearanceSettings.voiceBarsSpacing,
-            voiceBarsReactivity: parsed.voiceBarsReactivity || defaultAppearanceSettings.voiceBarsReactivity,
-            idleAnimation: parsed.idleAnimation !== undefined ? parsed.idleAnimation : defaultAppearanceSettings.idleAnimation,
-            pulseEffect: parsed.pulseEffect !== undefined ? parsed.pulseEffect : defaultAppearanceSettings.pulseEffect,
-            glowEffect: parsed.glowEffect !== undefined ? parsed.glowEffect : defaultAppearanceSettings.glowEffect,
-            glowIntensity: parsed.glowIntensity !== undefined ? (parsed.glowIntensity > 1 ? parsed.glowIntensity / 100 : parsed.glowIntensity) : defaultAppearanceSettings.glowIntensity,
-            floatingAnimation: parsed.floatingBehavior !== undefined ? parsed.floatingBehavior : (parsed.floatingAnimation !== undefined ? parsed.floatingAnimation : defaultAppearanceSettings.floatingAnimation),
-            floatingSpeed: parsed.floatingSpeed || defaultAppearanceSettings.floatingSpeed,
-            rotationSpeed: parsed.rotationSpeed || defaultAppearanceSettings.rotationSpeed,
-            morphingSpeed: parsed.morphingSpeed || defaultAppearanceSettings.morphingSpeed,
-            themeIntegration: parsed.adaptToSystemTheme !== undefined ? parsed.adaptToSystemTheme : (parsed.themeIntegration !== undefined ? parsed.themeIntegration : defaultAppearanceSettings.themeIntegration)
-          }
-          
-          setAppearanceSettings(normalizedSettings)
+          const normalizedAppearance = normalizeSettings(remoteAppearance)
+          setAppearanceSettings(normalizedAppearance)
+          setVoiceSettings(remoteVoice)
         } catch (error) {
-          console.error('Error loading updated appearance settings:', error)
+          console.error('Error loading updated settings:', error)
           setAppearanceSettings(defaultAppearanceSettings)
-        }
-      }
-      
-      if (savedVoice) {
-        try {
-          setVoiceSettings(JSON.parse(savedVoice))
-        } catch (error) {
-          console.error('Error loading updated voice settings:', error)
           setVoiceSettings(defaultVoiceSettings)
         }
       }
@@ -780,195 +751,122 @@ export default function OracleBlob() {
           }
         }, 30000) // 30 second timeout
         
-        audio.onended = () => {
+        const cleanup = () => {
           if (!hasResolved) {
-            console.log('✅ TTS playback completed - audio ended event fired')
             hasResolved = true
             clearTimeout(timeout)
             setIsPlaying(false)
             URL.revokeObjectURL(audioUrl)
-            resolve()
           }
+        }
+        
+        audio.onended = () => {
+          console.log('✅ TTS playback completed - audio ended event fired')
+          cleanup()
+          resolve()
         }
         
         audio.onerror = (error) => {
-          if (!hasResolved) {
-            console.error('❌ Audio playback error:', error)
-            hasResolved = true
-            clearTimeout(timeout)
-            setIsPlaying(false)
-            URL.revokeObjectURL(audioUrl)
-            reject(new Error('Audio playback failed'))
-          }
+          console.error('❌ Audio playback error:', error)
+          cleanup()
+          reject(new Error('Audio playback failed'))
         }
         
-        // Add loading event listeners
-        audio.onloadstart = () => {
-          console.log('🔄 Audio loading started')
-        }
-        
-        audio.oncanplay = () => {
-          console.log('✅ Audio can start playing')
-        }
-        
-        audio.oncanplaythrough = () => {
-          console.log('✅ Audio can play through without stopping')
-        }
-        
-        audio.onloadeddata = () => {
-          console.log('✅ Audio data loaded')
-        }
-        
-        audio.onloadedmetadata = () => {
-          console.log('✅ Audio metadata loaded:', {
-            duration: audio.duration,
-            readyState: audio.readyState
-          })
-        }
-        
-        // Set audio properties before playing
-        audio.preload = 'auto'
-        audio.autoplay = false
-        
-        console.log('🎵 Attempting to play TTS audio...')
-        
-        // Try to load the audio first
-        const loadAudio = () => {
-          return new Promise<void>((loadResolve, loadReject) => {
-            if (audio.readyState >= 2) { // HAVE_CURRENT_DATA
-              console.log('✅ Audio already loaded, ready to play')
-              loadResolve()
-              return
-            }
+        // Simplified audio loading and playing
+        const attemptPlay = async () => {
+          try {
+            console.log('🎵 Attempting to play TTS audio...')
             
-            const onCanPlay = () => {
-              console.log('✅ Audio loaded and ready to play')
-              audio.removeEventListener('canplay', onCanPlay)
-              audio.removeEventListener('error', onLoadError)
-              loadResolve()
-            }
+            // Try to play the audio
+            await audio.play()
+            console.log('🎵 TTS playback started successfully')
+            setIsPlaying(true)
             
-            const onLoadError = (error: Event) => {
-              console.error('❌ Audio loading error:', error)
-              audio.removeEventListener('canplay', onCanPlay)
-              audio.removeEventListener('error', onLoadError)
-              loadReject(error)
-            }
-            
-            audio.addEventListener('canplay', onCanPlay)
-            audio.addEventListener('error', onLoadError)
-            
-            // Force load
-            audio.load()
-          })
-        }
-        
-        // Load audio first, then play
-        loadAudio().then(() => {
-          console.log('🎵 Audio loaded successfully, attempting to play...')
-          
-          const playPromise = audio.play()
-          
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              console.log('🎵 TTS playback started successfully')
-              setIsPlaying(true)
-            }).catch((playError) => {
-              console.error('❌ Failed to start audio playback:', playError)
-              console.error('❌ Play error details:', {
-                name: playError.name,
-                message: playError.message,
-                code: playError.code
-              })
-              
-              // Check if it's an autoplay policy issue
-              if (playError.name === 'NotAllowedError' || playError.name === 'AbortError') {
-                console.log('🔒 Autoplay blocked by browser policy - trying alternative approach')
-                
-                if (!hasUserInteracted) {
-                  toast.error('🔒 Audio blocked! Click anywhere on the page to enable voice responses.')
-                  console.log('🔒 Waiting for user interaction to enable audio...')
-                  
-                  // Wait for user interaction
-                  const enableAndPlay = () => {
-                    setHasUserInteracted(true)
-                    audio.play().then(() => {
-                      console.log('🎵 TTS playback started after user interaction')
-                      setIsPlaying(true)
-                    }).catch(() => {
-                      console.error('❌ Still failed to play after user interaction')
-                    })
-                  }
-                  
-                  document.addEventListener('click', enableAndPlay, { once: true })
-                  document.addEventListener('keydown', enableAndPlay, { once: true })
-                  return
-                }
-                
-                // Force play with user interaction context
-                setTimeout(() => {
-                  audio.play().then(() => {
-                    console.log('🎵 TTS playback started after retry')
-                    setIsPlaying(true)
-                  }).catch((retryError) => {
-                    console.error('❌ Retry failed:', retryError)
-                    toast.error('Audio playback blocked. Please click anywhere to enable audio.')
-                    
-                    // Try to play on next user interaction
-                    const playOnInteraction = () => {
-                      audio.play().then(() => {
-                        console.log('🎵 TTS playback started after user interaction')
-                        setIsPlaying(true)
-                        document.removeEventListener('click', playOnInteraction)
-                        document.removeEventListener('keydown', playOnInteraction)
-                      }).catch(() => {
-                        console.error('❌ Still failed to play after user interaction')
-                      })
-                    }
-                    
-                    document.addEventListener('click', playOnInteraction, { once: true })
-                    document.addEventListener('keydown', playOnInteraction, { once: true })
-                  })
-                }, 100)
-              }
-              
-              if (!hasResolved) {
-                hasResolved = true
-                clearTimeout(timeout)
-                setIsPlaying(false)
-                URL.revokeObjectURL(audioUrl)
-                reject(playError)
-              }
+          } catch (playError) {
+            console.error('❌ Failed to start audio playback:', playError)
+            console.error('❌ Play error details:', {
+              name: playError.name,
+              message: playError.message,
+              code: playError.code
             })
-          } else {
-            console.error('❌ Audio.play() returned undefined')
-            if (!hasResolved) {
-              hasResolved = true
-              clearTimeout(timeout)
-              setIsPlaying(false)
-              URL.revokeObjectURL(audioUrl)
-              reject(new Error('Audio.play() returned undefined'))
+            
+            // Handle autoplay policy restrictions
+            if (playError.name === 'NotAllowedError' || playError.name === 'AbortError') {
+              console.log('🔒 Autoplay blocked by browser policy')
+              
+              // Show user-friendly message
+              toast.error('🔒 Audio blocked! Click the Oracle or anywhere on the page to enable voice responses.')
+              
+              // Set up one-time user interaction listeners
+              const enableAudioOnInteraction = async () => {
+                try {
+                  console.log('🔓 User interaction detected, attempting to play audio...')
+                  await audio.play()
+                  console.log('🎵 TTS playback started after user interaction')
+                  setIsPlaying(true)
+                  setHasUserInteracted(true)
+                  
+                  // Remove listeners after successful play
+                  document.removeEventListener('click', enableAudioOnInteraction)
+                  document.removeEventListener('keydown', enableAudioOnInteraction)
+                  document.removeEventListener('touchstart', enableAudioOnInteraction)
+                  
+                } catch (interactionError) {
+                  console.error('❌ Still failed to play after user interaction:', interactionError)
+                  cleanup()
+                  reject(interactionError)
+                }
+              }
+              
+              // Add multiple interaction listeners for better compatibility
+              document.addEventListener('click', enableAudioOnInteraction, { once: true })
+              document.addEventListener('keydown', enableAudioOnInteraction, { once: true })
+              document.addEventListener('touchstart', enableAudioOnInteraction, { once: true })
+              
+              // Also add a specific listener to the Oracle blob for immediate play
+              const oracleBlob = document.querySelector('[data-oracle-blob]')
+              if (oracleBlob) {
+                oracleBlob.addEventListener('click', enableAudioOnInteraction, { once: true })
+              }
+              
+              return // Don't reject immediately, wait for user interaction
             }
+            
+            // For other errors, reject immediately
+            cleanup()
+            reject(playError)
           }
-        }).catch((loadError) => {
-          console.error('❌ Failed to load audio:', loadError)
-          if (!hasResolved) {
-            hasResolved = true
-            clearTimeout(timeout)
-            setIsPlaying(false)
-            URL.revokeObjectURL(audioUrl)
-            reject(loadError)
-          }
-        })
+        }
+        
+        // Load audio first, then attempt to play
+        if (audio.readyState >= 2) { // HAVE_CURRENT_DATA
+          console.log('✅ Audio already loaded, ready to play')
+          attemptPlay()
+        } else {
+          console.log('🔄 Loading audio...')
+          
+          audio.addEventListener('canplay', () => {
+            console.log('✅ Audio loaded and ready to play')
+            attemptPlay()
+          }, { once: true })
+          
+          audio.addEventListener('error', (error) => {
+            console.error('❌ Audio loading error:', error)
+            cleanup()
+            reject(new Error('Audio loading failed'))
+          }, { once: true })
+          
+          // Force load
+          audio.load()
+        }
       })
       
     } catch (error) {
       console.error('❌ Error in TTS:', error)
       Sentry.captureException(error, {
         tags: { component: 'oracle-voice', action: 'tts-error' },
-        extra: { textLength: text.length, voiceId: voiceSettings.voiceId }
+        extra: { textLength: text.length }
       })
-      toast.error('Failed to play voice response')
       setIsPlaying(false)
       throw error
     }
@@ -1216,8 +1114,16 @@ export default function OracleBlob() {
                 partialMatch = transcription.includes('ora') || transcription.includes('orc')
               }
               
-              // Final detection
-              detected = oracleWordMatch || phraseMatch || startsWithOracle || exactMatch || partialMatch
+              // Method 6: ENHANCED - Treat any meaningful speech as conversation attempt
+              // If the transcription is longer than 3 words and doesn't contain obvious noise, process it
+              const words = transcription.split(/\s+/).filter(word => word.length > 0)
+              const isConversationAttempt = words.length >= 2 && 
+                                          !transcription.includes('noise') && 
+                                          !transcription.includes('static') &&
+                                          transcription.length > 5
+              
+              // Final detection - now includes conversation attempts
+              detected = oracleWordMatch || phraseMatch || startsWithOracle || exactMatch || partialMatch || isConversationAttempt
               
               console.log('🔍 Wake word detection debug:', {
                 transcription,
@@ -1226,22 +1132,29 @@ export default function OracleBlob() {
                 startsWithOracle,
                 exactMatch,
                 partialMatch,
+                isConversationAttempt,
+                wordsCount: words.length,
                 detected,
                 wakeWordSensitivity: voiceSettings.wakeWordSensitivity
               })
               
               if (detected) {
-                console.log('✅ Wake word detected!', transcription)
+                console.log('✅ Wake word or conversation detected!', transcription)
                 
                 Sentry.addBreadcrumb({
-                  message: 'Wake word detected',
-                  data: { transcription },
+                  message: 'Wake word or conversation detected',
+                  data: { transcription, detectionType: isConversationAttempt ? 'conversation' : 'wakeword' },
                   level: 'info'
                 })
                 
                 setWakeWordDetected(true)
                 setIsWakeWordListening(false)
-                toast.success('Oracle activated!')
+                
+                if (isConversationAttempt && !oracleWordMatch && !phraseMatch && !startsWithOracle) {
+                  toast.success('Oracle listening...')
+                } else {
+                  toast.success('Oracle activated!')
+                }
                 
                 // Check if the transcription contains more than just the wake word
                 const cleanTranscription = transcription.replace(/^(hey\s+|hi\s+|ok\s+)?oracle[,.]?\s*/i, '').trim()
@@ -1249,17 +1162,22 @@ export default function OracleBlob() {
                 console.log('🔍 Checking transcription content:', {
                   originalTranscription: transcription,
                   cleanTranscription,
-                  hasQuestion: cleanTranscription.length > 0
+                  hasQuestion: cleanTranscription.length > 0,
+                  isConversationAttempt
                 })
                 
-                if (cleanTranscription.length > 0) {
-                  // The user asked a question along with the wake word
-                  console.log('🎯 Processing full question directly:', cleanTranscription)
-                  
+                // If it's a conversation attempt without wake word, use the full transcription
+                const messageToProcess = isConversationAttempt && !oracleWordMatch && !phraseMatch && !startsWithOracle 
+                  ? transcription 
+                  : (cleanTranscription.length > 0 ? cleanTranscription : transcription)
+                
+                if (messageToProcess.length > 0) {
                   // Process the question immediately
+                  console.log('🎯 Processing question directly:', messageToProcess)
+                  
                   setTimeout(async () => {
                     try {
-                      await sendMessage(cleanTranscription)
+                      await sendMessage(messageToProcess)
                     } catch (error) {
                       console.error('❌ Error processing wake word question:', error)
                       Sentry.captureException(error, {
@@ -1291,7 +1209,7 @@ export default function OracleBlob() {
                   }
                 }, 30000)
               } else {
-                console.log('❌ No wake word detected in:', transcription)
+                console.log('❌ No wake word or meaningful conversation detected in:', transcription)
               }
             } else {
               console.log('⚠️ No transcription received from STT API')
@@ -1653,6 +1571,7 @@ export default function OracleBlob() {
             onClick={handleBlobClick}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            data-oracle-blob
             className={`relative overflow-hidden transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-full animate-float hover:animate-blobPulse ${isHovered ? 'scale-110' : 'scale-100'} ${isClicked ? 'scale-95' : ''}`}
             style={{
               width: `${appearanceSettings.blobSize}px`,
@@ -1726,4 +1645,4 @@ export default function OracleBlob() {
       </div>
     </>
   )
-} 
+}
