@@ -1,4 +1,4 @@
-// Server-side imports moved to server-only functions to avoid fs module in client
+import { readTriStore, writeTriStore } from './storage-service'
 
 export interface AISettings {
   auto_processing: {
@@ -76,79 +76,6 @@ export interface OracleSettings {
   }
 }
 
-// Client-safe functions that call API routes instead of direct storage
-export async function getAISetting<K extends keyof AISettings>(
-  userId: string,
-  key: K
-): Promise<AISettings[K]> {
-  try {
-    const response = await fetch(`/api/settings/ai/${key}?user_id=${userId}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch setting: ${response.statusText}`)
-    }
-    const data = await response.json()
-    return data.value
-  } catch (error) {
-    console.warn(`Failed to fetch AI setting ${key}:`, error)
-    // Return sensible defaults
-    return getDefaultAISetting(key)
-  }
-}
-
-export async function saveAISetting<K extends keyof AISettings>(
-  userId: string,
-  key: K,
-  value: AISettings[K]
-): Promise<void> {
-  const response = await fetch(`/api/settings/ai/${key}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ user_id: userId, value }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to save setting: ${response.statusText}`)
-  }
-}
-
-export async function getOracleSetting<K extends keyof OracleSettings>(
-  userId: string,
-  key: K
-): Promise<OracleSettings[K]> {
-  try {
-    const response = await fetch(`/api/settings/oracle/${key}?user_id=${userId}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch setting: ${response.statusText}`)
-    }
-    const data = await response.json()
-    return data.value
-  } catch (error) {
-    console.warn(`Failed to fetch Oracle setting ${key}:`, error)
-    // Return sensible defaults
-    return getDefaultOracleSetting(key)
-  }
-}
-
-export async function saveOracleSetting<K extends keyof OracleSettings>(
-  userId: string,
-  key: K,
-  value: OracleSettings[K]
-): Promise<void> {
-  const response = await fetch(`/api/settings/oracle/${key}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ user_id: userId, value }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to save setting: ${response.statusText}`)
-  }
-}
-
 // Default settings functions
 function getDefaultAISetting<K extends keyof AISettings>(key: K): AISettings[K] {
   const defaults: AISettings = {
@@ -214,7 +141,7 @@ function getDefaultOracleSetting<K extends keyof OracleSettings>(key: K): Oracle
     context: {
       remember_conversations: true,
       context_window_size: 4000,
-      personality: 'friendly',
+      personality: 'professional',
     },
     tools: {
       web_search: true,
@@ -223,7 +150,7 @@ function getDefaultOracleSetting<K extends keyof OracleSettings>(key: K): Oracle
       system_integration: false,
     },
     advanced: {
-      model: 'gpt-4o-mini',
+      model: 'gpt-4',
       temperature: 0.7,
       max_tokens: 1000,
       custom_instructions: '',
@@ -232,5 +159,55 @@ function getDefaultOracleSetting<K extends keyof OracleSettings>(key: K): Oracle
   return defaults[key]
 }
 
-// Server-side functions (for API routes) - these can use the storage service directly
-// Server-side functions moved to user-settings-server.ts to avoid fs module import in client 
+// Server-side functions that directly use storage service
+export async function getAISettingServer<K extends keyof AISettings>(
+  userId: string,
+  key: K
+): Promise<AISettings[K]> {
+  return await readTriStore({
+    userId,
+    key,
+    supabaseTable: 'linkpilot_settings',
+    defaultValue: getDefaultAISetting(key),
+  })
+}
+
+export async function saveAISettingServer<K extends keyof AISettings>(
+  userId: string,
+  key: K,
+  value: AISettings[K]
+): Promise<void> {
+  await writeTriStore({
+    userId,
+    key,
+    supabaseTable: 'linkpilot_settings',
+    value,
+    defaultValue: getDefaultAISetting(key),
+  })
+}
+
+export async function getOracleSettingServer<K extends keyof OracleSettings>(
+  userId: string,
+  key: K
+): Promise<OracleSettings[K]> {
+  return await readTriStore({
+    userId,
+    key,
+    supabaseTable: 'oracle_settings',
+    defaultValue: getDefaultOracleSetting(key),
+  })
+}
+
+export async function saveOracleSettingServer<K extends keyof OracleSettings>(
+  userId: string,
+  key: K,
+  value: OracleSettings[K]
+): Promise<void> {
+  await writeTriStore({
+    userId,
+    key,
+    supabaseTable: 'oracle_settings',
+    value,
+    defaultValue: getDefaultOracleSetting(key),
+  })
+} 

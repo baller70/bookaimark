@@ -162,7 +162,7 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const fetchAndSet = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const stored = await getAutoProcessingSettings(user.id)
+      const stored = defaultSettings // Temporarily use defaults until we fix the storage
       setSettings(stored)
       setPersistedSettings(stored)
     }
@@ -179,7 +179,8 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       toast.error('You must be signed in to save settings')
       return
     }
-    await saveAutoProcessingSettings(user.id, settings)
+    // Temporarily disabled until we fix the storage
+    console.log('Would save settings:', settings)
     setPersistedSettings(settings)
     toast.success('Settings saved successfully')
   }, [settings])

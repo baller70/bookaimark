@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOracleSettingServer, saveOracleSettingServer, OracleSettings } from '@/lib/user-settings-service'
+import { getOracleSettingServer, saveOracleSettingServer, OracleSettings } from '@/lib/user-settings-server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { setting: string } }
+  { params }: { params: Promise<{ setting: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url)
@@ -13,7 +13,8 @@ export async function GET(
       return NextResponse.json({ error: 'Missing user_id parameter' }, { status: 400 })
     }
 
-    const setting = params.setting as keyof OracleSettings
+    const resolvedParams = await params
+    const setting = resolvedParams.setting as keyof OracleSettings
     const value = await getOracleSettingServer(userId, setting)
     
     return NextResponse.json({ value })
@@ -25,7 +26,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { setting: string } }
+  { params }: { params: Promise<{ setting: string }> }
 ) {
   try {
     const body = await request.json()
@@ -35,7 +36,8 @@ export async function POST(
       return NextResponse.json({ error: 'Missing user_id in request body' }, { status: 400 })
     }
 
-    const setting = params.setting as keyof OracleSettings
+    const resolvedParams = await params
+    const setting = resolvedParams.setting as keyof OracleSettings
     await saveOracleSettingServer(userId, setting, value)
     
     return NextResponse.json({ success: true, message: 'Setting saved successfully' })
