@@ -1,0 +1,46 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getAISettingServer, saveAISettingServer, AISettings } from '@/lib/user-settings-service'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { setting: string } }
+) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('user_id')
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing user_id parameter' }, { status: 400 })
+    }
+
+    const setting = params.setting as keyof AISettings
+    const value = await getAISettingServer(userId, setting)
+    
+    return NextResponse.json({ value })
+  } catch (error) {
+    console.error('Error fetching AI setting:', error)
+    return NextResponse.json({ error: 'Failed to fetch setting' }, { status: 500 })
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { setting: string } }
+) {
+  try {
+    const body = await request.json()
+    const { user_id: userId, value } = body
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing user_id in request body' }, { status: 400 })
+    }
+
+    const setting = params.setting as keyof AISettings
+    await saveAISettingServer(userId, setting, value)
+    
+    return NextResponse.json({ success: true, message: 'Setting saved successfully' })
+  } catch (error) {
+    console.error('Error saving AI setting:', error)
+    return NextResponse.json({ error: 'Failed to save setting' }, { status: 500 })
+  }
+} 

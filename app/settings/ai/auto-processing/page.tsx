@@ -44,7 +44,7 @@ import {
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { getAutoProcessingSettings, saveAutoProcessingSettings } from '@/lib/linkpilot-service'
+import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 import { useTranslation } from '@/hooks/use-translation'
 import { LanguageSelector } from '@/components/ui/language-selector'
 

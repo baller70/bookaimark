@@ -199,7 +199,7 @@ const RecommendationProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } = await supabase.auth.getUser()
       if (user) {
         try {
-          const remote = await getAISetting<RecommendationSettings>(user.id, 'recommendations', defaultSettings)
+          const remote = await getAISetting(user.id, 'recommendations')
           setSettings(remote)
           setPersistedSettings(remote)
         } catch (error) {
@@ -219,7 +219,7 @@ const RecommendationProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } = await supabase.auth.getUser()
     if (user) {
       try {
-        await saveAISetting<RecommendationSettings>(user.id, 'recommendations', settings)
+        await saveAISetting(user.id, 'recommendations', settings)
         setPersistedSettings(settings)
         toast.success('Recommendation settings saved successfully')
       } catch (error) {
