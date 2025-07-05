@@ -287,7 +287,7 @@ export default function AICopilot2() {
             </Button>
             <Button variant="outline" size="sm">
               <Folder className="mr-2 h-4 w-4" />
-              Move to Playlist
+              Move to Playbook
             </Button>
             <Button variant="outline" size="sm">
               <Share className="mr-2 h-4 w-4" />

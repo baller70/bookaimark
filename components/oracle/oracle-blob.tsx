@@ -117,18 +117,9 @@ const defaultVoiceSettings: OracleVoiceSettings = {
 }
 
 export default function OracleBlob() {
-  // Check Oracle global state
+  // All hooks must be called unconditionally at the top
   const { settings: oracleGlobalSettings, isLoading: oracleLoading } = useOracle()
-  
-  // If Oracle is disabled, don't render anything
-  if (oracleLoading) {
-    return null // Don't show blob while loading Oracle settings
-  }
-  
-  if (!oracleGlobalSettings.enabled) {
-    console.log('🚫 Oracle is disabled, hiding Oracle blob')
-    return null
-  }
+  const router = useRouter()
 
   const [isOpen, setIsOpen] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
@@ -142,6 +133,9 @@ export default function OracleBlob() {
   const [voiceSettings, setVoiceSettings] = useState<OracleVoiceSettings>(defaultVoiceSettings)
   const [isWakeWordListening, setIsWakeWordListening] = useState(false)
   const [wakeWordDetected, setWakeWordDetected] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isClicked, setIsClicked] = useState(false)
+  const [hasUserInteracted, setHasUserInteracted] = useState(false)
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -150,18 +144,320 @@ export default function OracleBlob() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const wakeWordRecorderRef = useRef<MediaRecorder | null>(null)
   const wakeWordChunksRef = useRef<Blob[]>([])
-  
-  const router = useRouter()
-
-  const [isHovered, setIsHovered] = useState(false)
-  const [isClicked, setIsClicked] = useState(false)
 
   // Predefined heights for voice bars to avoid hydration issues
   const voiceBarHeights = [0.4, 0.7, 0.3, 0.9, 0.6, 0.8, 0.5, 0.4, 0.9, 0.7, 0.6, 0.8, 0.5, 0.3, 0.7]
-
-  // Add user interaction state
-  const [hasUserInteracted, setHasUserInteracted] = useState(false)
   
+  // Wake word detection functionality - defined early to be available for useEffect hooks
+  const startWakeWordListening = async () => {
+    try {
+      console.log('🎯 Starting wake word listening...')
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: voiceSettings.echoCancel,
+          noiseSuppression: voiceSettings.noiseReduction,
+          autoGainControl: voiceSettings.autoGainControl,
+          sampleRate: 16000,
+          channelCount: 1
+        } 
+      })
+      
+      console.log('🎤 Microphone stream acquired for wake word detection')
+      
+      // Check if MediaRecorder supports the format
+      const supportedTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/wav'
+      ]
+      
+      let mimeType = 'audio/webm;codecs=opus'
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type
+          break
+        }
+      }
+      
+      console.log('🔧 Using MIME type:', mimeType)
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: mimeType,
+        audioBitsPerSecond: 16000
+      })
+      
+      wakeWordRecorderRef.current = mediaRecorder
+      wakeWordChunksRef.current = []
+      
+      let isProcessingChunk = false
+      
+      mediaRecorder.ondataavailable = (event) => {
+        console.log('📊 Wake word audio chunk received:', event.data.size, 'bytes')
+        if (event.data.size > 0) {
+          wakeWordChunksRef.current.push(event.data)
+        }
+      }
+      
+      mediaRecorder.onstop = async () => {
+        console.log('⏹️ Wake word recorder stopped')
+        
+        if (isProcessingChunk) {
+          console.log('⚠️ Already processing chunk, skipping...')
+          return
+        }
+        
+        isProcessingChunk = true
+        
+        try {
+          const audioBlob = new Blob(wakeWordChunksRef.current, { type: mimeType })
+          console.log('🎵 Processing wake word audio blob:', audioBlob.size, 'bytes')
+          
+          if (audioBlob.size > 0) {
+            await processWakeWordAudio(audioBlob)
+          }
+          
+          // Continue listening if wake word not detected and still in listening mode
+          if (isWakeWordListening && !wakeWordDetected && !isRecording) {
+            console.log('🔄 Continuing wake word listening...')
+            setTimeout(() => {
+              if (isWakeWordListening && !wakeWordDetected && !isRecording) {
+                startWakeWordListening()
+              }
+            }, 100)
+          }
+        } catch (error) {
+          console.error('❌ Error in wake word onstop handler:', error)
+          Sentry.captureException(error, {
+            tags: { component: 'wake-word', action: 'onstop' },
+            extra: { chunkCount: wakeWordChunksRef.current.length }
+          })
+        } finally {
+          isProcessingChunk = false
+        }
+      }
+      
+      mediaRecorder.onerror = (event) => {
+        console.error('❌ Wake word MediaRecorder error:', event)
+        Sentry.captureException(new Error('Wake word MediaRecorder error'), {
+          tags: { component: 'wake-word', action: 'recorder-error' },
+          extra: { event }
+        })
+        setIsWakeWordListening(false)
+      }
+      
+      // Record in 3-second chunks for better wake word detection
+      mediaRecorder.start()
+      console.log('🎬 Wake word recording started')
+      
+      setTimeout(() => {
+        if (mediaRecorder.state === 'recording') {
+          console.log('⏱️ Stopping wake word chunk after 3 seconds')
+          mediaRecorder.stop()
+        }
+      }, 3000)
+      
+    } catch (error) {
+      console.error('❌ Error starting wake word listening:', error)
+      Sentry.captureException(error, {
+        tags: { component: 'wake-word', action: 'start-listening' }
+      })
+      setIsWakeWordListening(false)
+      
+      // Show user-friendly error
+      if (error instanceof Error && error.name === 'NotAllowedError') {
+        toast.error('Microphone permission denied. Please allow microphone access for wake word detection.')
+      } else if (error instanceof Error && error.name === 'NotFoundError') {
+        toast.error('No microphone found. Please connect a microphone for wake word detection.')
+      } else {
+        toast.error('Failed to start wake word listening. Please check your microphone.')
+      }
+    }
+  }
+
+  const processWakeWordAudio = async (audioBlob: Blob) => {
+    try {
+      console.log('🔍 Processing wake word audio:', audioBlob.size, 'bytes')
+      
+      await Sentry.startSpan(
+        {
+          op: "wake-word.process",
+          name: "Process Wake Word Audio",
+        },
+        async (span) => {
+          span.setAttribute("audio_size", audioBlob.size)
+          span.setAttribute("audio_type", audioBlob.type)
+          
+          // Create a proper File object instead of just appending a Blob
+          const audioFile = new File([audioBlob], 'wakeword.webm', {
+            type: audioBlob.type || 'audio/webm'
+          })
+          
+          const formData = new FormData()
+          formData.append('audio', audioFile)
+          formData.append('language', voiceSettings.language)
+          formData.append('prompt', 'Oracle, wake word, voice assistant, hey Oracle, Oracle AI')
+          
+          console.log('📤 Sending wake word audio to STT API...', {
+            fileName: audioFile.name,
+            fileSize: audioFile.size,
+            fileType: audioFile.type
+          })
+          
+          const response = await fetch('/api/ai/voice/stt', {
+            method: 'POST',
+            body: formData
+          })
+          
+          console.log('📥 STT API response status:', response.status)
+          
+          if (response.ok) {
+            const data = await response.json()
+            console.log('📝 STT transcription:', data.transcription)
+            
+            span.setAttribute("transcription", data.transcription || "")
+            
+            if (data.transcription) {
+              const transcription = data.transcription.toLowerCase().trim()
+              console.log('🔍 Checking transcription for wake word:', transcription)
+                
+              // Simplified and more reliable wake word detection
+              const wakeWords = [
+                'oracle', 'orical', 'oracles', 'oracle.', 'oracle,',
+                'hey oracle', 'oracle ai', 'oracle assistant', 'hi oracle',
+                'ok oracle', 'oracle please', 'oracle help'
+              ]
+              
+              let detected = false
+              
+              // Method 1: Direct word boundary matching (most reliable)
+              const oracleWordMatch = /\b(oracle|orical|oracles)\b/i.test(transcription)
+              
+              // Method 2: Check for phrase patterns
+              const phraseMatch = wakeWords.some(phrase => {
+                if (phrase.includes(' ')) {
+                  return transcription.includes(phrase.toLowerCase())
+                }
+                const wordRegex = new RegExp(`\\b${phrase.toLowerCase()}\\b`, 'i')
+                return wordRegex.test(transcription)
+              })
+              
+              // Method 3: Starts with oracle (high priority)
+              const startsWithOracle = transcription.startsWith('oracle') || 
+                                     transcription.startsWith('hey oracle') || 
+                                     transcription.startsWith('hi oracle')
+              
+              detected = oracleWordMatch || phraseMatch || startsWithOracle
+              
+              console.log('🔍 Wake word detection results:', {
+                transcription,
+                oracleWordMatch,
+                phraseMatch,
+                startsWithOracle,
+                detected
+              })
+              
+              if (detected) {
+                console.log('🎯 Wake word detected!')
+                setWakeWordDetected(true)
+                setIsWakeWordListening(false)
+                
+                // Open chat interface
+                setIsOpen(true)
+                
+                // Stop current wake word recorder
+                if (wakeWordRecorderRef.current) {
+                  wakeWordRecorderRef.current.stop()
+                }
+                
+                // Provide feedback
+                toast.success('Wake word detected! Chat is ready.')
+                
+                // Optional: Play a sound or provide other feedback
+                try {
+                  // Create a short beep sound
+                  const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+                  const oscillator = audioContext.createOscillator()
+                  const gainNode = audioContext.createGain()
+                  
+                  oscillator.connect(gainNode)
+                  gainNode.connect(audioContext.destination)
+                  
+                  oscillator.frequency.value = 800
+                  gainNode.gain.value = 0.1
+                  
+                  oscillator.start()
+                  oscillator.stop(audioContext.currentTime + 0.1)
+                } catch (beepError) {
+                  console.log('Could not play wake word sound:', beepError)
+                }
+              }
+            }
+          } else {
+            // Handle API errors gracefully for wake word detection
+            const errorData = await response.text()
+            
+            // Parse error data to check if Oracle is disabled
+            let parsedError = null
+            try {
+              parsedError = JSON.parse(errorData)
+            } catch (e) {
+              // Error data is not JSON, treat as regular error
+            }
+            
+            // Handle Oracle disabled status gracefully for wake word
+            if (response.status === 403 && parsedError?.code === 'ORACLE_DISABLED') {
+              console.warn('⚠️ Oracle is disabled - Wake word STT API blocked')
+              // Don't show error toast for wake word when Oracle is disabled
+              // Just silently stop wake word listening
+              setIsWakeWordListening(false)
+              return
+            }
+            
+            console.error('❌ Wake word STT API error:', response.status, errorData)
+            
+            // Don't show error toasts for wake word detection failures
+            // Just log them and continue
+            Sentry.captureException(new Error(`Wake word STT API error: ${response.status}`), {
+              tags: { component: 'wake-word', action: 'stt-api-error' },
+              extra: { status: response.status, error: errorData }
+            })
+          }
+        }
+      )
+    } catch (error) {
+      console.error('❌ Error processing wake word audio:', error)
+      Sentry.captureException(error, {
+        tags: { component: 'wake-word', action: 'process-audio' }
+      })
+      
+      // Don't show error toasts for wake word processing failures
+      // Just log them and continue
+    }
+  }
+
+  const stopWakeWordListening = () => {
+    console.log('🛑 Stopping wake word listening')
+    setIsWakeWordListening(false)
+    
+    if (wakeWordRecorderRef.current) {
+      const recorder = wakeWordRecorderRef.current
+      if (recorder.state === 'recording') {
+        console.log('⏹️ Stopping active wake word recorder')
+        recorder.stop()
+      }
+      
+      // Stop all tracks to release microphone
+      if (recorder.stream) {
+        recorder.stream.getTracks().forEach(track => {
+          console.log('🔇 Stopping microphone track')
+          track.stop()
+        })
+      }
+    }
+  }
+
   // Detect user interaction to enable audio
   useEffect(() => {
     const enableAudio = () => {
@@ -182,34 +478,6 @@ export default function OracleBlob() {
     }
   }, [hasUserInteracted])
 
-  // Normalize settings from different formats (simple vs extended)
-  const normalizeSettings = (settings: Record<string, unknown>): OracleAppearanceSettings => {
-    return {
-      primaryColor: (typeof settings.primaryColor === 'string' ? settings.primaryColor : defaultAppearanceSettings.primaryColor),
-      secondaryColor: (typeof settings.secondaryColor === 'string' ? settings.secondaryColor : defaultAppearanceSettings.secondaryColor),
-      gradientDirection: (settings.gradientDirection === 'linear' || settings.gradientDirection === 'radial' || settings.gradientDirection === 'conic' ? settings.gradientDirection : defaultAppearanceSettings.gradientDirection),
-      blobSize: (typeof settings.blobSize === 'number' ? settings.blobSize : defaultAppearanceSettings.blobSize),
-      voiceVisualization: (typeof settings.voiceVisualization === 'boolean' ? settings.voiceVisualization : defaultAppearanceSettings.voiceVisualization),
-      voiceBarsCount: (typeof settings.voiceBarsCount === 'number' ? settings.voiceBarsCount : defaultAppearanceSettings.voiceBarsCount),
-      // Convert percentage to decimal if needed
-      voiceBarsHeight: (typeof settings.voiceBarsHeight === 'number' ? (settings.voiceBarsHeight > 1 ? settings.voiceBarsHeight / 100 : settings.voiceBarsHeight) : defaultAppearanceSettings.voiceBarsHeight),
-      voiceBarsSpacing: (typeof settings.voiceBarsSpacing === 'number' ? settings.voiceBarsSpacing : defaultAppearanceSettings.voiceBarsSpacing),
-      // Handle both voiceReactivity and voiceBarsReactivity
-      voiceBarsReactivity: (typeof settings.voiceBarsReactivity === 'number' ? settings.voiceBarsReactivity : (typeof settings.voiceReactivity === 'number' ? settings.voiceReactivity / 100 : defaultAppearanceSettings.voiceBarsReactivity)),
-      idleAnimation: (typeof settings.idleAnimation === 'boolean' ? settings.idleAnimation : defaultAppearanceSettings.idleAnimation),
-      pulseEffect: (typeof settings.pulseEffect === 'boolean' ? settings.pulseEffect : defaultAppearanceSettings.pulseEffect),
-      glowEffect: (typeof settings.glowEffect === 'boolean' ? settings.glowEffect : defaultAppearanceSettings.glowEffect),
-      // Convert percentage to decimal if needed
-      glowIntensity: (typeof settings.glowIntensity === 'number' ? (settings.glowIntensity > 1 ? settings.glowIntensity / 100 : settings.glowIntensity) : defaultAppearanceSettings.glowIntensity),
-      // Handle both floatingAnimation and floatingBehavior
-      floatingAnimation: (typeof settings.floatingAnimation === 'boolean' ? settings.floatingAnimation : (typeof settings.floatingBehavior === 'boolean' ? settings.floatingBehavior : defaultAppearanceSettings.floatingAnimation)),
-      floatingSpeed: (typeof settings.floatingSpeed === 'number' ? settings.floatingSpeed : defaultAppearanceSettings.floatingSpeed),
-      rotationSpeed: (typeof settings.rotationSpeed === 'number' ? settings.rotationSpeed : defaultAppearanceSettings.rotationSpeed),
-      morphingSpeed: (typeof settings.morphingSpeed === 'number' ? settings.morphingSpeed : defaultAppearanceSettings.morphingSpeed),
-      themeIntegration: (typeof settings.themeIntegration === 'boolean' ? settings.themeIntegration : defaultAppearanceSettings.themeIntegration)
-    }
-  }
-
   // Load settings from Supabase
   useEffect(() => {
     ;(async () => {
@@ -219,13 +487,13 @@ export default function OracleBlob() {
       if (user) {
         try {
                      const [remoteAppearance, remoteVoice] = await Promise.all([
-             getOracleSetting<OracleAppearanceSettings>(user.id, 'appearance', defaultAppearanceSettings),
-             getOracleSetting<OracleVoiceSettings>(user.id, 'voice', defaultVoiceSettings)
+            getOracleSetting(user.id, 'appearance'),
+            getOracleSetting(user.id, 'voice')
            ])
           
-          const normalizedAppearance = normalizeSettings(remoteAppearance)
+          const normalizedAppearance = normalizeSettings(remoteAppearance as Record<string, unknown> || {})
           setAppearanceSettings(normalizedAppearance)
-          setVoiceSettings(remoteVoice)
+          setVoiceSettings(remoteVoice as unknown as OracleVoiceSettings || defaultVoiceSettings)
           
           console.log('✅ Oracle settings loaded from Supabase')
         } catch (error) {
@@ -247,13 +515,13 @@ export default function OracleBlob() {
       if (user) {
         try {
           const [remoteAppearance, remoteVoice] = await Promise.all([
-            getOracleSetting<OracleAppearanceSettings>(user.id, 'appearance', defaultAppearanceSettings),
-            getOracleSetting<OracleVoiceSettings>(user.id, 'voice', defaultVoiceSettings)
+            getOracleSetting(user.id, 'appearance'),
+            getOracleSetting(user.id, 'voice')
           ])
           
-          const normalizedAppearance = normalizeSettings(remoteAppearance)
+          const normalizedAppearance = normalizeSettings(remoteAppearance as Record<string, unknown> || {})
           setAppearanceSettings(normalizedAppearance)
-          setVoiceSettings(remoteVoice)
+          setVoiceSettings(remoteVoice as unknown as OracleVoiceSettings || defaultVoiceSettings)
         } catch (error) {
           console.error('Error loading updated settings:', error)
           setAppearanceSettings(defaultAppearanceSettings)
@@ -295,6 +563,110 @@ export default function OracleBlob() {
       }
     }
   }, [isRecording])
+
+  // Auto-start wake word listening when voice activation is enabled
+  useEffect(() => {
+    console.log('🔄 Wake word useEffect triggered:', {
+      voiceActivation: voiceSettings.voiceActivation,
+      isWakeWordListening,
+      wakeWordDetected,
+      isRecording,
+      isOpen
+    })
+    
+    // Start wake word listening if conditions are met
+    if (voiceSettings.voiceActivation && 
+        !isWakeWordListening && 
+        !wakeWordDetected && 
+        !isRecording) {
+      
+      console.log('✅ Starting wake word listening due to settings change')
+      setIsWakeWordListening(true)
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        startWakeWordListening()
+      }, 100)
+    } 
+    // Stop wake word listening if voice activation is disabled
+    else if (!voiceSettings.voiceActivation && isWakeWordListening) {
+      console.log('🛑 Stopping wake word listening due to settings change')
+      stopWakeWordListening()
+    }
+    // Stop wake word listening if recording
+    else if (isWakeWordListening && isRecording) {
+      console.log('⏸️ Pausing wake word listening (recording active)')
+      stopWakeWordListening()
+    }
+
+    return () => {
+      // Cleanup on unmount or dependency change
+      if (isWakeWordListening) {
+        console.log('🧹 Cleanup: Stopping wake word listening')
+        stopWakeWordListening()
+      }
+    }
+  }, [voiceSettings.voiceActivation, isWakeWordListening, wakeWordDetected, isRecording])
+
+  // Additional effect to handle wake word detection reset
+  useEffect(() => {
+    if (wakeWordDetected) {
+      console.log('🎯 Wake word detected, setting up reset timer')
+      
+      const resetTimer = setTimeout(() => {
+        console.log('⏰ Resetting wake word detection after timeout')
+        setWakeWordDetected(false)
+        
+        // Restart listening if voice activation is still enabled and not busy
+        if (voiceSettings.voiceActivation && !isRecording) {
+          console.log('🔄 Restarting wake word listening after reset')
+          setTimeout(() => {
+            setIsWakeWordListening(true)
+          }, 500)
+        }
+      }, 30000)
+      
+      return () => {
+        console.log('🧹 Clearing wake word reset timer')
+        clearTimeout(resetTimer)
+      }
+    }
+  }, [wakeWordDetected, voiceSettings.voiceActivation, isRecording])
+
+  // Effect to handle page visibility changes (pause/resume when tab is hidden/shown)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('👁️ Page hidden, pausing wake word listening')
+        if (isWakeWordListening) {
+          stopWakeWordListening()
+        }
+      } else {
+        console.log('👁️ Page visible, resuming wake word listening if needed')
+        if (voiceSettings.voiceActivation && !isWakeWordListening && !wakeWordDetected && !isRecording) {
+          setTimeout(() => {
+            setIsWakeWordListening(true)
+          }, 1000)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [voiceSettings.voiceActivation, isWakeWordListening, wakeWordDetected, isRecording])
+
+  // Check Oracle global state AFTER all hooks are called
+  if (oracleLoading) {
+    return null // Don't show blob while loading Oracle settings
+  }
+  
+  if (!oracleGlobalSettings.enabled) {
+    console.log('🚫 Oracle is disabled, hiding Oracle blob')
+    return null
+  }
 
   const quickActions = [
     {
@@ -340,12 +712,6 @@ export default function OracleBlob() {
       action: () => handleQuickAction('Let\'s brainstorm! Help me generate creative ideas, solutions, or approaches for any challenge or project I\'m working on.')
     }
   ]
-
-  const handleQuickAction = (prompt: string) => {
-    setInputText(prompt)
-    setShowQuickActions(false)
-    setIsOpen(true)
-  }
 
   const startRecording = async () => {
     try {
@@ -515,6 +881,23 @@ export default function OracleBlob() {
             }
                       } else {
               const errorData = await response.text()
+            
+            // Parse error data to check if Oracle is disabled
+            let parsedError = null
+            try {
+              parsedError = JSON.parse(errorData)
+            } catch (e) {
+              // Error data is not JSON, treat as regular error
+            }
+            
+            // Handle Oracle disabled status gracefully
+            if (response.status === 403 && parsedError?.code === 'ORACLE_DISABLED') {
+              console.warn('⚠️ Oracle is disabled - STT API blocked to prevent charges')
+              toast.info('Oracle is currently disabled. Enable Oracle in Settings to use voice features.')
+              return // Exit gracefully without throwing error
+            }
+            
+            // For other errors, log as error and capture in Sentry
               console.error('❌ Main STT API error:', response.status, errorData)
               
               Sentry.captureException(new Error(`Main STT API error: ${response.status}`), {
@@ -615,6 +998,23 @@ export default function OracleBlob() {
 
       if (!response.ok) {
         const errorData = await response.json()
+        
+        // Handle Oracle disabled status gracefully
+        if (response.status === 403 && errorData?.code === 'ORACLE_DISABLED') {
+          console.warn('⚠️ Oracle is disabled - Chat API blocked to prevent charges')
+          toast.info('Oracle is currently disabled. Enable Oracle in Settings to use AI features.')
+          
+          const disabledMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: "I'm currently disabled to prevent API charges. You can enable me in the Oracle Settings.",
+            isUser: false,
+            timestamp: new Date()
+          }
+          
+          setMessages(prev => [...prev, disabledMessage])
+          return // Exit gracefully without throwing error
+        }
+        
         throw new Error(errorData.error || 'Failed to get AI response')
       }
 
@@ -721,6 +1121,23 @@ export default function OracleBlob() {
 
       if (!response.ok) {
         const errorData = await response.text()
+        
+        // Parse error data to check if Oracle is disabled
+        let parsedError = null
+        try {
+          parsedError = JSON.parse(errorData)
+        } catch (e) {
+          // Error data is not JSON, treat as regular error
+        }
+        
+        // Handle Oracle disabled status gracefully for TTS
+        if (response.status === 403 && parsedError?.code === 'ORACLE_DISABLED') {
+          console.warn('⚠️ Oracle is disabled - TTS API blocked to prevent charges')
+          // Don't throw error for TTS when Oracle is disabled, just skip TTS
+          return // Exit gracefully without throwing error
+        }
+        
+        // For other errors, log and throw
         console.error('❌ TTS API error:', response.status, errorData)
         throw new Error(`TTS API error: ${response.status}`)
       }
@@ -916,464 +1333,32 @@ export default function OracleBlob() {
     router.push('/settings/oracle')
   }
 
-  // Wake word detection functionality
-  const startWakeWordListening = async () => {
-    try {
-      console.log('🎯 Starting wake word listening...')
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: voiceSettings.echoCancel,
-          noiseSuppression: voiceSettings.noiseReduction,
-          autoGainControl: voiceSettings.autoGainControl,
-          sampleRate: 16000,
-          channelCount: 1
-        } 
-      })
-      
-      console.log('🎤 Microphone stream acquired for wake word detection')
-      
-      // Check if MediaRecorder supports the format
-      const supportedTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4',
-        'audio/wav'
-      ]
-      
-      let mimeType = 'audio/webm;codecs=opus'
-      for (const type of supportedTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          mimeType = type
-          break
-        }
-      }
-      
-      console.log('🔧 Using MIME type:', mimeType)
-      
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: mimeType,
-        audioBitsPerSecond: 16000
-      })
-      
-      wakeWordRecorderRef.current = mediaRecorder
-      wakeWordChunksRef.current = []
-      
-      let isProcessingChunk = false
-      
-      mediaRecorder.ondataavailable = (event) => {
-        console.log('📊 Wake word audio chunk received:', event.data.size, 'bytes')
-        if (event.data.size > 0) {
-          wakeWordChunksRef.current.push(event.data)
-        }
-      }
-      
-      mediaRecorder.onstop = async () => {
-        console.log('⏹️ Wake word recorder stopped')
-        
-        if (isProcessingChunk) {
-          console.log('⚠️ Already processing chunk, skipping...')
-          return
-        }
-        
-        isProcessingChunk = true
-        
-        try {
-          const audioBlob = new Blob(wakeWordChunksRef.current, { type: mimeType })
-          console.log('🎵 Processing wake word audio blob:', audioBlob.size, 'bytes')
-          
-          if (audioBlob.size > 0) {
-            await processWakeWordAudio(audioBlob)
-          }
-          
-          // Continue listening if wake word not detected and still in listening mode
-          if (isWakeWordListening && !wakeWordDetected && !isRecording) {
-            console.log('🔄 Continuing wake word listening...')
-            setTimeout(() => {
-              if (isWakeWordListening && !wakeWordDetected && !isRecording) {
-                startWakeWordListening()
-              }
-            }, 100)
-          }
-        } catch (error) {
-          console.error('❌ Error in wake word onstop handler:', error)
-          Sentry.captureException(error, {
-            tags: { component: 'wake-word', action: 'onstop' },
-            extra: { chunkCount: wakeWordChunksRef.current.length }
-          })
-        } finally {
-          isProcessingChunk = false
-        }
-      }
-      
-      mediaRecorder.onerror = (event) => {
-        console.error('❌ Wake word MediaRecorder error:', event)
-        Sentry.captureException(new Error('Wake word MediaRecorder error'), {
-          tags: { component: 'wake-word', action: 'recorder-error' },
-          extra: { event }
-        })
-        setIsWakeWordListening(false)
-      }
-      
-      // Record in 3-second chunks for better wake word detection
-      mediaRecorder.start()
-      console.log('🎬 Wake word recording started')
-      
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          console.log('⏱️ Stopping wake word chunk after 3 seconds')
-          mediaRecorder.stop()
-        }
-      }, 3000)
-      
-    } catch (error) {
-      console.error('❌ Error starting wake word listening:', error)
-      Sentry.captureException(error, {
-        tags: { component: 'wake-word', action: 'start-listening' }
-      })
-      setIsWakeWordListening(false)
-      
-      // Show user-friendly error
-      if (error instanceof Error && error.name === 'NotAllowedError') {
-        toast.error('Microphone permission denied. Please allow microphone access for wake word detection.')
-      } else if (error instanceof Error && error.name === 'NotFoundError') {
-        toast.error('No microphone found. Please connect a microphone for wake word detection.')
-      } else {
-        toast.error('Failed to start wake word listening. Please check your microphone.')
-      }
+  // Normalize settings from different formats (simple vs extended)
+  const normalizeSettings = (settings: Record<string, unknown>): OracleAppearanceSettings => {
+    return {
+      primaryColor: (typeof settings.primaryColor === 'string' ? settings.primaryColor : defaultAppearanceSettings.primaryColor),
+      secondaryColor: (typeof settings.secondaryColor === 'string' ? settings.secondaryColor : defaultAppearanceSettings.secondaryColor),
+      gradientDirection: (settings.gradientDirection === 'linear' || settings.gradientDirection === 'radial' || settings.gradientDirection === 'conic' ? settings.gradientDirection : defaultAppearanceSettings.gradientDirection),
+      blobSize: (typeof settings.blobSize === 'number' ? settings.blobSize : defaultAppearanceSettings.blobSize),
+      voiceVisualization: (typeof settings.voiceVisualization === 'boolean' ? settings.voiceVisualization : defaultAppearanceSettings.voiceVisualization),
+      voiceBarsCount: (typeof settings.voiceBarsCount === 'number' ? settings.voiceBarsCount : defaultAppearanceSettings.voiceBarsCount),
+      // Convert percentage to decimal if needed
+      voiceBarsHeight: (typeof settings.voiceBarsHeight === 'number' ? (settings.voiceBarsHeight > 1 ? settings.voiceBarsHeight / 100 : settings.voiceBarsHeight) : defaultAppearanceSettings.voiceBarsHeight),
+      voiceBarsSpacing: (typeof settings.voiceBarsSpacing === 'number' ? settings.voiceBarsSpacing : defaultAppearanceSettings.voiceBarsSpacing),
+      // Handle both voiceReactivity and voiceBarsReactivity
+      voiceBarsReactivity: (typeof settings.voiceBarsReactivity === 'number' ? settings.voiceBarsReactivity : (typeof settings.voiceReactivity === 'number' ? settings.voiceReactivity / 100 : defaultAppearanceSettings.voiceBarsReactivity)),
+      idleAnimation: (typeof settings.idleAnimation === 'boolean' ? settings.idleAnimation : defaultAppearanceSettings.idleAnimation),
+      pulseEffect: (typeof settings.pulseEffect === 'boolean' ? settings.pulseEffect : defaultAppearanceSettings.pulseEffect),
+      glowEffect: (typeof settings.glowEffect === 'boolean' ? settings.glowEffect : defaultAppearanceSettings.glowEffect),
+      // Convert percentage to decimal if needed
+      glowIntensity: (typeof settings.glowIntensity === 'number' ? (settings.glowIntensity > 1 ? settings.glowIntensity / 100 : settings.glowIntensity) : defaultAppearanceSettings.glowIntensity),
+      // Handle both floatingAnimation and floatingBehavior
+      floatingAnimation: (typeof settings.floatingAnimation === 'boolean' ? settings.floatingAnimation : (typeof settings.floatingBehavior === 'boolean' ? settings.floatingBehavior : defaultAppearanceSettings.floatingAnimation)),
+      floatingSpeed: (typeof settings.floatingSpeed === 'number' ? settings.floatingSpeed : defaultAppearanceSettings.floatingSpeed),
+      rotationSpeed: (typeof settings.rotationSpeed === 'number' ? settings.rotationSpeed : defaultAppearanceSettings.rotationSpeed),
+      morphingSpeed: (typeof settings.morphingSpeed === 'number' ? settings.morphingSpeed : defaultAppearanceSettings.morphingSpeed),
+      themeIntegration: (typeof settings.themeIntegration === 'boolean' ? settings.themeIntegration : defaultAppearanceSettings.themeIntegration)
     }
-  }
-
-  const processWakeWordAudio = async (audioBlob: Blob) => {
-    try {
-      console.log('🔍 Processing wake word audio:', audioBlob.size, 'bytes')
-      
-      Sentry.startSpan(
-        {
-          op: "wake-word.process",
-          name: "Process Wake Word Audio",
-        },
-        async (span) => {
-          span.setAttribute("audio_size", audioBlob.size)
-          span.setAttribute("audio_type", audioBlob.type)
-          
-          // Create a proper File object instead of just appending a Blob
-          const audioFile = new File([audioBlob], 'wakeword.webm', {
-            type: audioBlob.type || 'audio/webm'
-          })
-          
-          const formData = new FormData()
-          formData.append('audio', audioFile)
-          formData.append('language', voiceSettings.language)
-          formData.append('prompt', 'Oracle, wake word, voice assistant, hey Oracle, Oracle AI')
-          
-          console.log('📤 Sending wake word audio to STT API...', {
-            fileName: audioFile.name,
-            fileSize: audioFile.size,
-            fileType: audioFile.type
-          })
-          
-          const response = await fetch('/api/ai/voice/stt', {
-            method: 'POST',
-            body: formData
-          })
-          
-          console.log('📥 STT API response status:', response.status)
-          
-          if (response.ok) {
-            const data = await response.json()
-            console.log('📝 STT transcription:', data.transcription)
-            
-            span.setAttribute("transcription", data.transcription || "")
-            
-            if (data.transcription) {
-              const transcription = data.transcription.toLowerCase().trim()
-              console.log('🔍 Checking transcription for wake word:', transcription)
-                
-              // Simplified and more reliable wake word detection
-              const wakeWords = [
-                'oracle', 'orical', 'oracles', 'oracle.', 'oracle,',
-                'hey oracle', 'oracle ai', 'oracle assistant', 'hi oracle',
-                'ok oracle', 'oracle please', 'oracle help'
-              ]
-              
-              let detected = false
-              
-              // Method 1: Direct word boundary matching (most reliable) - exclude "oral" from standalone matching
-              const oracleWordMatch = /\b(oracle|orical|oracles)\b/i.test(transcription)
-              
-              // Method 2: Check for phrase patterns - be more specific
-              const phraseMatch = wakeWords.some(phrase => {
-                // Only match if the phrase appears as a complete unit
-                if (phrase.includes(' ')) {
-                  return transcription.includes(phrase.toLowerCase())
-                }
-                // For single words, use word boundary matching
-                const wordRegex = new RegExp(`\\b${phrase.toLowerCase()}\\b`, 'i')
-                return wordRegex.test(transcription)
-              })
-              
-              // Method 3: Starts with oracle (high priority)
-              const startsWithOracle = transcription.startsWith('oracle') || 
-                                     transcription.startsWith('hey oracle') || 
-                                     transcription.startsWith('hi oracle') || 
-                                     transcription.startsWith('ok oracle')
-              
-              // Method 4: Exact match
-              const exactMatch = wakeWords.includes(transcription)
-              
-              // Method 5: Partial match for short transcriptions (fallback)
-              let partialMatch = false
-              if (voiceSettings.wakeWordSensitivity > 0.6 && transcription.length <= 8) {
-                partialMatch = transcription.includes('ora') || transcription.includes('orc')
-              }
-              
-              // Method 6: ENHANCED - Treat any meaningful speech as conversation attempt
-              // If the transcription is longer than 3 words and doesn't contain obvious noise, process it
-              const words = transcription.split(/\s+/).filter(word => word.length > 0)
-              const isConversationAttempt = words.length >= 2 && 
-                                          !transcription.includes('noise') && 
-                                          !transcription.includes('static') &&
-                                          transcription.length > 5
-              
-              // Final detection - now includes conversation attempts
-              detected = oracleWordMatch || phraseMatch || startsWithOracle || exactMatch || partialMatch || isConversationAttempt
-              
-              console.log('🔍 Wake word detection debug:', {
-                transcription,
-                oracleWordMatch,
-                phraseMatch,
-                startsWithOracle,
-                exactMatch,
-                partialMatch,
-                isConversationAttempt,
-                wordsCount: words.length,
-                detected,
-                wakeWordSensitivity: voiceSettings.wakeWordSensitivity
-              })
-              
-              if (detected) {
-                console.log('✅ Wake word or conversation detected!', transcription)
-                
-                Sentry.addBreadcrumb({
-                  message: 'Wake word or conversation detected',
-                  data: { transcription, detectionType: isConversationAttempt ? 'conversation' : 'wakeword' },
-                  level: 'info'
-                })
-                
-                setWakeWordDetected(true)
-                setIsWakeWordListening(false)
-                
-                if (isConversationAttempt && !oracleWordMatch && !phraseMatch && !startsWithOracle) {
-                  toast.success('Oracle listening...')
-                } else {
-                  toast.success('Oracle activated!')
-                }
-                
-                // Check if the transcription contains more than just the wake word
-                const cleanTranscription = transcription.replace(/^(hey\s+|hi\s+|ok\s+)?oracle[,.]?\s*/i, '').trim()
-                
-                console.log('🔍 Checking transcription content:', {
-                  originalTranscription: transcription,
-                  cleanTranscription,
-                  hasQuestion: cleanTranscription.length > 0,
-                  isConversationAttempt
-                })
-                
-                // If it's a conversation attempt without wake word, use the full transcription
-                const messageToProcess = isConversationAttempt && !oracleWordMatch && !phraseMatch && !startsWithOracle 
-                  ? transcription 
-                  : (cleanTranscription.length > 0 ? cleanTranscription : transcription)
-                
-                if (messageToProcess.length > 0) {
-                  // Process the question immediately
-                  console.log('🎯 Processing question directly:', messageToProcess)
-                  
-                  setTimeout(async () => {
-                    try {
-                      await sendMessage(messageToProcess)
-                    } catch (error) {
-                      console.error('❌ Error processing wake word question:', error)
-                      Sentry.captureException(error, {
-                        tags: { component: 'wake-word', action: 'process-question-error' }
-                      })
-                    }
-                  }, 500)
-                } else {
-                  // Only the wake word was detected, start recording for the question
-                  console.log('🎯 Starting recording for question after wake word...')
-                  setTimeout(async () => {
-                    try {
-                      await startRecording()
-                    } catch (error) {
-                      console.error('❌ Error starting recording after wake word:', error)
-                      Sentry.captureException(error, {
-                        tags: { component: 'wake-word', action: 'start-recording-after-detection' }
-                      })
-                    }
-                  }, 500)
-                }
-                
-                // Reset wake word detection after 30 seconds
-                setTimeout(() => {
-                  console.log('🔄 Resetting wake word detection')
-                  setWakeWordDetected(false)
-                  if (voiceSettings.voiceActivation && !isRecording) {
-                    setIsWakeWordListening(true)
-                  }
-                }, 30000)
-              } else {
-                console.log('❌ No wake word or meaningful conversation detected in:', transcription)
-              }
-            } else {
-              console.log('⚠️ No transcription received from STT API')
-            }
-          } else {
-            const errorData = await response.text()
-            console.error('❌ STT API error:', response.status, errorData)
-            
-            Sentry.captureException(new Error(`STT API error: ${response.status}`), {
-              tags: { component: 'wake-word', action: 'stt-api-error' },
-              extra: { status: response.status, error: errorData }
-            })
-            
-            // Don't show error to user for wake word failures, just continue listening
-          }
-        }
-      )
-    } catch (error) {
-      console.error('❌ Error processing wake word audio:', error)
-      Sentry.captureException(error, {
-        tags: { component: 'wake-word', action: 'process-audio' },
-        extra: { audioSize: audioBlob.size }
-      })
-      
-      // Continue listening even if processing fails
-    }
-  }
-
-  const stopWakeWordListening = () => {
-    console.log('🛑 Stopping wake word listening')
-    setIsWakeWordListening(false)
-    
-    if (wakeWordRecorderRef.current) {
-      const recorder = wakeWordRecorderRef.current
-      if (recorder.state === 'recording') {
-        console.log('⏹️ Stopping active wake word recorder')
-        recorder.stop()
-      }
-      
-      // Stop all tracks to release microphone
-      if (recorder.stream) {
-        recorder.stream.getTracks().forEach(track => {
-          console.log('🔇 Stopping microphone track')
-          track.stop()
-        })
-      }
-    }
-  }
-
-  // Auto-start wake word listening when voice activation is enabled
-  useEffect(() => {
-    console.log('🔄 Wake word useEffect triggered:', {
-      voiceActivation: voiceSettings.voiceActivation,
-      isWakeWordListening,
-      wakeWordDetected,
-      isRecording,
-      isOpen
-    })
-    
-    // Start wake word listening if conditions are met
-    if (voiceSettings.voiceActivation && 
-        !isWakeWordListening && 
-        !wakeWordDetected && 
-        !isRecording) {
-      
-      console.log('✅ Starting wake word listening due to settings change')
-      setIsWakeWordListening(true)
-      
-      // Small delay to ensure state is updated
-      setTimeout(() => {
-        startWakeWordListening()
-      }, 100)
-    } 
-    // Stop wake word listening if voice activation is disabled
-    else if (!voiceSettings.voiceActivation && isWakeWordListening) {
-      console.log('🛑 Stopping wake word listening due to settings change')
-      stopWakeWordListening()
-    }
-    // Stop wake word listening if recording
-    else if (isWakeWordListening && isRecording) {
-      console.log('⏸️ Pausing wake word listening (recording active)')
-      stopWakeWordListening()
-    }
-
-    return () => {
-      // Cleanup on unmount or dependency change
-      if (isWakeWordListening) {
-        console.log('🧹 Cleanup: Stopping wake word listening')
-        stopWakeWordListening()
-      }
-    }
-  }, [voiceSettings.voiceActivation, isWakeWordListening, wakeWordDetected, isRecording])
-
-  // Additional effect to handle wake word detection reset
-  useEffect(() => {
-    if (wakeWordDetected) {
-      console.log('🎯 Wake word detected, setting up reset timer')
-      
-      const resetTimer = setTimeout(() => {
-        console.log('⏰ Resetting wake word detection after timeout')
-        setWakeWordDetected(false)
-        
-        // Restart listening if voice activation is still enabled and not busy
-        if (voiceSettings.voiceActivation && !isRecording) {
-          console.log('🔄 Restarting wake word listening after reset')
-          setTimeout(() => {
-            setIsWakeWordListening(true)
-          }, 500)
-        }
-      }, 30000)
-      
-      return () => {
-        console.log('🧹 Clearing wake word reset timer')
-        clearTimeout(resetTimer)
-      }
-    }
-  }, [wakeWordDetected, voiceSettings.voiceActivation, isRecording])
-
-  // Effect to handle page visibility changes (pause/resume when tab is hidden/shown)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log('👁️ Page hidden, pausing wake word listening')
-        if (isWakeWordListening) {
-          stopWakeWordListening()
-        }
-      } else {
-        console.log('👁️ Page visible, resuming wake word listening if needed')
-        if (voiceSettings.voiceActivation && !isWakeWordListening && !wakeWordDetected && !isRecording) {
-          setTimeout(() => {
-            setIsWakeWordListening(true)
-          }, 1000)
-        }
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [voiceSettings.voiceActivation, isWakeWordListening, wakeWordDetected, isRecording])
-
-  // Generate gradient style
-  const gradientStyle = {
-    background: appearanceSettings.gradientDirection === 'linear' 
-      ? `linear-gradient(135deg, ${appearanceSettings.primaryColor}, ${appearanceSettings.secondaryColor})`
-      : appearanceSettings.gradientDirection === 'radial'
-      ? `radial-gradient(circle, ${appearanceSettings.primaryColor}, ${appearanceSettings.secondaryColor})`
-      : `conic-gradient(from 0deg, ${appearanceSettings.primaryColor}, ${appearanceSettings.secondaryColor}, ${appearanceSettings.primaryColor})`
   }
 
   return (
@@ -1591,7 +1576,11 @@ export default function OracleBlob() {
               width: `${appearanceSettings.blobSize}px`,
               height: `${appearanceSettings.blobSize}px`,
               borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%',
-              ...gradientStyle,
+              background: appearanceSettings.gradientDirection === 'linear' 
+                ? `linear-gradient(135deg, ${appearanceSettings.primaryColor}, ${appearanceSettings.secondaryColor})`
+                : appearanceSettings.gradientDirection === 'radial'
+                ? `radial-gradient(circle, ${appearanceSettings.primaryColor}, ${appearanceSettings.secondaryColor})`
+                : `conic-gradient(from 0deg, ${appearanceSettings.primaryColor}, ${appearanceSettings.secondaryColor}, ${appearanceSettings.primaryColor})`,
               boxShadow: appearanceSettings.glowEffect 
                 ? `0 0 ${20 * appearanceSettings.glowIntensity * (isHovered ? 1.5 : 1)}px ${appearanceSettings.primaryColor}40, 0 0 ${40 * appearanceSettings.glowIntensity * (isHovered ? 1.5 : 1)}px ${appearanceSettings.primaryColor}20`
                 : 'none',

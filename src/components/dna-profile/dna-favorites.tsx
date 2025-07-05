@@ -1,401 +1,745 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { 
   Grid3X3, 
   List, 
   Search, 
-  Filter, 
-    ArrowUpDown,
-  ArrowDownUp,
   Star,
   Heart,
-  Bookmark,
   ExternalLink,
-  Edit,
   Trash2,
-  Copy,
-  Share,
-  Archive,
-  Tag,
-  Calendar,
-  Globe,
-  Sparkles,
-  MoreHorizontal,
-  Eye,
-  Download,
   Move,
-  FolderOpen,
-  Clock
+  X,
+  GripVertical,
+  Clock,
+  Eye,
+  SortDesc,
+  Bookmark
 } from 'lucide-react'
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 
-interface FavoriteItem {
+interface Favorite {
   id: string
-  title: string
   url: string
-  description: string
+  title: string
   favicon: string
   tags: string[]
-  folder: string
-  dateAdded: Date
-  lastVisited: Date
-  visitCount: number
-  rating: number
-  isStarred: boolean
-  isArchived: boolean
-  thumbnail?: string
+  addedAt: string
+  visitCount?: number
 }
 
-interface Folder {
-  id: string
-  name: string
-  color: string
-  count: number
-}
-
-const mockFavorites: FavoriteItem[] = [
+// Mock data for demonstration
+const mockFavorites: Favorite[] = [
   {
     id: '1',
-    title: 'React Documentation',
     url: 'https://react.dev',
-    description: 'The official React documentation with hooks, components, and best practices.',
-    favicon: '/react-icon.png',
-    tags: ['React', 'Documentation', 'Frontend'],
-    folder: 'Development',
-    dateAdded: new Date('2024-01-15'),
-    lastVisited: new Date('2024-01-20'),
-    visitCount: 45,
-    rating: 5,
-    isStarred: true,
-    isArchived: false,
-    thumbnail: '/thumbnails/react-docs.png'
+    title: 'React - The library for web and native user interfaces',
+    favicon: 'https://www.google.com/s2/favicons?domain=react.dev&sz=64',
+    tags: ['Development', 'Frontend', 'JavaScript'],
+    addedAt: '2024-01-15T10:30:00Z',
+    visitCount: 24
   },
   {
     id: '2',
-    title: 'TypeScript Handbook',
-    url: 'https://typescriptlang.org/docs',
-    description: 'Complete guide to TypeScript features, types, and advanced patterns.',
-    favicon: '/ts-icon.png',
-    tags: ['TypeScript', 'Documentation', 'Programming'],
-    folder: 'Development',
-    dateAdded: new Date('2024-01-10'),
-    lastVisited: new Date('2024-01-18'),
-    visitCount: 32,
-    rating: 5,
-    isStarred: true,
-    isArchived: false
+    url: 'https://www.typescriptlang.org',
+    title: 'TypeScript: JavaScript With Syntax For Types',
+    favicon: 'https://www.google.com/s2/favicons?domain=typescriptlang.org&sz=64',
+    tags: ['Development', 'TypeScript', 'Programming'],
+    addedAt: '2024-01-14T15:45:00Z',
+    visitCount: 18
   },
   {
     id: '3',
-    title: 'Dribbble Design Inspiration',
     url: 'https://dribbble.com',
-    description: 'Discover the world\'s top designers & creatives on Dribbble.',
-    favicon: '/dribbble-icon.png',
+    title: 'Dribbble - Discover the World&apos;s Top Designers & Creative Professionals',
+    favicon: 'https://www.google.com/s2/favicons?domain=dribbble.com&sz=64',
     tags: ['Design', 'Inspiration', 'UI/UX'],
-    folder: 'Design',
-    dateAdded: new Date('2024-01-12'),
-    lastVisited: new Date('2024-01-19'),
-    visitCount: 28,
-    rating: 4,
-    isStarred: false,
-    isArchived: false
+    addedAt: '2024-01-13T09:15:00Z',
+    visitCount: 32
+  },
+  {
+    id: '4',
+    url: 'https://github.com',
+    title: 'GitHub - Where the world builds software',
+    favicon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64',
+    tags: ['Development', 'Version Control', 'Open Source'],
+    addedAt: '2024-01-12T14:20:00Z',
+    visitCount: 45
+  },
+  {
+    id: '5',
+    url: 'https://stackoverflow.com',
+    title: 'Stack Overflow - Where Developers Learn, Share, & Build Careers',
+    favicon: 'https://www.google.com/s2/favicons?domain=stackoverflow.com&sz=64',
+    tags: ['Development', 'Q&A', 'Programming'],
+    addedAt: '2024-01-11T11:30:00Z',
+    visitCount: 28
+  },
+  {
+    id: '6',
+    url: 'https://tailwindcss.com',
+    title: 'Tailwind CSS - Rapidly build modern websites without ever leaving your HTML',
+    favicon: 'https://www.google.com/s2/favicons?domain=tailwindcss.com&sz=64',
+    tags: ['CSS', 'Framework', 'Design'],
+    addedAt: '2024-01-10T16:45:00Z',
+    visitCount: 19
+  },
+  {
+    id: '7',
+    url: 'https://nextjs.org',
+    title: 'Next.js - The React Framework for Production',
+    favicon: 'https://www.google.com/s2/favicons?domain=nextjs.org&sz=64',
+    tags: ['React', 'Framework', 'Full-stack'],
+    addedAt: '2024-01-09T13:10:00Z',
+    visitCount: 37
+  },
+  {
+    id: '8',
+    url: 'https://vercel.com',
+    title: 'Vercel - Build, deploy, and scale apps with zero configuration',
+    favicon: 'https://www.google.com/s2/favicons?domain=vercel.com&sz=64',
+    tags: ['Deployment', 'Hosting', 'DevOps'],
+    addedAt: '2024-01-08T10:25:00Z',
+    visitCount: 15
+  },
+  {
+    id: '9',
+    url: 'https://figma.com',
+    title: 'Figma - The collaborative interface design tool',
+    favicon: 'https://www.google.com/s2/favicons?domain=figma.com&sz=64',
+    tags: ['Design', 'UI/UX', 'Collaboration'],
+    addedAt: '2024-01-07T15:50:00Z',
+    visitCount: 22
+  },
+  {
+    id: '10',
+    url: 'https://supabase.com',
+    title: 'Supabase - The open source Firebase alternative',
+    favicon: 'https://www.google.com/s2/favicons?domain=supabase.com&sz=64',
+    tags: ['Database', 'Backend', 'Open Source'],
+    addedAt: '2024-01-06T12:35:00Z',
+    visitCount: 31
   }
 ]
 
-const mockFolders: Folder[] = [
-  { id: '1', name: 'Development', color: 'blue', count: 15 },
-  { id: '2', name: 'Design', color: 'purple', count: 8 },
-  { id: '3', name: 'Research', color: 'green', count: 12 },
-  { id: '4', name: 'Tools', color: 'orange', count: 6 }
-]
+type ViewMode = 'grid' | 'list'
+type SortOption = 'recent' | 'most-opened' | 'alphabetical'
 
-export default function DnaFavorites() {
-  const [favorites, setFavorites] = useState<FavoriteItem[]>(mockFavorites)
-  const [folders] = useState<Folder[]>(mockFolders)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedFolder, setSelectedFolder] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<'dateAdded' | 'title' | 'visitCount' | 'rating'>('dateAdded')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [selectedItems, setSelectedItems] = useState<string[]>([])
-  const [showFilters, setShowFilters] = useState(false)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [detailItem, setDetailItem] = useState<FavoriteItem | null>(null)
+const FavoritesSkeleton = () => (
+  <div className="space-y-6">
+    <div className="space-y-2">
+      <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
+      <div className="h-4 bg-gray-100 rounded w-96 animate-pulse" />
+    </div>
+    <div className="flex gap-4">
+      <div className="h-10 bg-gray-200 rounded flex-1 animate-pulse" />
+      <div className="h-10 bg-gray-200 rounded w-32 animate-pulse" />
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+      ))}
+    </div>
+  </div>
+)
 
-  // Filter and sort favorites
-  const filteredFavorites = favorites
-    .filter(item => {
-      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           item.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-      
-      const matchesFolder = selectedFolder === 'all' || item.folder === selectedFolder
-      
-      const matchesTags = selectedTags.length === 0 || 
-                         selectedTags.some(tag => item.tags.includes(tag))
-      
-      return matchesSearch && matchesFolder && matchesTags && !item.isArchived
+const EmptyFavoritesState = () => (
+  <Card className="text-center py-16">
+    <CardContent>
+      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Bookmark className="h-8 w-8 text-gray-400" />
+      </div>
+      <CardTitle className="mb-2">No favorites yet</CardTitle>
+      <CardDescription>
+        Start building your collection by adding bookmarks and important links
+      </CardDescription>
+    </CardContent>
+  </Card>
+)
+
+const FavoriteCard = ({ 
+  favorite, 
+  isSelected, 
+  onSelect, 
+  onOpen,
+  isDragging = false,
+  dragHandleProps = {}
+}: { 
+  favorite: Favorite
+  isSelected: boolean
+  onSelect: (checked: boolean) => void
+  onOpen: () => void
+  isDragging?: boolean
+  dragHandleProps?: Record<string, unknown>
+}) => {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
     })
-    .sort((a, b) => {
-      const aValue = a[sortBy]
-      const bValue = b[sortBy]
-      
-      if (sortBy === 'dateAdded' || sortBy === 'lastVisited') {
-        return sortOrder === 'desc' 
-          ? new Date(bValue as Date).getTime() - new Date(aValue as Date).getTime()
-          : new Date(aValue as Date).getTime() - new Date(bValue as Date).getTime()
-      }
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortOrder === 'desc' ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue)
-      }
-      
-      return sortOrder === 'desc' ? (bValue as number) - (aValue as number) : (aValue as number) - (bValue as number)
-    })
-
-  // Get all unique tags
-  const allTags = Array.from(new Set(favorites.flatMap(item => item.tags)))
-
-  const handleBulkAction = (action: string) => {
-    if (selectedItems.length === 0) {
-      toast.error('Please select items first')
-      return
-    }
-
-    switch (action) {
-      case 'delete':
-        setFavorites(prev => prev.filter(item => !selectedItems.includes(item.id)))
-        toast.success(`Deleted ${selectedItems.length} items`)
-        break
-      case 'archive':
-        setFavorites(prev => prev.map(item => 
-          selectedItems.includes(item.id) ? { ...item, isArchived: true } : item
-        ))
-        toast.success(`Archived ${selectedItems.length} items`)
-        break
-      case 'star':
-        setFavorites(prev => prev.map(item => 
-          selectedItems.includes(item.id) ? { ...item, isStarred: true } : item
-        ))
-        toast.success(`Starred ${selectedItems.length} items`)
-        break
-    }
-    setSelectedItems([])
   }
 
-  const handleSmartOrganize = () => {
-    toast.loading('AI is organizing your favorites...')
-    setTimeout(() => {
-      toast.success('Favorites organized by AI based on your interests!')
-    }, 2000)
-  }
-
-  const FavoriteCard = ({ item }: { item: FavoriteItem }) => (
-    <Card className="group hover:shadow-md transition-all duration-200 cursor-pointer">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-2">
+  return (
+    <Card 
+      className={`group cursor-pointer transition-all duration-200 hover:shadow-md border-gray-200 bg-white hover:border-gray-300 ${
+        isDragging ? 'shadow-lg border-gray-300 rotate-1 scale-105 z-50' : ''
+      } ${isSelected ? 'ring-2 ring-blue-500/20 border-blue-300 bg-blue-50/30' : ''} overflow-hidden`}
+      onClick={onOpen}
+      {...dragHandleProps}
+    >
+      {/* Header with favicon and actions */}
+      <div className="p-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
             <Checkbox 
-              checked={selectedItems.includes(item.id)}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  setSelectedItems(prev => [...prev, item.id])
-                } else {
-                  setSelectedItems(prev => prev.filter(id => id !== item.id))
-                }
+            checked={isSelected}
+            onCheckedChange={onSelect}
+            onClick={(e) => e.stopPropagation()}
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+          <div className="w-8 h-8 bg-white rounded-lg border border-gray-200 flex items-center justify-center flex-shrink-0">
+            <img 
+              src={favorite.favicon} 
+              alt="" 
+              className="w-5 h-5"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.src = `https://www.google.com/s2/favicons?domain=${new URL(favorite.url).hostname}&sz=64`
               }}
             />
-            <img src={item.favicon} alt="" className="w-4 h-4" />
-            {item.isStarred && <Star className="h-4 w-4 text-yellow-500 fill-current" />}
-          </div>
-          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="sm" onClick={() => setDetailItem(item)}>
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
           </div>
         </div>
         
-        <div className="space-y-2">
-          <h3 className="font-medium text-sm line-clamp-2">{item.title}</h3>
-          <p className="text-xs text-gray-600 line-clamp-2">{item.description}</p>
-          
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              toast.success('Added to favorites')
+            }}
+          >
+            <Heart className="h-4 w-4" />
+            </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              toast.success('Added to starred')
+            }}
+          >
+            <Star className="h-4 w-4" />
+            </Button>
+          <div className="cursor-grab active:cursor-grabbing ml-1">
+            <GripVertical className="h-4 w-4 text-gray-400" />
+          </div>
+          </div>
+        </div>
+        
+      {/* Content */}
+      <CardContent className="p-4">
+        <div className="space-y-3">
+          <div>
+            <h3 className="font-bold text-gray-900 font-audiowide uppercase text-sm group-hover:text-blue-600 transition-colors line-clamp-2">
+              {favorite.title}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1 truncate">
+              {favorite.url}
+            </p>
+          </div>
+
+          {/* Tags */}
           <div className="flex flex-wrap gap-1">
-            {item.tags.slice(0, 3).map(tag => (
-              <Badge key={tag} variant="secondary" className="text-xs">
+            {favorite.tags.slice(0, 3).map((tag) => (
+              <Badge 
+                key={tag} 
+                variant="secondary" 
+                className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
                 {tag}
               </Badge>
             ))}
-            {item.tags.length > 3 && (
-              <Badge variant="outline" className="text-xs">
-                +{item.tags.length - 3}
+            {favorite.tags.length > 3 && (
+              <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+                +{favorite.tags.length - 3}
               </Badge>
             )}
           </div>
           
+          {/* Stats */}
           <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{item.visitCount} visits</span>
-            <div className="flex items-center space-x-1">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star 
-                  key={i} 
-                  className={`h-3 w-3 ${i < item.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                />
-              ))}
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatDate(favorite.addedAt)}
+            </div>
+            <div className="flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              {favorite.visitCount || 0}
             </div>
           </div>
         </div>
       </CardContent>
     </Card>
   )
+}
 
-  const FavoriteListItem = ({ item }: { item: FavoriteItem }) => (
-    <Card className="group hover:shadow-sm transition-all duration-200">
+const FavoriteRow = ({ 
+  favorite, 
+  isSelected, 
+  onSelect, 
+  onOpen 
+}: { 
+  favorite: Favorite
+  isSelected: boolean
+  onSelect: (checked: boolean) => void
+  onOpen: () => void
+}) => {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+
+  return (
+    <Card 
+      className={`group cursor-pointer transition-all duration-200 hover:shadow-sm border-gray-200 bg-white hover:border-gray-300 ${
+        isSelected ? 'ring-2 ring-blue-500/20 border-blue-300 bg-blue-50/30' : ''
+      }`}
+      onClick={onOpen}
+    >
       <CardContent className="p-4">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-4">
           <Checkbox 
-            checked={selectedItems.includes(item.id)}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedItems(prev => [...prev, item.id])
-              } else {
-                setSelectedItems(prev => prev.filter(id => id !== item.id))
-              }
-            }}
+            checked={isSelected}
+            onCheckedChange={onSelect}
+            onClick={(e) => e.stopPropagation()}
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
           />
           
-          <div className="flex items-center space-x-2">
-            <img src={item.favicon} alt="" className="w-4 h-4" />
-            {item.isStarred && <Star className="h-4 w-4 text-yellow-500 fill-current" />}
+          <div className="w-8 h-8 bg-gray-50 rounded border border-gray-200 flex items-center justify-center flex-shrink-0">
+            <img 
+              src={favorite.favicon} 
+              alt="" 
+              className="w-5 h-5"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.src = `https://www.google.com/s2/favicons?domain=${new URL(favorite.url).hostname}&sz=64`
+              }}
+            />
           </div>
           
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-sm truncate">{item.title}</h3>
-            <p className="text-xs text-gray-600 truncate">{item.description}</p>
+            <h3 className="font-bold text-gray-900 font-audiowide uppercase text-sm group-hover:text-blue-600 transition-colors truncate">
+              {favorite.title}
+            </h3>
+            <p className="text-sm text-gray-500 truncate">
+              {favorite.url}
+            </p>
           </div>
           
-          <div className="flex items-center space-x-4 text-xs text-gray-500">
-            <span>{item.visitCount} visits</span>
-            <span>{item.folder}</span>
-            <span>{item.dateAdded.toLocaleDateString()}</span>
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <div className="flex flex-wrap gap-1">
+              {favorite.tags.slice(0, 2).map((tag) => (
+                <Badge 
+                  key={tag} 
+                  variant="secondary" 
+                  className="text-xs bg-gray-100 text-gray-700"
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatDate(favorite.addedAt)}
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              {favorite.visitCount || 0}
+            </div>
           </div>
           
-          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="sm" onClick={() => setDetailItem(item)}>
-              <Eye className="h-4 w-4" />
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation()
+                toast.success('Added to favorites')
+              }}
+            >
+              <Heart className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm">
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation()
+                toast.success('Added to starred')
+              }}
+            >
+              <Star className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </CardContent>
     </Card>
   )
+}
+
+const FavoriteDetailPanel = ({ 
+  favorite, 
+  isOpen, 
+  onClose 
+}: {
+  favorite: Favorite | null
+  isOpen: boolean
+  onClose: () => void
+}) => {
+  if (!favorite) return null
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gray-50 rounded border border-gray-200 flex items-center justify-center">
+              <img 
+                src={favorite.favicon} 
+                alt="" 
+                className="w-5 h-5"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  const parent = target.parentElement
+                  if (parent) {
+                    target.style.display = 'none'
+                    const fallback = document.createElement('div')
+                    fallback.className = 'w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-sm flex items-center justify-center text-white text-xs font-bold'
+                    fallback.textContent = favorite.title.charAt(0).toUpperCase()
+                    parent.appendChild(fallback)
+                  }
+                }}
+              />
+            </div>
+            <span className="truncate">{favorite.title}</span>
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-6">
+          {/* URL */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">URL</h4>
+            <p className="text-sm text-gray-600 break-all bg-gray-50 p-2 rounded border">
+              {favorite.url}
+            </p>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">Tags</h4>
+            <div className="flex flex-wrap gap-2">
+              {favorite.tags.map((tag) => (
+                <Badge 
+                  key={tag} 
+                  variant="secondary" 
+                  className="bg-gray-100 text-gray-700"
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          {/* Statistics */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3">Statistics</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-600">Date Added</span>
+                <span className="text-sm font-medium">{formatDate(favorite.addedAt)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-600">Visit Count</span>
+                <span className="text-sm font-medium">{favorite.visitCount || 0} times</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-gray-600">Last Visited</span>
+                <span className="text-sm font-medium">2 days ago</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <Button 
+              className="w-full" 
+              onClick={() => window.open(favorite.url, '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open Link
+            </Button>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => toast.success('Added to favorites')}
+              >
+                <Heart className="h-4 w-4 mr-2" />
+                Favorite
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => toast.success('Added to starred')}
+              >
+                <Star className="h-4 w-4 mr-2" />
+                Star
+              </Button>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={() => {
+                toast.success('Favorite deleted')
+                onClose()
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+const BulkToolbar = ({ 
+  selectedCount, 
+  onMove, 
+  onDelete, 
+  onCancel 
+}: {
+  selectedCount: number
+  onMove: () => void
+  onDelete: () => void
+  onCancel: () => void
+}) => (
+  <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+    <Card className="shadow-lg border-gray-200">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-900">
+            {selectedCount} selected
+          </span>
+          
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={onMove}>
+              <Move className="h-4 w-4 mr-2" />
+              Move
+            </Button>
+            <Button size="sm" variant="outline" onClick={onDelete} className="text-red-600 hover:text-red-700">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onCancel}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+)
+
+export default function DnaFavorites() {
+  const [favorites] = useState<Favorite[]>(mockFavorites)
+  const [isLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [sortBy, setSortBy] = useState<SortOption>('recent')
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const [selectedFavorite, setSelectedFavorite] = useState<Favorite | null>(null)
+  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false)
+
+  // For SWR-like functionality (currently unused but kept for future implementation)
+  // const mutate = () => {
+  //   // Trigger refresh
+  // }
+
+  // Filter and sort favorites
+  const filteredAndSortedFavorites = useMemo(() => {
+    const filtered = favorites.filter(favorite =>
+      favorite.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      favorite.url.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      favorite.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+
+    switch (sortBy) {
+      case 'recent':
+        return filtered.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
+      case 'most-opened':
+        return filtered.sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0))
+      case 'alphabetical':
+        return filtered.sort((a, b) => a.title.localeCompare(b.title))
+      default:
+        return filtered
+    }
+  }, [favorites, searchQuery, sortBy])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Focus search on "/"
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement
+        searchInput?.focus()
+      }
+
+      // Toggle view mode with "g l"
+      if (e.key === 'g' && !e.ctrlKey && !e.metaKey) {
+        const handleSecondKey = (secondE: KeyboardEvent) => {
+          if (secondE.key === 'l') {
+            setViewMode(prev => prev === 'grid' ? 'list' : 'grid')
+          }
+          document.removeEventListener('keydown', handleSecondKey)
+        }
+        document.addEventListener('keydown', handleSecondKey)
+        setTimeout(() => document.removeEventListener('keydown', handleSecondKey), 1000)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyPress)
+    return () => document.removeEventListener('keydown', handleKeyPress)
+  }, [])
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(new Set(filteredAndSortedFavorites.map(f => f.id)))
+    } else {
+      setSelectedItems(new Set())
+    }
+  }
+
+  const handleSelectItem = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedItems)
+    if (checked) {
+      newSelected.add(id)
+    } else {
+      newSelected.delete(id)
+    }
+    setSelectedItems(newSelected)
+  }
+
+  const handleOpenFavorite = (favorite: Favorite) => {
+    setSelectedFavorite(favorite)
+    setIsDetailPanelOpen(true)
+  }
+
+  const handleBulkMove = () => {
+    toast.success(`Moved ${selectedItems.size} favorites`)
+    setSelectedItems(new Set())
+  }
+
+  const handleBulkDelete = () => {
+    toast.success(`Deleted ${selectedItems.size} favorites`)
+    setSelectedItems(new Set())
+  }
+
+  const handleBulkCancel = () => {
+    setSelectedItems(new Set())
+  }
+
+  if (isLoading) {
+    return <FavoritesSkeleton />
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Header - Following DNA settings pattern */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Favorites</h2>
-          <p className="text-gray-600">Manage your bookmarked content</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={handleSmartOrganize}>
-            <Sparkles className="h-4 w-4 mr-2" />
-            AI Organize
-          </Button>
-          <Button>
-            <Bookmark className="h-4 w-4 mr-2" />
-            Add Bookmark
-          </Button>
+          <h2 className="text-3xl font-bold text-gray-900 font-audiowide uppercase">Favorites</h2>
+          <p className="text-gray-600 mt-2">Your curated collection of bookmarks and important links</p>
         </div>
       </div>
 
-      {/* Toolbar */}
+      {/* Controls */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-audiowide uppercase">
+            <Search className="h-5 w-5" />
+            Search & Filter
+          </CardTitle>
+          <CardDescription>
+            Find and organize your favorite content
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 max-w-md">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search favorites..."
+                  placeholder="Search favorites... (Press / to focus)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 border-gray-200"
                 />
               </div>
             </div>
 
-            {/* Filters */}
-            <div className="flex items-center space-x-2">
-              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Folders" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Folders</SelectItem>
-                  {folders.map(folder => (
-                    <SelectItem key={folder.id} value={folder.name}>
-                      {folder.name} ({folder.count})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                <SelectTrigger className="w-40">
+            <div className="flex items-center gap-3">
+              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                <SelectTrigger className="w-[140px] border-gray-200">
+                  <SortDesc className="h-4 w-4 mr-2" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="dateAdded">Date Added</SelectItem>
-                  <SelectItem value="title">Title</SelectItem>
-                  <SelectItem value="visitCount">Visit Count</SelectItem>
-                  <SelectItem value="rating">Rating</SelectItem>
+                  <SelectItem value="recent">Recent</SelectItem>
+                  <SelectItem value="most-opened">Most Opened</SelectItem>
+                  <SelectItem value="alphabetical">A-Z</SelectItem>
                 </SelectContent>
               </Select>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              >
-                {sortOrder === 'asc' ? <ArrowUpDown className="h-4 w-4" /> : <ArrowDownUp className="h-4 w-4" />}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-4 w-4" />
-              </Button>
-
-              <div className="flex items-center space-x-1 border rounded-md">
+              <div className="flex items-center bg-white rounded-lg border border-gray-200">
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
+                  className="rounded-r-none"
                 >
                   <Grid3X3 className="h-4 w-4" />
                 </Button>
@@ -403,6 +747,7 @@ export default function DnaFavorites() {
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('list')}
+                  className="rounded-l-none"
                 >
                   <List className="h-4 w-4" />
                 </Button>
@@ -410,169 +755,99 @@ export default function DnaFavorites() {
             </div>
           </div>
 
-          {/* Advanced Filters */}
-          {showFilters && (
-            <div className="mt-4 pt-4 border-t">
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Tags</label>
-                  <div className="flex flex-wrap gap-2">
-                    {allTags.map(tag => (
-                      <Badge
-                        key={tag}
-                        variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                        className="cursor-pointer"
-                        onClick={() => {
-                          if (selectedTags.includes(tag)) {
-                            setSelectedTags(prev => prev.filter(t => t !== tag))
-                          } else {
-                            setSelectedTags(prev => [...prev, tag])
-                          }
-                        }}
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Bulk Actions */}
-          {selectedItems.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
-              <div className="flex items-center justify-between">
+          {/* Bulk selection controls */}
+          {filteredAndSortedFavorites.length > 0 && (
+            <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+              <Checkbox
+                checked={selectedItems.size === filteredAndSortedFavorites.length}
+                onCheckedChange={handleSelectAll}
+                aria-label="Select all favorites"
+              />
                 <span className="text-sm text-gray-600">
-                  {selectedItems.length} items selected
+                {selectedItems.size > 0 ? `${selectedItems.size} selected` : 'Select all'}
                 </span>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={() => handleBulkAction('star')}>
-                    <Star className="h-4 w-4 mr-1" />
-                    Star
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleBulkAction('archive')}>
-                    <Archive className="h-4 w-4 mr-1" />
-                    Archive
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleBulkAction('delete')}>
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Content */}
-      <div className="space-y-4">
+      {filteredAndSortedFavorites.length === 0 ? (
+        searchQuery ? (
+          <Card className="text-center py-16">
+            <CardContent>
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="h-8 w-8 text-gray-400" />
+              </div>
+              <CardTitle className="mb-2 font-audiowide uppercase">No results found</CardTitle>
+              <CardDescription>
+                Try adjusting your search terms or filters to find what you&apos;re looking for.
+              </CardDescription>
+            </CardContent>
+          </Card>
+        ) : (
+          <EmptyFavoritesState />
+        )
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-audiowide uppercase">
+              <Bookmark className="h-5 w-5" />
+              Your Favorites ({filteredAndSortedFavorites.length})
+            </CardTitle>
+            <CardDescription>
+              {viewMode === 'grid' ? 'Grid view' : 'List view'} • Sorted by {sortBy.replace('-', ' ')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredFavorites.map(item => (
-              <FavoriteCard key={item.id} item={item} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredAndSortedFavorites.map((favorite) => (
+                  <FavoriteCard
+                    key={favorite.id}
+                    favorite={favorite}
+                    isSelected={selectedItems.has(favorite.id)}
+                    onSelect={(checked) => handleSelectItem(favorite.id, checked)}
+                    onOpen={() => handleOpenFavorite(favorite)}
+                  />
             ))}
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredFavorites.map(item => (
-              <FavoriteListItem key={item.id} item={item} />
+                {filteredAndSortedFavorites.map((favorite) => (
+                  <FavoriteRow
+                    key={favorite.id}
+                    favorite={favorite}
+                    isSelected={selectedItems.has(favorite.id)}
+                    onSelect={(checked) => handleSelectItem(favorite.id, checked)}
+                    onOpen={() => handleOpenFavorite(favorite)}
+                  />
             ))}
           </div>
         )}
-
-        {filteredFavorites.length === 0 && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Bookmark className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No favorites found</h3>
-              <p className="text-gray-600 mb-4">
-                {searchQuery || selectedFolder !== 'all' || selectedTags.length > 0
-                  ? 'Try adjusting your filters or search query.'
-                  : 'Start bookmarking your favorite content to see it here.'}
-              </p>
-              <Button>
-                <Bookmark className="h-4 w-4 mr-2" />
-                Add Your First Bookmark
-              </Button>
             </CardContent>
           </Card>
         )}
-      </div>
 
-      {/* Detail Drawer */}
-      <Sheet open={!!detailItem} onOpenChange={() => setDetailItem(null)}>
-        <SheetContent className="w-96">
-          {detailItem && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center space-x-2">
-                  <img src={detailItem.favicon} alt="" className="w-5 h-5" />
-                  <span className="truncate">{detailItem.title}</span>
-                </SheetTitle>
-              </SheetHeader>
-              
-              <div className="space-y-6 mt-6">
-                <div>
-                  <h4 className="font-medium mb-2">Description</h4>
-                  <p className="text-sm text-gray-600">{detailItem.description}</p>
-                </div>
+      {/* Bulk Toolbar */}
+      {selectedItems.size > 0 && (
+        <BulkToolbar
+          selectedCount={selectedItems.size}
+          onMove={handleBulkMove}
+          onDelete={handleBulkDelete}
+          onCancel={handleBulkCancel}
+        />
+      )}
 
-                <div>
-                  <h4 className="font-medium mb-2">Tags</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {detailItem.tags.map(tag => (
-                      <Badge key={tag} variant="secondary">{tag}</Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <h4 className="font-medium mb-1">Folder</h4>
-                    <p className="text-gray-600">{detailItem.folder}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Rating</h4>
-                    <div className="flex items-center space-x-1">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star 
-                          key={i} 
-                          className={`h-4 w-4 ${i < detailItem.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Visits</h4>
-                    <p className="text-gray-600">{detailItem.visitCount}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Added</h4>
-                    <p className="text-gray-600">{detailItem.dateAdded.toLocaleDateString()}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col space-y-2">
-                  <Button className="w-full">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Visit Site
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Bookmark
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <Share className="h-4 w-4 mr-2" />
-                    Share
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+      {/* Detail Panel */}
+      <FavoriteDetailPanel
+        favorite={selectedFavorite}
+        isOpen={isDetailPanelOpen}
+        onClose={() => {
+          setIsDetailPanelOpen(false)
+          setSelectedFavorite(null)
+        }}
+      />
     </div>
   )
 } 

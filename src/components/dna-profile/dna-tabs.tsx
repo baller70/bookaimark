@@ -10,9 +10,9 @@ interface TabDef {
 }
 
 const tabs: TabDef[] = [
-  { value: 'dna', label: 'DNA Profile', href: '/dna-profile' },
-  { value: 'favorites', label: 'Favorite', href: '/favorites' },
-  { value: 'playlists', label: 'Playlist', href: '/playlists' },
+  { value: 'about-you', label: 'About You', href: '/about-you' },
+  { value: 'favorites', label: 'Favorites', href: '/favorites' },
+  { value: 'playbooks', label: 'Playbooks', href: '/playbooks' },
   { value: 'search', label: 'Search', href: '/search' },
   { value: 'analytics', label: 'Analytics', href: '/analytics' },
   { value: 'timecapsule', label: 'Time Capsule', href: '/time-capsule' },
@@ -23,7 +23,7 @@ export default function DnaTabs() {
   const router = useRouter()
 
   const active =
-    tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))?.value ?? 'dna'
+    tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))?.value ?? 'about-you'
 
   const handleChange = (value: string) => {
     const target = tabs.find((t) => t.value === value)

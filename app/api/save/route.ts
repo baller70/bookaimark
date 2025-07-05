@@ -91,15 +91,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log("📝 Save data:", body);
 
-    // Extract settings from the description field if it's JSON
     let settingsToSave = body;
+    let settingsKey = '';
+
+    // Handle different data formats
     if (body.payload && body.payload.description) {
+      // Legacy format: { payload: { title, description } }
       try {
         const parsedSettings = JSON.parse(body.payload.description);
         settingsToSave = parsedSettings;
-        
-        // Store the settings in memory using table and title as key
-        const settingsKey = `${body.table}_${body.payload.title}`;
+        settingsKey = `${body.table}_${body.payload.title}`;
         savedSettings[settingsKey] = parsedSettings;
         console.log(`💾 Stored settings under key: ${settingsKey}`);
         
@@ -110,7 +111,25 @@ export async function POST(request: NextRequest) {
         }
       } catch (parseError) {
         console.log("📝 Description is not JSON, storing full payload");
+        settingsKey = `${body.table}_${body.payload.title}`;
+        savedSettings[settingsKey] = body.payload;
       }
+    } else if (body.table && body.title && body.data) {
+      // New format: { table, title, data }
+      settingsKey = `${body.table}_${body.title}`;
+      savedSettings[settingsKey] = body.data;
+      console.log(`💾 Stored settings under key: ${settingsKey}`, body.data);
+      
+      // Update Oracle global state if this is Oracle settings
+      if (body.title === 'Oracle Global Settings' && typeof body.data.enabled === 'boolean') {
+        setOracleState(body.data.enabled);
+        console.log('🔄 Updated Oracle global state:', body.data.enabled ? 'ENABLED' : 'DISABLED');
+      }
+    } else {
+      // Fallback: store the entire body
+      settingsKey = `${body.table || 'default'}_${body.title || 'settings'}`;
+      savedSettings[settingsKey] = body;
+      console.log(`💾 Stored full body under key: ${settingsKey}`);
     }
 
     // TODO: Implement actual Supabase MCP database operations
@@ -122,7 +141,8 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
         project_id: SUPABASE_PROJECT_ID,
         supabase_url: SUPABASE_URL,
-        saved_data: body
+        saved_data: body,
+        stored_key: settingsKey
       }
     };
     

@@ -1418,7 +1418,7 @@ export default function EnhancedBookmarkSettings() {
                       
                       <div className="flex items-center justify-between">
                         <div>
-                          <Label>Collaborative Playlist Invites</Label>
+                          <Label>Collaborative Playbook Invites</Label>
                           <p className="text-sm text-gray-500">When someone invites you to collaborate</p>
                         </div>
                         <Switch

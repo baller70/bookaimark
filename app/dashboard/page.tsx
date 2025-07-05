@@ -446,41 +446,43 @@ export default function Dashboard() {
     setIsClient(true)
   }, [])
 
-  // Load user profile picture as default logo from localStorage
+  // Load user profile picture from Supabase
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Always check for the latest profile avatar from settings
-      const savedSettings = localStorage.getItem('userSettings')
-      if (savedSettings) {
-        try {
-          const settings = JSON.parse(savedSettings)
-          if (settings.profile?.avatar) {
-            setUserDefaultLogo(settings.profile.avatar)
-            console.log('Profile avatar loaded as default bookmark logo:', settings.profile.avatar)
-          }
-        } catch (error) {
-          console.log('Error loading profile avatar as default logo:', error)
+    const loadProfileAvatar = async () => {
+      try {
+        // Skip Supabase authentication entirely - use localStorage only
+        console.log('Supabase authentication bypassed - loading profile from localStorage only')
+        
+        // Try all localStorage formats
+        const localAvatar = localStorage.getItem('dna_profile_avatar') || 
+                           localStorage.getItem('profilePicture')
+        
+        if (localAvatar) {
+          setUserDefaultLogo(localAvatar)
+          console.log('Profile avatar loaded from localStorage:', localAvatar)
+          return
         }
-      }
-      
-      // Listen for storage changes to update when settings change
-      const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === 'userSettings' && e.newValue) {
-          try {
-            const settings = JSON.parse(e.newValue)
-            if (settings.profile?.avatar) {
-              setUserDefaultLogo(settings.profile.avatar)
-              console.log('Profile avatar updated from settings change:', settings.profile.avatar)
-            }
-          } catch (error) {
-            console.log('Error updating profile avatar from storage change:', error)
-          }
+        
+        // Try userSettings format as well
+        const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}')
+        if (userSettings.profile?.avatar || userSettings.profile?.avatarUrl) {
+          const avatar = userSettings.profile.avatar || userSettings.profile.avatarUrl
+          setUserDefaultLogo(avatar)
+          console.log('Profile avatar loaded from userSettings:', avatar)
+          return
         }
+        
+        console.log('No profile avatar found in localStorage')
+      } catch (error) {
+        console.log('Error loading profile avatar from localStorage:', error)
       }
-      
-      window.addEventListener('storage', handleStorageChange)
-      return () => window.removeEventListener('storage', handleStorageChange)
     }
+    
+    loadProfileAvatar()
+    
+    // Poll for updates every 5 seconds to catch changes from DNA profile
+    const interval = setInterval(loadProfileAvatar, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   // Drag and drop sensors
