@@ -1,13 +1,12 @@
 # Dependencies
 node_modules/
 */node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Production builds
+# Next.js
 .next/
 out/
+
+# Production
 build/
 dist/
 
@@ -18,15 +17,44 @@ dist/
 .env.test.local
 .env.production.local
 
-# IDE files
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local development
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# Vercel
+.vercel
+
+# Sentry
+.sentryclirc
+
+# Supabase
+.supabase/
+
+# Misc
+*.log
+.temp/
+.cache/
 
 # OS generated files
-.DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
@@ -43,9 +71,6 @@ pids
 *.pid
 *.seed
 *.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
 
 # Dependency directories
 jspm_packages/

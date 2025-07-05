@@ -3,17 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --experimental-app-dir",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint --fix",
-    "lint:check": "next lint",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage",
+    "lint": "next lint --fix --dir frontend",
+    "lint:check": "next lint --dir frontend",
+    "test": "vitest --config config/vitest.config.ts",
+    "test:ui": "vitest --ui --config config/vitest.config.ts",
+    "test:coverage": "vitest --coverage --config config/vitest.config.ts",
     "clean": "rm -rf .next && rm -rf node_modules/.cache",
     "analyze": "ANALYZE=true npm run build",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit --project config/tsconfig.json"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

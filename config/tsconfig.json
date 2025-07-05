@@ -1,14 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "es5",
     "lib": [
       "dom",
       "dom.iterable",
-      "esnext"
+      "es6"
     ],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": false,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "incremental": true,
     "module": "esnext",
@@ -24,16 +25,24 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./frontend/*"],
+      "@/components/*": ["./frontend/components/*"],
+      "@/lib/*": ["./frontend/lib/*"],
+      "@/hooks/*": ["./frontend/hooks/*"],
+      "@/utils/*": ["./backend/utils/*"],
+      "@/types/*": ["./backend/types/*"]
     }
   },
   "include": [
     "next-env.d.ts",
-    ".next/types/**/*.ts",
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "frontend/**/*",
+    "backend/**/*"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "comments.disabled"
   ]
 }
