@@ -61,6 +61,7 @@ interface Preset {
   forceFolderId?: string | null;
   privacy: 'private' | 'public';
   autoCategorize: boolean;
+  autoPriority: boolean;
   duplicateHandling: 'skip' | 'overwrite' | 'keepBoth' | 'autoMerge';
 }
 
@@ -68,6 +69,7 @@ interface BulkUploaderPrefs {
   defaultBatchSize: 10 | 20 | 30 | 40;
   privacyDefault: 'private' | 'public';
   autoCategorizeDefault: boolean;
+  autoPriorityDefault: boolean;
   duplicateHandling: 'skip' | 'overwrite' | 'keepBoth' | 'autoMerge';
   backgroundModeDefault: boolean;
   presets: Record<string, Preset>;
@@ -87,6 +89,7 @@ const defaultPrefs: BulkUploaderPrefs = {
   defaultBatchSize: 20,
   privacyDefault: 'private',
   autoCategorizeDefault: true,
+  autoPriorityDefault: true,
   duplicateHandling: 'autoMerge',
   backgroundModeDefault: true,
   presets: {}
@@ -101,6 +104,7 @@ interface BulkUploaderState {
     forceFolderId: string | null;
     privacy: 'private' | 'public';
     autoCategorize: boolean;
+    autoPriority: boolean;
     duplicateHandling: 'skip' | 'overwrite' | 'keepBoth' | 'autoMerge';
     backgroundMode: boolean;
   };
@@ -318,6 +322,7 @@ const bulkUploaderReducer = (state: BulkUploaderState, action: BulkUploaderActio
           forceFolderId: null,
           privacy: state.prefs.privacyDefault,
           autoCategorize: state.prefs.autoCategorizeDefault,
+          autoPriority: state.prefs.autoPriorityDefault,
           duplicateHandling: state.prefs.duplicateHandling,
           backgroundMode: state.prefs.backgroundModeDefault
         },
@@ -1005,6 +1010,7 @@ const SidebarControls: React.FC = () => {
       forceFolderId: state.currentSettings.forceFolderId,
       privacy: state.currentSettings.privacy,
       autoCategorize: state.currentSettings.autoCategorize,
+      autoPriority: state.currentSettings.autoPriority,
       duplicateHandling: state.currentSettings.duplicateHandling
     };
 
@@ -1566,6 +1572,7 @@ const ImportButton: React.FC = () => {
           forceFolderId: state.currentSettings.forceFolderId,
           privacy: state.currentSettings.privacy,
           autoCategorize: state.currentSettings.autoCategorize,
+          autoPriority: state.currentSettings.autoPriority,
           duplicateHandling: state.currentSettings.duplicateHandling,
           backgroundMode: state.currentSettings.backgroundMode,
           language: 'english' // TODO: Get from user settings
@@ -1728,6 +1735,7 @@ const BulkUploaderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       forceFolderId: null,
       privacy: defaultPrefs.privacyDefault,
       autoCategorize: defaultPrefs.autoCategorizeDefault,
+      autoPriority: defaultPrefs.autoPriorityDefault,
       duplicateHandling: defaultPrefs.duplicateHandling,
       backgroundMode: defaultPrefs.backgroundModeDefault
     },
@@ -1764,7 +1772,7 @@ const BulkUploaderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } = await supabase.auth.getUser()
       if (user) {
         try {
-          const remote = await getAISetting<BulkUploaderPrefs>(user.id, 'bulk_uploader', defaultPrefs)
+          const remote = await getAISetting<BulkUploaderPrefs>(user.id, 'bulk_uploader')
           dispatch({ type: 'SET_PREFS', payload: remote })
         } catch (error) {
           console.error('Failed to load bulk uploader settings:', error)

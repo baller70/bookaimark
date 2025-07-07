@@ -19,9 +19,12 @@ interface BulkLink {
   linkType?: 'video' | 'doc' | 'pdf' | 'repo' | 'web';
   predictedTags: string[];
   predictedFolder: string;
+  predictedPriority?: 'low' | 'medium' | 'high';
   status: BulkLinkStatus;
   error?: string;
   selected: boolean;
+  aiNotes?: string;
+  aiSummary?: string;
 }
 
 interface BulkUploaderSettings {
@@ -30,6 +33,7 @@ interface BulkUploaderSettings {
   forceFolderId?: string | null;
   privacy: 'private' | 'public';
   autoCategorize: boolean;
+  autoPriority: boolean;
   duplicateHandling: 'skip' | 'overwrite' | 'keepBoth' | 'autoMerge';
   backgroundMode: boolean;
   language?: string;
@@ -56,6 +60,7 @@ interface BookmarkData {
   description: string;
   category: string;
   tags: string[];
+  priority: 'low' | 'medium' | 'high';
   ai_summary: string;
   ai_tags: string[];
   notes: string;
@@ -126,46 +131,65 @@ const validateUrl = (url: string): boolean => {
   }
 };
 
-const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings): Promise<{ tags: string[]; folder: string }> => {
+const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings): Promise<{ tags: string[]; folder: string; priority: 'low' | 'medium' | 'high' }> => {
   const hostname = new URL(url).hostname.toLowerCase();
   
   // Basic prediction based on URL patterns
   let tags: string[] = [];
   let folder = 'General';
+  let priority: 'low' | 'medium' | 'high' = 'medium'; // Default priority
 
-  // Domain-based categorization
+  // Domain-based categorization with priority assignment
   if (hostname.includes('github.com')) {
     tags.push('development', 'code', 'repository');
     folder = 'Development';
+    priority = 'high'; // Development resources are typically high priority
   } else if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
     tags.push('video', 'tutorial', 'media');
     folder = 'Videos';
+    priority = 'medium'; // Videos are medium priority
   } else if (hostname.includes('medium.com') || hostname.includes('dev.to') || hostname.includes('hashnode.com')) {
     tags.push('article', 'blog', 'reading');
     folder = 'Articles';
+    priority = 'medium'; // Articles are medium priority
   } else if (hostname.includes('stackoverflow.com') || hostname.includes('stackexchange.com')) {
     tags.push('qa', 'programming', 'help');
     folder = 'Development';
+    priority = 'high'; // Programming Q&A is high priority
   } else if (hostname.includes('docs.google.com') || hostname.includes('notion.so')) {
     tags.push('document', 'notes', 'collaboration');
     folder = 'Documents';
+    priority = 'high'; // Documentation is high priority
   } else if (hostname.includes('twitter.com') || hostname.includes('x.com') || hostname.includes('linkedin.com')) {
     tags.push('social', 'networking', 'discussion');
     folder = 'Social';
+    priority = 'low'; // Social media is low priority
   } else if (hostname.includes('reddit.com')) {
     tags.push('discussion', 'community', 'forum');
     folder = 'Forums';
+    priority = 'low'; // Forums are low priority
   }
 
   // AI-enhanced categorization if enabled
-  if (settings.autoCategorize) {
+  if (settings.autoCategorize || settings.autoPriority) {
     try {
-      const aiResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a URL categorization expert. Analyze the URL and provide relevant tags and folder suggestions.
+      const systemPrompt = settings.autoPriority 
+        ? `You are a URL categorization expert. Analyze the URL and provide relevant tags, folder suggestions, and priority assessment.
+            
+            Rules:
+            - Provide 2-5 relevant tags
+            - Suggest an appropriate folder name  
+            - Assign priority based on content importance and urgency:
+              * HIGH: Documentation, API references, critical tools, official guides, important repositories
+              * MEDIUM: Tutorials, articles, educational content, useful tools, general resources  
+              * LOW: Social media, entertainment, forums, casual reading, news
+            - Consider the domain, path, and URL structure
+            - Tags should be lowercase, single words or short phrases
+            - Folder should be a clear category name
+            - Respond in JSON format: {"tags": ["tag1", "tag2"], "folder": "FolderName", "priority": "high|medium|low"}
+            
+            Language preference: ${settings.language || 'english'}`
+        : `You are a URL categorization expert. Analyze the URL and provide relevant tags and folder suggestions.
             
             Rules:
             - Provide 2-5 relevant tags
@@ -175,7 +199,14 @@ const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings)
             - Folder should be a clear category name
             - Respond in JSON format: {"tags": ["tag1", "tag2"], "folder": "FolderName"}
             
-            Language preference: ${settings.language || 'english'}`
+            Language preference: ${settings.language || 'english'}`;
+
+      const aiResponse = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
           },
           {
             role: 'user',
@@ -193,6 +224,9 @@ const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings)
       if (aiResult.folder && typeof aiResult.folder === 'string') {
         folder = aiResult.folder;
       }
+      if (settings.autoPriority && aiResult.priority && ['low', 'medium', 'high'].includes(aiResult.priority)) {
+        priority = aiResult.priority;
+      }
     } catch (error) {
       console.warn('AI categorization failed:', error);
       // Continue with basic categorization
@@ -209,7 +243,7 @@ const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings)
     folder = settings.forceFolderId;
   }
 
-  return { tags: [...new Set(tags)], folder };
+  return { tags: [...new Set(tags)], folder, priority };
 };
 
 const fetchMetadata = async (url: string): Promise<{ title?: string; description?: string }> => {
@@ -238,6 +272,134 @@ const fetchMetadata = async (url: string): Promise<{ title?: string; description
     return { title, description };
   } catch (error) {
     console.warn(`Failed to fetch metadata for ${url}:`, error);
+    return {};
+  }
+};
+
+const analyzeWebsiteContentWithAI = async (url: string, html: string, settings: BulkUploaderSettings): Promise<{
+  title?: string;
+  description?: string;
+  aiSummary?: string;
+  aiTags?: string[];
+  aiCategory?: string;
+  aiNotes?: string;
+}> => {
+  try {
+    // Extract text content from HTML (remove scripts, styles, etc.)
+    const textContent = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 8000); // Limit content to avoid token limits
+
+    // Extract metadata
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : undefined;
+
+    const descMatch = html.match(/<meta[^>]*name=['"](description|og:description)['"'][^>]*content=['"']([^'"]*)['"']/i);
+    const description = descMatch ? descMatch[2].trim() : undefined;
+
+    // Use AI to analyze the content
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert content analyzer for bookmark management. Analyze the website content and provide comprehensive categorization and insights.
+
+Your task:
+1. Generate a concise summary (2-3 sentences) of what this website/page is about
+2. Suggest 3-6 relevant tags for categorization (lowercase, single words or short phrases)
+3. Determine the most appropriate folder/category
+4. Create helpful notes highlighting key points or why this might be bookmarked
+
+Guidelines:
+- Tags should be specific and useful for searching/filtering
+- Folder should be a clear, broad category (e.g., "Development", "Articles", "Tools", "Resources", "Documentation")
+- Notes should be actionable and highlight key value propositions
+- Consider the user's likely intent for bookmarking this content
+- Language preference: ${settings.language || 'english'}
+
+Respond in JSON format:
+{
+  "summary": "Brief description of the content",
+  "tags": ["tag1", "tag2", "tag3"],
+  "category": "FolderName", 
+  "notes": "Key insights and why this is worth bookmarking"
+}`
+        },
+        {
+          role: 'user',
+          content: `URL: ${url}
+Title: ${title || 'No title'}
+Description: ${description || 'No description'}
+
+Content preview:
+${textContent.substring(0, 3000)}...`
+        }
+      ],
+      max_tokens: 500,
+      temperature: 0.3,
+    });
+
+    const aiResult = JSON.parse(aiResponse.choices[0].message.content || '{}');
+    
+    return {
+      title,
+      description,
+      aiSummary: aiResult.summary || undefined,
+      aiTags: Array.isArray(aiResult.tags) ? aiResult.tags : [],
+      aiCategory: aiResult.category || undefined,
+      aiNotes: aiResult.notes || undefined
+    };
+
+  } catch (error) {
+    console.warn(`AI content analysis failed for ${url}:`, error);
+    // Fall back to basic metadata extraction
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : undefined;
+
+    const descMatch = html.match(/<meta[^>]*name=['"](description|og:description)['"'][^>]*content=['"']([^'"]*)['"']/i);
+    const description = descMatch ? descMatch[2].trim() : undefined;
+
+    return { title, description };
+  }
+};
+
+const fetchEnhancedMetadata = async (url: string, settings: BulkUploaderSettings): Promise<{
+  title?: string;
+  description?: string;
+  aiSummary?: string;
+  aiTags?: string[];
+  aiCategory?: string;
+  aiNotes?: string;
+}> => {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LinkBot/1.0)',
+      },
+      signal: AbortSignal.timeout(15000), // 15 second timeout for AI analysis
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    
+    // Use AI-powered analysis if auto-categorize is enabled
+    if (settings.autoCategorize) {
+      return await analyzeWebsiteContentWithAI(url, html, settings);
+    } else {
+      // Fall back to basic metadata extraction
+      return await fetchMetadata(url);
+    }
+    
+  } catch (error) {
+    console.warn(`Failed to fetch enhanced metadata for ${url}:`, error);
     return {};
   }
 };
@@ -279,12 +441,13 @@ const saveLinksToDatabase = async (userId: string, links: BulkLink[]) => {
         user_id: userId,
         title: link.title || new URL(link.url).hostname,
         url: link.url,
-        description: link.notes || `${link.linkType} resource - ${link.predictedTags.join(', ')}`,
+        description: link.aiSummary || link.notes || `${link.linkType} resource - ${link.predictedTags.join(', ')}`,
         category: link.predictedFolder,
         tags: link.predictedTags,
-        ai_summary: `Auto-categorized ${link.linkType} resource`,
+        priority: link.predictedPriority || 'medium',
+        ai_summary: link.aiSummary || `Auto-categorized ${link.linkType} resource`,
         ai_tags: link.predictedTags,
-        notes: link.notes || '',
+        notes: link.aiNotes || link.notes || '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -387,6 +550,7 @@ export async function POST(request: NextRequest) {
           batchSize: 20,
           privacy: 'private',
           autoCategorize: true,
+          autoPriority: true,
           duplicateHandling: 'autoMerge',
           backgroundMode: false,
           language: 'english',
@@ -470,19 +634,43 @@ export async function POST(request: NextRequest) {
                 // For other duplicate handling strategies, continue processing
               }
 
-              // Fetch metadata
-              const metadata = await fetchMetadata(cleanedUrl);
-              if (metadata.title) {
-                bulkLink.title = metadata.title;
+              // Fetch enhanced metadata with AI analysis
+              const enhancedMetadata = await fetchEnhancedMetadata(cleanedUrl, processingSettings);
+              
+              // Update title and description from AI analysis
+              if (enhancedMetadata.title && !bulkLink.title) {
+                bulkLink.title = enhancedMetadata.title;
               }
-              if (metadata.description && !bulkLink.notes) {
-                bulkLink.notes = metadata.description;
+              
+              // Set description/notes from AI analysis
+              if (enhancedMetadata.aiSummary) {
+                bulkLink.notes = enhancedMetadata.aiSummary;
+              } else if (enhancedMetadata.description && !bulkLink.notes) {
+                bulkLink.notes = enhancedMetadata.description;
               }
 
-              // Predict tags and folder
-              const { tags, folder } = await predictTagsAndFolder(cleanedUrl, processingSettings);
-              bulkLink.predictedTags = tags;
-              bulkLink.predictedFolder = folder;
+              // Use AI-generated tags and folder if available, or fall back to basic prediction
+              const prediction = await predictTagsAndFolder(cleanedUrl, processingSettings);
+              
+              if (enhancedMetadata.aiTags && enhancedMetadata.aiTags.length > 0) {
+                bulkLink.predictedTags = enhancedMetadata.aiTags;
+              } else {
+                bulkLink.predictedTags = prediction.tags;
+              }
+              
+              if (enhancedMetadata.aiCategory) {
+                bulkLink.predictedFolder = enhancedMetadata.aiCategory;
+              } else {
+                bulkLink.predictedFolder = prediction.folder;
+              }
+              
+              // Set priority from prediction (AI or basic)
+              bulkLink.predictedPriority = prediction.priority;
+
+              // Store AI-generated notes for later use
+              if (enhancedMetadata.aiNotes) {
+                bulkLink.aiNotes = enhancedMetadata.aiNotes;
+              }
 
               bulkLink.status = 'processed'; // Will be set to 'saved' after database insertion
               return bulkLink;

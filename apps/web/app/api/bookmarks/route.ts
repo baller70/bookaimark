@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 
 // File-based storage for persistent bookmarks (until Supabase credentials are fixed)
-const BOOKMARKS_FILE = join(process.cwd(), '..', '..', 'data', 'bookmarks.json');
+const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
 
 interface Bookmark {
   id: number;
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     
     // Transform bookmarks to match frontend format
     const transformedBookmarks = userBookmarks.map((bookmark, index) => ({
-      id: index + 1,
+      id: bookmark.id,
       title: bookmark.title?.toUpperCase() || 'UNTITLED',
       url: bookmark.url,
       description: bookmark.description || 'No description available',

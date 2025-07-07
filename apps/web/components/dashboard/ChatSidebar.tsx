@@ -6,8 +6,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+// Custom SVG component to prevent hydration errors
+const SendIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+  </svg>
+)
 
 interface Message {
   id: string
@@ -219,7 +225,7 @@ export function ChatSidebar() {
               size="icon"
               className="bg-blue-600 hover:bg-blue-700"
             >
-              <Send className="h-4 w-4" />
+              <SendIcon className="h-4 w-4" />
             </Button>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">

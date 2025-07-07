@@ -230,5 +230,433 @@
     "notes": "Run open-source machine learning models with a cloud API",
     "created_at": "2025-07-07T00:53:59.198Z",
     "updated_at": "2025-07-07T00:53:59.198Z"
+  },
+  {
+    "id": 12,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Rise as One AAU Basketball &#8211; One Team One Rise",
+    "url": "https://riseasoneaau.com/",
+    "description": "web resource - community, events, education",
+    "category": "Community Engagement",
+    "tags": [
+      "community",
+      "events",
+      "education"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "community",
+      "events",
+      "education"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T07:55:20.258Z",
+    "updated_at": "2025-07-07T07:55:20.258Z"
+  },
+  {
+    "id": 13,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Elite Basketball Training in Sparta, NJ | The Basketball Factory Inc",
+    "url": "https://thebasketballfactoryinc.com/",
+    "description": "web resource - basketball, training, sports",
+    "category": "Basketball Training",
+    "tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T07:55:20.258Z",
+    "updated_at": "2025-07-07T07:55:20.258Z"
+  },
+  {
+    "id": 14,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Home | TBF Skillz",
+    "url": "https://tbfskillz.com/",
+    "description": "PRO SKILL DEVELOPMENT PRODUCTS",
+    "category": "Gaming",
+    "tags": [
+      "gaming",
+      "skills",
+      "community"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "gaming",
+      "skills",
+      "community"
+    ],
+    "notes": "PRO SKILL DEVELOPMENT PRODUCTS",
+    "created_at": "2025-07-07T07:55:20.259Z",
+    "updated_at": "2025-07-07T07:55:20.259Z"
+  },
+  {
+    "id": 15,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Rise as One AAU Basketball &#8211; One Team One Rise",
+    "url": "https://riseasoneaau.com/",
+    "description": "web resource - community, events, education",
+    "category": "Community Engagement",
+    "tags": [
+      "community",
+      "events",
+      "education"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "community",
+      "events",
+      "education"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T08:10:09.110Z",
+    "updated_at": "2025-07-07T08:10:09.110Z"
+  },
+  {
+    "id": 16,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Elite Basketball Training in Sparta, NJ | The Basketball Factory Inc",
+    "url": "https://thebasketballfactoryinc.com/",
+    "description": "web resource - ",
+    "category": "General",
+    "tags": [],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [],
+    "notes": "",
+    "created_at": "2025-07-07T08:10:09.110Z",
+    "updated_at": "2025-07-07T08:10:09.110Z"
+  },
+  {
+    "id": 17,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Home | TBF Skillz",
+    "url": "https://tbfskillz.com/",
+    "description": "PRO SKILL DEVELOPMENT PRODUCTS",
+    "category": "Gaming",
+    "tags": [
+      "gaming",
+      "skills",
+      "community"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "gaming",
+      "skills",
+      "community"
+    ],
+    "notes": "PRO SKILL DEVELOPMENT PRODUCTS",
+    "created_at": "2025-07-07T08:10:09.110Z",
+    "updated_at": "2025-07-07T08:10:09.110Z"
+  },
+  {
+    "id": 18,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Rise as One AAU Basketball &#8211; One Team One Rise",
+    "url": "https://riseasoneaau.com/",
+    "description": "web resource - community, wellness, events",
+    "category": "Health and Wellness",
+    "tags": [
+      "community",
+      "wellness",
+      "events"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "community",
+      "wellness",
+      "events"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T08:43:42.772Z",
+    "updated_at": "2025-07-07T08:43:42.772Z"
+  },
+  {
+    "id": 19,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Elite Basketball Training in Sparta, NJ | The Basketball Factory Inc",
+    "url": "https://thebasketballfactoryinc.com/",
+    "description": "web resource - basketball, training, sports",
+    "category": "Basketball Training",
+    "tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T08:43:42.772Z",
+    "updated_at": "2025-07-07T08:43:42.772Z"
+  },
+  {
+    "id": 20,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Home | TBF Skillz",
+    "url": "https://tbfskillz.com/",
+    "description": "TBF Skillz is a website dedicated to providing premium basketball training equipment designed to enhance athletes' skills through innovative technology. The site offers a range of products aimed at improving performance and precision for basketball players of all levels.",
+    "category": "Resources",
+    "tags": [
+      "basketball",
+      "training",
+      "equipment",
+      "skill development",
+      "athletics"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "basketball",
+      "training",
+      "equipment",
+      "skill development",
+      "athletics"
+    ],
+    "notes": "This website is valuable for athletes and coaches looking for high-quality training aids to improve basketball skills. The focus on advanced technology and premium materials makes it a reliable source for performance enhancement. Bookmarking this site can provide easy access to innovative training solutions and updates on new products.",
+    "created_at": "2025-07-07T08:43:42.772Z",
+    "updated_at": "2025-07-07T08:43:42.772Z"
+  },
+  {
+    "id": 21,
+    "user_id": "dev-user-123",
+    "title": "GitHub · Build and ship software on a single, collaborative platform · GitHub",
+    "url": "https://github.com/",
+    "description": "GitHub is where people build software. More than 150 million people use GitHub to discover, fork, and contribute to over 420 million projects.",
+    "category": "Development",
+    "tags": [
+      "development",
+      "code",
+      "repository"
+    ],
+    "ai_summary": "Auto-categorized repo resource",
+    "ai_tags": [
+      "development",
+      "code",
+      "repository"
+    ],
+    "notes": "GitHub is where people build software. More than 150 million people use GitHub to discover, fork, and contribute to over 420 million projects.",
+    "created_at": "2025-07-07T08:52:34.319Z",
+    "updated_at": "2025-07-07T08:52:34.319Z"
+  },
+  {
+    "id": 22,
+    "user_id": "dev-user-123",
+    "title": "Newest Questions - Stack Overflow",
+    "url": "https://stackoverflow.com/",
+    "description": "web resource - qa, programming, help, questions, community",
+    "category": "developer_resources",
+    "tags": [
+      "qa",
+      "programming",
+      "help",
+      "questions",
+      "community"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "qa",
+      "programming",
+      "help",
+      "questions",
+      "community"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T08:54:27.564Z",
+    "updated_at": "2025-07-07T08:54:27.564Z"
+  },
+  {
+    "id": 25,
+    "user_id": "dev-user-123",
+    "title": "GitHub Docs",
+    "url": "https://docs.github.com/",
+    "description": "Official documentation",
+    "category": "Technical Resources",
+    "tags": [
+      "development",
+      "code",
+      "repository",
+      "documentation",
+      "github"
+    ],
+    "ai_summary": "Auto-categorized repo resource",
+    "ai_tags": [
+      "development",
+      "code",
+      "repository",
+      "documentation",
+      "github"
+    ],
+    "notes": "Official documentation",
+    "created_at": "2025-07-07T08:59:19.174Z",
+    "updated_at": "2025-07-07T08:59:19.175Z"
+  },
+  {
+    "id": 33,
+    "user_id": "dev-user-123",
+    "title": "Rise as One AAU Basketball &#8211; One Team One Rise",
+    "url": "https://riseasoneaau.com/",
+    "description": "web resource - community, wellness, support",
+    "category": "Organizations",
+    "tags": [
+      "community",
+      "wellness",
+      "support"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "community",
+      "wellness",
+      "support"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T09:10:27.226Z",
+    "updated_at": "2025-07-07T09:10:27.226Z"
+  },
+  {
+    "id": 34,
+    "user_id": "dev-user-123",
+    "title": "Elite Basketball Training in Sparta, NJ | The Basketball Factory Inc",
+    "url": "https://thebasketballfactoryinc.com/",
+    "description": "web resource - basketball, training, sports",
+    "category": "Basketball Training",
+    "tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T09:10:27.227Z",
+    "updated_at": "2025-07-07T09:10:27.227Z"
+  },
+  {
+    "id": 35,
+    "user_id": "dev-user-123",
+    "title": "Home | TBF Skillz",
+    "url": "https://tbfskillz.com/",
+    "description": "TBF Skillz offers premium basketball training equipment designed to enhance athletes' skills through innovative technology. Their products focus on improving performance and precision for players at all levels, particularly Division I athletes.",
+    "category": "Resources",
+    "tags": [
+      "basketball",
+      "training",
+      "equipment",
+      "skill development",
+      "athletes"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "basketball",
+      "training",
+      "equipment",
+      "skill development",
+      "athletes"
+    ],
+    "notes": "This website is valuable for athletes looking to improve their basketball skills with high-quality training aids. The focus on cutting-edge technology and premium materials makes it a go-to resource for serious players. Bookmarking this site can provide access to specialized training tools and insights into skill enhancement.",
+    "created_at": "2025-07-07T09:10:27.227Z",
+    "updated_at": "2025-07-07T09:10:27.227Z"
+  },
+  {
+    "id": 36,
+    "user_id": "dev-user-123",
+    "title": "React Documentation",
+    "url": "https://docs.react.dev/",
+    "description": "Official React docs with priority test",
+    "category": "General",
+    "tags": [],
+    "priority": "medium",
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [],
+    "notes": "Official React docs with priority test",
+    "created_at": "2025-07-07T09:58:28.624Z",
+    "updated_at": "2025-07-07T09:58:28.624Z"
+  },
+  {
+    "id": 37,
+    "user_id": "dev-user-123",
+    "title": "React GitHub Repository",
+    "url": "https://github.com/facebook/react",
+    "description": "Official React repository with priority test",
+    "category": "Development",
+    "tags": [
+      "development",
+      "code",
+      "repository"
+    ],
+    "priority": "high",
+    "ai_summary": "Auto-categorized repo resource",
+    "ai_tags": [
+      "development",
+      "code",
+      "repository"
+    ],
+    "notes": "Official React repository with priority test",
+    "created_at": "2025-07-07T09:58:51.597Z",
+    "updated_at": "2025-07-07T09:58:51.597Z"
+  },
+  {
+    "id": 38,
+    "user_id": "dev-user-123",
+    "title": "React Twitter Account",
+    "url": "https://twitter.com/reactjs",
+    "description": "React official Twitter with priority test",
+    "category": "Social",
+    "tags": [
+      "social",
+      "networking",
+      "discussion"
+    ],
+    "priority": "low",
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "social",
+      "networking",
+      "discussion"
+    ],
+    "notes": "React official Twitter with priority test",
+    "created_at": "2025-07-07T09:59:12.353Z",
+    "updated_at": "2025-07-07T09:59:12.353Z"
+  },
+  {
+    "id": 39,
+    "user_id": "dev-user-123",
+    "title": "Next.js GitHub Repository",
+    "url": "https://github.com/vercel/next.js",
+    "description": "Testing basic priority without AI",
+    "category": "Web Development Frameworks",
+    "tags": [
+      "development",
+      "code",
+      "repository",
+      "next.js",
+      "framework",
+      "github"
+    ],
+    "priority": "high",
+    "ai_summary": "Auto-categorized repo resource",
+    "ai_tags": [
+      "development",
+      "code",
+      "repository",
+      "next.js",
+      "framework",
+      "github"
+    ],
+    "notes": "Testing basic priority without AI",
+    "created_at": "2025-07-07T10:00:13.466Z",
+    "updated_at": "2025-07-07T10:00:13.466Z"
   }
 ]

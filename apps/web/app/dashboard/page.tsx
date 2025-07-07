@@ -6,13 +6,16 @@ import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
+
 import { 
   Search, 
   Plus, 
@@ -58,7 +61,36 @@ import {
   ChevronRight,
   BookmarkIcon as BookmarkIconLucide,
   Building,
-  Columns
+  Columns,
+  FileText,
+  Settings,
+  Users,
+  TestTube,
+  GraduationCap,
+  Rocket,
+  Zap,
+  ShoppingCart,
+  PieChart,
+  Code,
+  Palette,
+  Database,
+  Shield,
+  Smartphone,
+  Monitor,
+  CheckCircle,
+  ArrowRight,
+  PlayCircle,
+  BarChart3,
+  Lightbulb,
+  Layers,
+  Cloud,
+  BookOpen,
+  Workflow,
+  ClipboardCheck,
+  Users2,
+  TrendingDown,
+  Filter as FilterIcon,
+  RotateCcw
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -300,6 +332,12 @@ export default function Dashboard() {
   const [activeBookmarkTab, setActiveBookmarkTab] = useState('overview');
   const [hasVisitedMediaTab, setHasVisitedMediaTab] = useState(false);
 
+  // ARP (Application Requirements Document) template system state
+  const [arpSelectedTemplate, setArpSelectedTemplate] = useState('developer');
+  const [arpCompletedSteps, setArpCompletedSteps] = useState<string[]>([]);
+  const [arpCurrentStep, setArpCurrentStep] = useState(0);
+  const [arpShowAllSteps, setArpShowAllSteps] = useState(false);
+
   // State for mock folders used in Folder 2.0 and Goal 2.0 views
   const [mockFolders, setMockFolders] = useState([
     {
@@ -470,8 +508,8 @@ export default function Dashboard() {
       const profilePicture = getProfilePicture()
       setUserDefaultLogo(profilePicture)
       console.log('Profile picture loaded:', profilePicture)
-    }
-    
+        }
+        
     // Load initial profile picture
     loadProfilePicture()
     
@@ -3376,8 +3414,9 @@ export default function Dashboard() {
               </DialogHeader>
 
               <Tabs value={activeBookmarkTab} onValueChange={handleTabChange} className="mt-6">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="overview">OVERVIEW</TabsTrigger>
+                  <TabsTrigger value="arp">ARP</TabsTrigger>
                   <TabsTrigger value="notification">NOTIFICATION</TabsTrigger>
                   <TabsTrigger value="timer">TIMER</TabsTrigger>
                   <TabsTrigger value="media">MEDIA</TabsTrigger>
@@ -3634,98 +3673,9 @@ export default function Dashboard() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex items-center space-x-2 hover:bg-gray-50"
                         onClick={() => {
-                          // Add functionality to add new related bookmark
-                          showNotification('Add related bookmark functionality coming soon!')
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                        <span>ADD RELATED</span>
-                      </Button>
-                    </div>
-
-                    {/* Related Bookmarks Grid with Drag and Drop */}
-                    <ClientOnlyDndProvider>
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={(event) => {
-                          // Handle drag end for related bookmarks
-                          const { active, over } = event
-                          if (active.id !== over?.id) {
-                            showNotification('Related bookmark reordered!')
-                          }
-                        }}
-                      >
-                        <SortableContext items={filteredBookmarks.slice(0, 4).map(b => `related-${b.id}`)} strategy={rectSortingStrategy}>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {filteredBookmarks.slice(0, 4).map((bookmark) => (
-                              <div key={`related-${bookmark.id}`} className="relative group">
-                                {/* Drag Handle for Related Bookmarks */}
-                                <div className="absolute top-2 left-2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105">
-                                  <GripVertical className="h-4 w-4 text-gray-700" />
-                                </div>
-                                
-                                <Card className="p-4 hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-300 hover:border-blue-400 bg-gradient-to-br from-white via-gray-50/20 to-white backdrop-blur-sm shadow-sm hover:shadow-blue-500/10">
-                                  <div className="flex items-start space-x-3">
-                                    {/* Circular Image */}
-                                    <div className="flex-shrink-0">
-                                      <img
-                                        src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg"}
-                                        alt={`${bookmark.title} image`}
-                                        className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50"
-                                      />
-                                    </div>
-                                    
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="font-semibold text-sm text-gray-900 truncate font-audiowide uppercase mb-1">
-                                        {bookmark.title}
-                                      </h4>
-                                      <p className="text-xs text-gray-600 truncate mb-2">
-                                        {bookmark.description}
-                                      </p>
-                                      <div className="flex items-center justify-between">
-                                        <Badge variant="outline" className="text-xs bg-white/50 border-gray-300/50">
-                                          {bookmark.category}
-                                        </Badge>
-                                        <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                          <Eye className="h-3 w-3" />
-                                          <span>{bookmark.visits}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Remove Button */}
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-600"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        showNotification('Related bookmark removed!')
-                                      }}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </Card>
-                              </div>
-                            ))}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    </ClientOnlyDndProvider>
-
-                    {/* Add More Related Bookmarks */}
-                    <div className="mt-4 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                        onClick={() => {
-                          showNotification('Browse all bookmarks to add more relations!')
+                          console.log('Opening browse all bookmarks modal');
+                          // Add logic to open browse all bookmarks modal
                         }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -3735,7 +3685,720 @@ export default function Dashboard() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="notification" className="space-y-6">
+                <TabsContent value="arp" className="space-y-6">
+                  {(() => {
+                    // Analyze bookmark URL to determine website type and suggest appropriate workflow
+                    const getWebsiteType = (url: string): string => {
+                      const domain = url.toLowerCase();
+                      
+                      // Development & Technical
+                      if (domain.includes('github.com') || domain.includes('stackoverflow.com') || 
+                          domain.includes('developer.mozilla.org') || domain.includes('docs.') ||
+                          domain.includes('api.') || domain.includes('codepen.io') ||
+                          domain.includes('jsfiddle.net') || domain.includes('replit.com')) {
+                        return 'developer';
+                      }
+                      
+                      // Design & Creative
+                      if (domain.includes('dribbble.com') || domain.includes('behance.net') ||
+                          domain.includes('figma.com') || domain.includes('adobe.com') ||
+                          domain.includes('canva.com') || domain.includes('unsplash.com') ||
+                          domain.includes('pexels.com') || domain.includes('pinterest.com')) {
+                        return 'creative';
+                      }
+                      
+                      // Business & Analytics
+                      if (domain.includes('linkedin.com') || domain.includes('crunchbase.com') ||
+                          domain.includes('bloomberg.com') || domain.includes('forbes.com') ||
+                          domain.includes('analytics.google.com') || domain.includes('salesforce.com') ||
+                          domain.includes('hubspot.com') || domain.includes('tableau.com')) {
+                        return 'business';
+                      }
+                      
+                      // Learning & Education
+                      if (domain.includes('coursera.org') || domain.includes('udemy.com') ||
+                          domain.includes('edx.org') || domain.includes('khanacademy.org') ||
+                          domain.includes('pluralsight.com') || domain.includes('youtube.com') ||
+                          domain.includes('wikipedia.org') || domain.includes('medium.com')) {
+                        return 'learning';
+                      }
+                      
+                      // Sync & Development Infrastructure
+                      if (domain.includes('supabase.com') || domain.includes('github.com') ||
+                          domain.includes('gitlab.com') || domain.includes('bitbucket.org') ||
+                          domain.includes('vercel.com') || domain.includes('netlify.com') ||
+                          domain.includes('firebase.google.com') || domain.includes('aws.amazon.com') ||
+                          domain.includes('heroku.com') || domain.includes('digitalocean.com')) {
+                        return 'sync';
+                      }
+                      
+                      // Default to productivity for general websites
+                      return 'productivity';
+                    };
+
+                    const websiteType = getWebsiteType(selectedBookmark.url);
+
+                    // Define the 5 professional bookmark workflow templates
+                    const templates = {
+                      'developer': {
+                        title: '💻 Developer Resource Workflow',
+                        description: 'Optimize how you save and organize development resources',
+                        color: 'from-blue-500 to-purple-600',
+                        icon: Code,
+                        steps: [
+                          {
+                            id: 'categorize-resource',
+                            title: 'Categorize This Resource',
+                            description: 'Tag this bookmark with relevant development categories',
+                            icon: Tag,
+                            time: '1 min',
+                            action: 'Add Tags',
+                            details: [
+                              'Add programming language tags (JavaScript, Python, etc.)',
+                              'Include framework/library tags (React, Node.js, etc.)',
+                              'Mark resource type (documentation, tutorial, tool)'
+                            ]
+                          },
+                          {
+                            id: 'set-priority',
+                            title: 'Set Learning Priority',
+                            description: 'Prioritize this resource in your learning queue',
+                            icon: Target,
+                            time: '30 sec',
+                            action: 'Set Priority',
+                            details: [
+                              'High: Need to learn immediately',
+                              'Medium: Learn within this month',
+                              'Low: Reference for future projects'
+                            ]
+                          },
+                          {
+                            id: 'create-project-folder',
+                            title: 'Organize by Project',
+                            description: 'Link this resource to relevant projects',
+                            icon: FolderIcon,
+                            time: '1 min',
+                            action: 'Organize',
+                            details: [
+                              'Create project-specific folders',
+                              'Group by technology stack',
+                              'Separate learning vs reference materials'
+                            ]
+                          },
+                          {
+                            id: 'schedule-review',
+                            title: 'Schedule Review Time',
+                            description: 'Set reminders to revisit this resource',
+                            icon: Clock,
+                            time: '30 sec',
+                            action: 'Set Reminder',
+                            details: [
+                              'Daily: For current learning materials',
+                              'Weekly: For important references',
+                              'Monthly: For general resources'
+                            ]
+                          }
+                        ]
+                      },
+                      'productivity': {
+                        title: '⚡ Productivity Resource Workflow',
+                        description: 'Maximize efficiency with this productivity resource',
+                        color: 'from-green-500 to-emerald-600',
+                        icon: Zap,
+                        steps: [
+                          {
+                            id: 'assess-usefulness',
+                            title: 'Assess Resource Value',
+                            description: 'Evaluate how this tool/resource fits your workflow',
+                            icon: CheckCircle,
+                            time: '2 min',
+                            action: 'Evaluate',
+                            details: [
+                              'Rate usefulness (1-5 stars)',
+                              'Identify specific use cases',
+                              'Compare with current tools'
+                            ]
+                          },
+                          {
+                            id: 'integration-plan',
+                            title: 'Plan Integration',
+                            description: 'Determine how to incorporate this into daily routine',
+                            icon: Workflow,
+                            time: '3 min',
+                            action: 'Plan Usage',
+                            details: [
+                              'Schedule trial period',
+                              'Define success metrics',
+                              'Set implementation timeline'
+                            ]
+                          },
+                          {
+                            id: 'track-results',
+                            title: 'Track Results',
+                            description: 'Monitor impact on your productivity',
+                            icon: BarChart3,
+                            time: '1 min',
+                            action: 'Set Tracking',
+                            details: [
+                              'Create productivity metrics',
+                              'Schedule periodic reviews',
+                              'Document improvements'
+                            ]
+                          },
+                          {
+                            id: 'share-insights',
+                            title: 'Share with Team',
+                            description: 'Share valuable tools with colleagues',
+                            icon: Users2,
+                            time: '2 min',
+                            action: 'Share Resource',
+                            details: [
+                              'Write brief review',
+                              'Tag team members',
+                              'Create usage guidelines'
+                            ]
+                          }
+                        ]
+                      },
+                      'creative': {
+                        title: '🎨 Creative Resource Workflow',
+                        description: 'Organize and utilize creative inspiration effectively',
+                        color: 'from-purple-500 to-pink-600',
+                        icon: Palette,
+                        steps: [
+                          {
+                            id: 'inspiration-category',
+                            title: 'Categorize Inspiration',
+                            description: 'Tag this creative resource appropriately',
+                            icon: Tag,
+                            time: '1 min',
+                            action: 'Categorize',
+                            details: [
+                              'Add style tags (minimalist, vintage, modern)',
+                              'Include medium type (web, print, illustration)',
+                              'Mark inspiration level (high, medium, reference)'
+                            ]
+                          },
+                          {
+                            id: 'mood-board',
+                            title: 'Add to Mood Board',
+                            description: 'Organize into project-specific collections',
+                            icon: Layers,
+                            time: '2 min',
+                            action: 'Organize',
+                            details: [
+                              'Create project mood boards',
+                              'Group by color palette',
+                              'Separate by design phase'
+                            ]
+                          },
+                          {
+                            id: 'analyze-elements',
+                            title: 'Analyze Design Elements',
+                            description: 'Document what makes this design effective',
+                            icon: Eye,
+                            time: '3 min',
+                            action: 'Analyze',
+                            details: [
+                              'Note color schemes',
+                              'Identify typography choices',
+                              'Document layout principles'
+                            ]
+                          },
+                          {
+                            id: 'apply-learnings',
+                            title: 'Plan Application',
+                            description: 'Schedule how to use this inspiration',
+                            icon: CheckCircle,
+                            time: '2 min',
+                            action: 'Plan Usage',
+                            details: [
+                              'Link to current projects',
+                              'Set review reminders',
+                              'Share with design team'
+                            ]
+                          }
+                        ]
+                      },
+                      'business': {
+                        title: '📊 Business Resource Workflow',
+                        description: 'Strategic approach to business resource management',
+                        color: 'from-orange-500 to-red-600',
+                        icon: Building,
+                        steps: [
+                          {
+                            id: 'business-value',
+                            title: 'Assess Business Value',
+                            description: 'Evaluate strategic importance of this resource',
+                            icon: TrendingUp,
+                            time: '2 min',
+                            action: 'Evaluate',
+                            details: [
+                              'Rate strategic importance (1-5)',
+                              'Identify business impact areas',
+                              'Assess implementation complexity'
+                            ]
+                          },
+                          {
+                            id: 'stakeholder-relevance',
+                            title: 'Identify Stakeholders',
+                            description: 'Determine who should know about this resource',
+                            icon: Users,
+                            time: '2 min',
+                            action: 'Tag Stakeholders',
+                            details: [
+                              'Tag relevant team members',
+                              'Identify decision makers',
+                              'Note permission levels needed'
+                            ]
+                          },
+                          {
+                            id: 'implementation-plan',
+                            title: 'Create Action Plan',
+                            description: 'Develop implementation or usage strategy',
+                            icon: ClipboardCheck,
+                            time: '3 min',
+                            action: 'Plan Implementation',
+                            details: [
+                              'Define next steps',
+                              'Set timeline milestones',
+                              'Allocate required resources'
+                            ]
+                          },
+                          {
+                            id: 'track-outcomes',
+                            title: 'Monitor Results',
+                            description: 'Track business impact and ROI',
+                            icon: BarChart3,
+                            time: '1 min',
+                            action: 'Set Tracking',
+                            details: [
+                              'Define success metrics',
+                              'Schedule progress reviews',
+                              'Document lessons learned'
+                            ]
+                          }
+                        ]
+                      },
+                      'learning': {
+                        title: '📚 Learning Resource Workflow',
+                        description: 'Systematic approach to educational content',
+                        color: 'from-indigo-500 to-purple-600',
+                        icon: BookOpen,
+                        steps: [
+                          {
+                            id: 'assess-difficulty',
+                            title: 'Assess Learning Level',
+                            description: 'Determine complexity and prerequisites',
+                            icon: GraduationCap,
+                            time: '2 min',
+                            action: 'Assess Level',
+                            details: [
+                              'Rate difficulty (Beginner/Intermediate/Advanced)',
+                              'Identify prerequisites needed',
+                              'Estimate time investment required'
+                            ]
+                          },
+                          {
+                            id: 'create-learning-path',
+                            title: 'Build Learning Path',
+                            description: 'Structure this resource in your learning journey',
+                            icon: GitBranch,
+                            time: '3 min',
+                            action: 'Plan Learning',
+                            details: [
+                              'Link to related resources',
+                              'Set learning sequence order',
+                              'Define completion criteria'
+                            ]
+                          },
+                          {
+                            id: 'schedule-study',
+                            title: 'Schedule Study Time',
+                            description: 'Block time for focused learning',
+                            icon: Clock,
+                            time: '1 min',
+                            action: 'Schedule',
+                            details: [
+                              'Set dedicated study sessions',
+                              'Create progress checkpoints',
+                              'Plan review intervals'
+                            ]
+                          },
+                          {
+                            id: 'track-progress',
+                            title: 'Track Learning Progress',
+                            description: 'Monitor understanding and retention',
+                            icon: CheckCircle,
+                            time: '2 min',
+                            action: 'Track Progress',
+                            details: [
+                              'Mark completion status',
+                              'Note key takeaways',
+                              'Rate understanding level'
+                            ]
+                          }
+                        ]
+                      },
+                      'sync': {
+                        title: '🔄 Data Sync & Backup Workflow',
+                        description: 'Set up comprehensive sync with Supabase, GitHub, and localStorage',
+                        color: 'from-cyan-500 to-blue-600',
+                        icon: Cloud,
+                        steps: [
+                          {
+                            id: 'supabase-setup',
+                            title: 'Configure Supabase Integration',
+                            description: 'Set up cloud database storage and real-time sync',
+                            icon: Database,
+                            time: '8 min',
+                            action: 'Setup Supabase',
+                            details: [
+                              'Create Supabase project',
+                              'Configure database schema',
+                              'Set up authentication',
+                              'Enable real-time subscriptions'
+                            ]
+                          },
+                          {
+                            id: 'github-sync',
+                            title: 'GitHub Repository Sync',
+                            description: 'Connect to GitHub for version control and backup',
+                            icon: GitBranch,
+                            time: '6 min',
+                            action: 'Connect GitHub',
+                            details: [
+                              'Create GitHub repository',
+                              'Set up automated commits',
+                              'Configure push/pull workflows',
+                              'Enable branch protection'
+                            ]
+                          },
+                          {
+                            id: 'local-storage',
+                            title: 'localStorage Optimization',
+                            description: 'Implement efficient local caching and offline support',
+                            icon: Smartphone,
+                            time: '5 min',
+                            action: 'Setup Local Cache',
+                            details: [
+                              'Configure localStorage strategy',
+                              'Implement data compression',
+                              'Set up offline fallbacks',
+                              'Optimize storage limits'
+                            ]
+                          },
+                          {
+                            id: 'sync-automation',
+                            title: 'Automated Sync Pipeline',
+                            description: 'Create seamless three-way sync between all platforms',
+                            icon: RotateCcw,
+                            time: '10 min',
+                            action: 'Automate Sync',
+                            details: [
+                              'Set up conflict resolution',
+                              'Configure sync intervals',
+                              'Implement change detection',
+                              'Add sync status monitoring'
+                            ]
+                          },
+                          {
+                            id: 'backup-strategy',
+                            title: 'Backup & Recovery Strategy',
+                            description: 'Implement comprehensive backup and disaster recovery',
+                            icon: Shield,
+                            time: '7 min',
+                            action: 'Setup Backups',
+                            details: [
+                              'Schedule automated backups',
+                              'Create recovery procedures',
+                              'Test restore processes',
+                              'Monitor backup integrity'
+                            ]
+                          }
+                        ]
+                      }
+                    };
+
+                    const currentTemplate = templates[arpSelectedTemplate as keyof typeof templates];
+                    const IconComponent = currentTemplate.icon;
+
+                    const markStepComplete = (stepId: string) => {
+                      if (!arpCompletedSteps.includes(stepId)) {
+                        setArpCompletedSteps([...arpCompletedSteps, stepId]);
+                      }
+                    };
+
+                    const getStepStatus = (stepId: string) => {
+                      return arpCompletedSteps.includes(stepId);
+                    };
+
+                    return (
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center space-y-4">
+                          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r ${currentTemplate.color} text-white shadow-lg`}>
+                            <IconComponent className="h-8 w-8" />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-bold text-gray-900">{currentTemplate.title}</h3>
+                            <p className="text-gray-600 mt-1">{currentTemplate.description}</p>
+                          </div>
+                        </div>
+
+                        {/* Smart Template Suggestion */}
+                        {selectedBookmark && (() => {
+                          const suggestedTemplate = getWebsiteType(selectedBookmark.url);
+                          const suggestion = templates[suggestedTemplate as keyof typeof templates];
+                          
+                          if (suggestedTemplate !== arpSelectedTemplate && suggestion) {
+                            return (
+                              <Card className="border-2 border-blue-200 bg-blue-50">
+                                <CardContent className="p-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-shrink-0">
+                                      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-r ${suggestion.color} text-white`}>
+                                        <suggestion.icon className="h-5 w-5" />
+                                      </div>
+                                    </div>
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-blue-900">Suggested Workflow</h4>
+                                      <p className="text-sm text-blue-700">
+                                        Based on <span className="font-medium">{extractDomain(selectedBookmark.url)}</span>, 
+                                        we recommend the <span className="font-medium">{suggestion.title}</span>
+                                      </p>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setArpSelectedTemplate(suggestedTemplate);
+                                        setArpCurrentStep(0);
+                                        setArpCompletedSteps([]);
+                                      }}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    >
+                                      Use This
+                                    </Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        {/* Template Selector */}
+                        <Card className="border-2 border-dashed border-gray-200 hover:border-gray-300 transition-colors">
+                          <CardContent className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                              {Object.entries(templates).map(([key, template]) => {
+                                const TemplateIcon = template.icon;
+                                const isSelected = arpSelectedTemplate === key;
+                                return (
+                                  <button
+                                    key={key}
+                                    onClick={() => {
+                                      setArpSelectedTemplate(key);
+                                      setArpCurrentStep(0);
+                                      setArpCompletedSteps([]);
+                                    }}
+                                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                                      isSelected 
+                                        ? 'border-blue-500 bg-blue-50 shadow-md scale-105' 
+                                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                                    }`}
+                                  >
+                                    <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-r ${template.color} text-white mb-3`}>
+                                      <TemplateIcon className="h-5 w-5" />
+                                    </div>
+                                    <h4 className="font-semibold text-sm mb-1">{template.title.replace(/^[^\s]+ /, '')}</h4>
+                                    <p className="text-xs text-gray-600 line-clamp-2">{template.description}</p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Progress Overview */}
+                        <Card>
+                          <CardContent className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <h4 className="font-semibold text-lg">Your Progress</h4>
+                                <p className="text-sm text-gray-600">
+                                  {arpCompletedSteps.length} of {currentTemplate.steps.length} steps completed
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-green-600">
+                                  {Math.round((arpCompletedSteps.length / currentTemplate.steps.length) * 100)}%
+                                </div>
+                                <div className="text-xs text-gray-500">Complete</div>
+                              </div>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-3">
+                              <div 
+                                className={`h-3 rounded-full bg-gradient-to-r ${currentTemplate.color} transition-all duration-500`}
+                                style={{ width: `${(arpCompletedSteps.length / currentTemplate.steps.length) * 100}%` }}
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Steps */}
+                        <div className="space-y-4">
+                          {currentTemplate.steps.map((step, index) => {
+                            const StepIcon = step.icon;
+                            const isCompleted = getStepStatus(step.id);
+                            const isCurrent = index === arpCurrentStep;
+                            const isLocked = index > arpCurrentStep && !arpShowAllSteps;
+
+                            return (
+                              <Card key={step.id} className={`transition-all duration-200 ${
+                                isCompleted ? 'bg-green-50 border-green-200' :
+                                isCurrent ? 'bg-blue-50 border-blue-200 shadow-md' :
+                                isLocked ? 'bg-gray-50 border-gray-200 opacity-60' :
+                                'hover:shadow-sm'
+                              }`}>
+                                <CardContent className="p-6">
+                                  <div className="flex items-start gap-4">
+                                    {/* Step Icon */}
+                                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                                      isCompleted ? 'bg-green-500 text-white' :
+                                      isCurrent ? `bg-gradient-to-r ${currentTemplate.color} text-white` :
+                                      isLocked ? 'bg-gray-300 text-gray-500' :
+                                      'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {isCompleted ? (
+                                        <CheckCircle className="h-6 w-6" />
+                                      ) : (
+                                        <StepIcon className="h-6 w-6" />
+                                      )}
+                                    </div>
+
+                                    {/* Step Content */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <h5 className="font-semibold text-lg">{step.title}</h5>
+                                        <div className="flex items-center gap-2">
+                                          <Badge variant="secondary" className="text-xs">
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            {step.time}
+                                          </Badge>
+                                          {isCompleted && (
+                                            <Badge className="bg-green-500 text-white text-xs">
+                                              <CheckCircle className="h-3 w-3 mr-1" />
+                                              Complete
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      <p className="text-gray-600 mb-4">{step.description}</p>
+                                      
+                                      {/* Step Details */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                          <h6 className="font-medium text-sm mb-2">What you'll learn:</h6>
+                                          <ul className="space-y-1">
+                                            {step.details.map((detail, idx) => (
+                                              <li key={idx} className="text-sm text-gray-600 flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full flex-shrink-0" />
+                                                {detail}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      </div>
+
+                                      {/* Action Buttons */}
+                                      <div className="flex items-center gap-3">
+                                        {!isLocked && !isCompleted && (
+                                          <>
+                                            <Button 
+                                              className={`bg-gradient-to-r ${currentTemplate.color} hover:opacity-90`}
+                                              onClick={() => {
+                                                markStepComplete(step.id);
+                                                if (index === arpCurrentStep) {
+                                                  setArpCurrentStep(Math.min(index + 1, currentTemplate.steps.length - 1));
+                                                }
+                                              }}
+                                            >
+                                              <PlayCircle className="h-4 w-4 mr-2" />
+                                              {step.action}
+                                            </Button>
+                                            <Button variant="outline" size="sm">
+                                              <Eye className="h-4 w-4 mr-2" />
+                                              Preview
+                                            </Button>
+                                          </>
+                                        )}
+                                        
+                                        {isCompleted && (
+                                          <Button variant="outline" disabled>
+                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                            Completed
+                                          </Button>
+                                        )}
+                                        
+                                        {isLocked && (
+                                          <Button variant="outline" disabled>
+                                            Complete previous steps first
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+
+                        {/* Action Bar */}
+                        <Card className="bg-gradient-to-r from-gray-50 to-gray-100">
+                          <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setArpShowAllSteps(!arpShowAllSteps)}
+                                >
+                                  {arpShowAllSteps ? 'Lock Future Steps' : 'Show All Steps'}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setArpCompletedSteps([]);
+                                    setArpCurrentStep(0);
+                                  }}
+                                >
+                                  Reset Progress
+                                </Button>
+                              </div>
+                              
+                              <div className="flex items-center gap-3">
+                                {arpCompletedSteps.length === currentTemplate.steps.length && (
+                                  <div className="flex items-center gap-2 text-green-600">
+                                    <CheckCircle className="h-5 w-5" />
+                                    <span className="font-semibold">Template Complete!</span>
+                                  </div>
+                                )}
+                                <Button className={`bg-gradient-to-r ${currentTemplate.color} hover:opacity-90`}>
+                                  <Rocket className="h-4 w-4 mr-2" />
+                                  Continue Journey
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    );
+                  })()}
+                </TabsContent>
+
+                <TabsContent value="notification" className="h-[600px]">
                   <NotificationTab 
                     bookmarkId={selectedBookmark.id.toString()} 
                     bookmarkTitle={selectedBookmark.title} 
@@ -3756,62 +4419,19 @@ export default function Dashboard() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="comment" className="space-y-6">
-                  <div className="py-4">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900">COMMENTS & NOTES</h3>
-                      <Button size="sm" variant="outline">
-                        <Plus className="h-4 w-4 mr-2" />
-                        ADD COMMENT
-                      </Button>
+                <TabsContent value="comment" className="space-y-4">
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Comments</h3>
+                      <Button size="sm">Add Comment</Button>
                     </div>
-                    
-                    <div className="space-y-4">
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex items-start space-x-3">
-                          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                            A
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="font-medium text-sm">Andrew</span>
-                              <span className="text-xs text-gray-500">2 hours ago</span>
-                            </div>
-                            <p className="text-sm text-gray-700">
-                              This bookmark is really useful for my daily workflow. The interface is clean and easy to navigate.
-                            </p>
-                          </div>
+                    <div className="space-y-3">
+                      <div className="p-3 bg-gray-50 rounded">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium text-sm">You</span>
+                          <span className="text-xs text-gray-500">2 hours ago</span>
                         </div>
-                      </div>
-                      
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex items-start space-x-3">
-                          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                            A
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="font-medium text-sm">Andrew</span>
-                              <span className="text-xs text-gray-500">1 day ago</span>
-                            </div>
-                            <p className="text-sm text-gray-700">
-                              Added this to my favorites. Will definitely be using this frequently for my projects.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 border-t pt-4">
-                      <Textarea 
-                        placeholder="Add a comment or note..."
-                        className="mb-3"
-                      />
-                      <div className="flex justify-end">
-                        <Button size="sm">
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          POST COMMENT
-                        </Button>
+                        <p className="text-sm">This is a great resource for learning React hooks!</p>
                       </div>
                     </div>
                   </div>
