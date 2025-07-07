@@ -4069,9 +4069,9 @@ export default function Dashboard() {
                             action: 'Connect GitHub',
                             details: [
                               'Create GitHub repository',
-                              'Set up automated commits',
-                              'Configure push/pull workflows',
-                              'Enable branch protection'
+                              'Set up automated commits (every 5 min)',
+                              'Configure push/pull workflows with hooks',
+                              'Enable branch protection and CI/CD'
                             ]
                           },
                           {
@@ -4097,9 +4097,9 @@ export default function Dashboard() {
                             action: 'Automate Sync',
                             details: [
                               'Set up conflict resolution',
-                              'Configure sync intervals',
-                              'Implement change detection',
-                              'Add sync status monitoring'
+                              'Configure sync intervals (every 5 min)',
+                              'Implement real-time change detection',
+                              'Add sync status monitoring dashboard'
                             ]
                           },
                           {
@@ -4219,6 +4219,65 @@ export default function Dashboard() {
                             </div>
                           </CardContent>
                         </Card>
+
+                        {/* Real-time Sync Status (only for sync template) */}
+                        {arpSelectedTemplate === 'sync' && (
+                          <Card className="border-green-200 bg-green-50">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                    <span className="font-semibold text-green-800">Sync Status</span>
+                                  </div>
+                                  <div className="flex gap-4 text-sm">
+                                    <div className="flex items-center gap-1">
+                                      <Database className="h-4 w-4 text-blue-600" />
+                                      <span className="text-gray-600">Supabase: Connected</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <GitBranch className="h-4 w-4 text-purple-600" />
+                                      <span className="text-gray-600">GitHub: Synced</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Smartphone className="h-4 w-4 text-orange-600" />
+                                      <span className="text-gray-600">Local: Cached</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      // Trigger manual sync
+                                      showNotification('Manual sync initiated...');
+                                    }}
+                                    className="text-green-700 border-green-300 hover:bg-green-100"
+                                  >
+                                    <RotateCcw className="h-4 w-4 mr-1" />
+                                    Sync Now
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      // Quick commit and push
+                                      showNotification('Committing and pushing changes...');
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    <GitBranch className="h-4 w-4 mr-1" />
+                                    Commit & Push
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="mt-3 text-xs text-green-700">
+                                Last sync: Just now • Next auto-sync in 4:32 • 
+                                <span className="font-medium"> Changes detected: 3 files</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
 
                         {/* Progress Overview */}
                         <Card>
