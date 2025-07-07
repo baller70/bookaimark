@@ -349,8 +349,6 @@ const UnsavedChangesBar: React.FC = () => {
     toast.success('Settings reset to defaults');
   };
 
-
-
   return (
     <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6" role="alert" aria-live="polite">
       <div className="flex items-center justify-between">
@@ -388,88 +386,420 @@ const InputTabs: React.FC = () => {
   const { dispatch } = useBulkUploaderPrefs();
   const [pasteText, setPasteText] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'drag' | 'paste' | 'url'>('drag');
+  
+  // Single URL form state
+  const [singleUrl, setSingleUrl] = useState('');
+  const [singleTitle, setSingleTitle] = useState('');
+  const [singleNotes, setSingleNotes] = useState('');
+  const [isSavingSingle, setIsSavingSingle] = useState(false);
 
   const handlePaste = useCallback(() => {
     if (!pasteText.trim()) return;
     
+    setIsProcessing(true);
     try {
       const links = parseTextLinks(pasteText);
       dispatch({ type: 'SET_LINKS', payload: links });
-      toast.success(`Parsed ${links.length} links from text`);
+      toast.success(`✨ Parsed ${links.length} links from text`);
+      setPasteText('');
     } catch (error) {
       toast.error('Failed to parse links from text');
+    } finally {
+      setIsProcessing(false);
     }
   }, [pasteText, dispatch]);
 
   const handleCsvUpload = useCallback((file: File) => {
+    setIsProcessing(true);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const csvText = e.target?.result as string;
         const links = parseCsv(csvText);
         dispatch({ type: 'SET_LINKS', payload: links });
-        toast.success(`Parsed ${links.length} links from CSV`);
+        toast.success(`✨ Parsed ${links.length} links from CSV`);
+        setCsvFile(file);
       } catch (error) {
         toast.error(`CSV parsing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsProcessing(false);
       }
     };
     reader.readAsText(file);
   }, [dispatch]);
 
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const text = e.dataTransfer.getData('text');
+    
+    if (files.length > 0) {
+      const csvFile = files.find(f => f.name.endsWith('.csv') || f.type === 'text/csv');
+      if (csvFile) {
+        handleCsvUpload(csvFile);
+      } else {
+        toast.error('Please drop a CSV file');
+      }
+    } else if (text) {
+      setPasteText(text);
+      setActiveTab('paste');
+      setTimeout(() => handlePaste(), 100);
+    }
+  }, [handleCsvUpload, handlePaste]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  // Handle single URL submission
+  const handleSingleUrl = useCallback(async () => {
+    if (!singleUrl.trim()) {
+      toast.error('Please enter a URL');
+      return;
+    }
+
+    // Validate URL format
+    try {
+      new URL(singleUrl);
+    } catch {
+      toast.error('Please enter a valid URL');
+      return;
+    }
+
+    setIsSavingSingle(true);
+    
+    try {
+      // Create a single BulkLink and add it to the links
+      const newLink: BulkLink = {
+        id: generateId(),
+        url: singleUrl.trim(),
+        title: singleTitle.trim() || undefined,
+        notes: singleNotes.trim() || undefined,
+        linkType: detectLinkType(singleUrl),
+        predictedTags: predictTagsAndFolder(singleUrl).tags,
+        predictedFolder: predictTagsAndFolder(singleUrl).folder,
+        status: 'queued',
+        selected: true
+      };
+
+      // Add to the existing links
+      dispatch({ type: 'SET_LINKS', payload: [newLink] });
+      
+      // Also save directly to bookmarks API
+      const response = await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: singleTitle.trim() || new URL(singleUrl).hostname,
+          url: singleUrl.trim(),
+          description: singleNotes.trim() || '',
+          category: predictTagsAndFolder(singleUrl).folder,
+          tags: predictTagsAndFolder(singleUrl).tags,
+          notes: singleNotes.trim() || ''
+        })
+      });
+
+      if (response.ok) {
+        toast.success('✨ Link added successfully!');
+        
+        // Clear form
+        setSingleUrl('');
+        setSingleTitle('');
+        setSingleNotes('');
+        
+        // Switch to preview to show the added link
+        // The link should also appear in bookmark selector views
+      } else {
+        const error = await response.json();
+        toast.error(`Failed to save bookmark: ${error.error || 'Unknown error'}`);
+      }
+      
+    } catch (error) {
+      console.error('Error adding single URL:', error);
+      toast.error('Failed to add link. Please try again.');
+    } finally {
+      setIsSavingSingle(false);
+    }
+  }, [singleUrl, singleTitle, singleNotes, dispatch]);
+
   return (
-    <Tabs defaultValue="paste" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="paste" className="flex items-center">
-          <Clipboard className="h-4 w-4 mr-2" />
-          Paste Links
-        </TabsTrigger>
-        <TabsTrigger value="csv" className="flex items-center">
-          <Upload className="h-4 w-4 mr-2" />
-          Upload CSV
-        </TabsTrigger>
-      </TabsList>
-      
-      <TabsContent value="paste" className="space-y-4">
-        <div>
-          <Label htmlFor="paste-textarea">Paste URLs (one per line or space-separated)</Label>
-          <Textarea
-            id="paste-textarea"
-            placeholder="https://example.com&#10;https://github.com/user/repo&#10;https://youtube.com/watch?v=..."
-            value={pasteText}
-            onChange={(e) => setPasteText(e.target.value)}
-            className="min-h-[120px] mt-2"
-          />
+    <div className="space-y-6">
+      {/* Modern Tab Navigation */}
+      <div className="flex items-center justify-center">
+        <div className="inline-flex h-12 items-center justify-center rounded-xl bg-muted p-1 text-muted-foreground">
+          <button
+            onClick={() => setActiveTab('drag')}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+              activeTab === 'drag'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'hover:bg-background/60'
+            }`}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Drag & Drop
+          </button>
+          <button
+            onClick={() => setActiveTab('paste')}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+              activeTab === 'paste'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'hover:bg-background/60'
+            }`}
+          >
+            <Clipboard className="h-4 w-4 mr-2" />
+            Paste Text
+          </button>
+          <button
+            onClick={() => setActiveTab('url')}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+              activeTab === 'url'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'hover:bg-background/60'
+            }`}
+          >
+            <Globe className="h-4 w-4 mr-2" />
+            Single URL
+          </button>
         </div>
-        <Button onClick={handlePaste} disabled={!pasteText.trim()}>
-          <Clipboard className="h-4 w-4 mr-2" />
-          Parse Links
-        </Button>
-      </TabsContent>
-      
-      <TabsContent value="csv" className="space-y-4">
-        <div>
-          <Label htmlFor="csv-upload">Upload CSV file (columns: url, title, notes)</Label>
-          <Input
-            id="csv-upload"
-            type="file"
-            accept=".csv"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                setCsvFile(file);
-                handleCsvUpload(file);
-              }
-            }}
-            className="mt-2"
-          />
-        </div>
-        {csvFile && (
-          <div className="text-sm text-muted-foreground">
-            Selected: {csvFile.name} ({(csvFile.size / 1024).toFixed(1)} KB)
+      </div>
+
+      {/* Drag & Drop Zone */}
+      {activeTab === 'drag' && (
+        <div
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={`relative overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-300 ${
+            isDragOver
+              ? 'border-primary bg-primary/5 scale-[1.02]'
+              : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+          }`}
+        >
+          {/* Background Gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-purple-50/30 to-pink-50/50 dark:from-blue-950/20 dark:via-purple-950/10 dark:to-pink-950/20" />
+          
+          {/* Content */}
+          <div className="relative p-12 text-center">
+            <div className={`transition-all duration-300 ${isDragOver ? 'scale-110' : ''}`}>
+              {isProcessing ? (
+                <div className="space-y-4">
+                  <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                  <p className="text-lg font-medium">Processing your links...</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Icon */}
+                  <div className="relative">
+                    <div className="h-20 w-20 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                      <Upload className="h-10 w-10 text-white" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-green-500 flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">+</span>
+                    </div>
+                  </div>
+
+                  {/* Main Text */}
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Drop your files here
+                    </h3>
+                    <p className="text-muted-foreground text-lg">
+                      Drag and drop CSV files or paste URLs directly
+                    </p>
+                  </div>
+
+                  {/* Features */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                      <span>CSV Files</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                      <span>Text URLs</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <div className="h-2 w-2 rounded-full bg-purple-500"></div>
+                      <span>Bulk Import</span>
+                    </div>
+                  </div>
+
+                  {/* Upload Button */}
+                  <div className="pt-4">
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <div className="inline-flex items-center px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl">
+                        <FolderOpen className="h-5 w-5 mr-2" />
+                        Choose Files
+                      </div>
+                    </label>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      accept=".csv,.txt"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleCsvUpload(file);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </TabsContent>
-    </Tabs>
+        </div>
+      )}
+
+      {/* Paste Text Tab */}
+      {activeTab === 'paste' && (
+        <div className="space-y-4">
+          <div className="relative">
+            <Label htmlFor="paste-textarea" className="text-base font-medium">
+              Paste URLs
+            </Label>
+            <p className="text-sm text-muted-foreground mt-1">
+              Paste multiple URLs (one per line or space-separated)
+            </p>
+          </div>
+          
+          <div className="relative">
+            <Textarea
+              id="paste-textarea"
+              placeholder="https://example.com&#10;https://github.com/user/repo&#10;https://youtube.com/watch?v=...&#10;&#10;Or paste them space-separated on one line"
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              className="min-h-[160px] text-sm resize-none border-2 focus:border-primary/50 rounded-xl"
+            />
+            {pasteText && (
+              <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
+                {pasteText.split('\n').filter(line => line.trim()).length} lines
+              </div>
+            )}
+          </div>
+
+          <Button 
+            onClick={handlePaste} 
+            disabled={!pasteText.trim() || isProcessing}
+            size="lg"
+            className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
+          >
+            {isProcessing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Processing...
+              </>
+            ) : (
+              <>
+                <Clipboard className="h-4 w-4 mr-2" />
+                Parse {pasteText.split('\n').filter(line => line.trim()).length} Links
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Single URL Tab */}
+      {activeTab === 'url' && (
+        <div className="space-y-4">
+          <div className="relative">
+            <Label htmlFor="single-url" className="text-base font-medium">
+              Add Single URL
+            </Label>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add one URL at a time with custom title and notes
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4">
+            <div className="relative">
+              <Input
+                id="single-url"
+                type="url"
+                placeholder="https://example.com"
+                value={singleUrl}
+                onChange={(e) => setSingleUrl(e.target.value)}
+                className="h-12 text-base border-2 focus:border-primary/50 rounded-xl pl-12"
+              />
+              <Globe className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            </div>
+            
+            <Input
+              placeholder="Title (optional)"
+              value={singleTitle}
+              onChange={(e) => setSingleTitle(e.target.value)}
+              className="h-12 text-base border-2 focus:border-primary/50 rounded-xl"
+            />
+            
+            <Textarea
+              placeholder="Notes (optional)"
+              value={singleNotes}
+              onChange={(e) => setSingleNotes(e.target.value)}
+              className="min-h-[80px] text-sm resize-none border-2 focus:border-primary/50 rounded-xl"
+            />
+          </div>
+
+          <Button 
+            size="lg"
+            onClick={handleSingleUrl}
+            disabled={isSavingSingle || !singleUrl.trim()}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white disabled:opacity-50"
+          >
+            {isSavingSingle ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Globe className="h-4 w-4 mr-2" />
+                Add Link
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* File Status */}
+      {csvFile && (
+        <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
+          <div className="flex items-center space-x-3">
+            <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="font-medium text-green-800 dark:text-green-200">{csvFile.name}</p>
+              <p className="text-sm text-green-600 dark:text-green-400">
+                {(csvFile.size / 1024).toFixed(1)} KB • CSV File
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCsvFile(null)}
+            className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:text-green-300 dark:hover:bg-green-900"
+          >
+            Remove
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -859,6 +1189,261 @@ const SidebarControls: React.FC = () => {
   );
 };
 
+const UploadSummary: React.FC = () => {
+  const { state } = useBulkUploaderPrefs();
+  const { links, jobState } = state;
+
+  const stats = useMemo(() => {
+    const total = links.length;
+    const saved = links.filter(link => link.status === 'saved').length;
+    const failed = links.filter(link => link.status === 'failed').length;
+    const processing = links.filter(link => link.status === 'processing').length;
+    const queued = links.filter(link => link.status === 'queued').length;
+    const duplicates = links.filter(link => link.status === 'duplicate').length;
+
+    const byType = links.reduce((acc, link) => {
+      acc[link.linkType || 'web'] = (acc[link.linkType || 'web'] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const recentUploads = links
+      .filter(link => link.status === 'saved')
+      .slice(-5)
+      .reverse();
+
+    return {
+      total,
+      saved,
+      failed,
+      processing,
+      queued,
+      duplicates,
+      byType,
+      recentUploads,
+      successRate: total > 0 ? Math.round((saved / total) * 100) : 0
+    };
+  }, [links]);
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'video': return <Video className="h-4 w-4" />;
+      case 'repo': return <Github className="h-4 w-4" />;
+      case 'doc': return <FileText className="h-4 w-4" />;
+      case 'pdf': return <FileText className="h-4 w-4" />;
+      default: return <Globe className="h-4 w-4" />;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'video': return 'bg-red-100 text-red-700 border-red-200';
+      case 'repo': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'doc': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'pdf': return 'bg-orange-100 text-orange-700 border-orange-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  if (stats.total === 0) {
+    return (
+      <Card className="mt-8 border-dashed border-2 border-gray-200">
+        <CardContent className="py-12">
+          <div className="text-center">
+            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">No uploads yet</h3>
+            <p className="text-gray-500">Start by importing some links above to see your upload summary here</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-8 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-blue-200">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-xl text-gray-800">Upload Summary</CardTitle>
+            <p className="text-sm text-gray-600 mt-1">Your recent upload activity and statistics</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Badge variant="outline" className="bg-white/80 border-blue-300 text-blue-700">
+              {stats.total} Total Links
+            </Badge>
+            {stats.successRate >= 80 && (
+              <Badge className="bg-green-500 text-white">
+                <Star className="h-3 w-3 mr-1" />
+                {stats.successRate}% Success
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-6">
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="bg-white/80 rounded-lg p-4 text-center border border-green-200">
+            <div className="text-2xl font-bold text-green-600">{stats.saved}</div>
+            <div className="text-xs text-green-700 font-medium">Saved</div>
+          </div>
+          
+          {stats.processing > 0 && (
+            <div className="bg-white/80 rounded-lg p-4 text-center border border-blue-200">
+              <div className="text-2xl font-bold text-blue-600">{stats.processing}</div>
+              <div className="text-xs text-blue-700 font-medium">Processing</div>
+            </div>
+          )}
+          
+          {stats.queued > 0 && (
+            <div className="bg-white/80 rounded-lg p-4 text-center border border-yellow-200">
+              <div className="text-2xl font-bold text-yellow-600">{stats.queued}</div>
+              <div className="text-xs text-yellow-700 font-medium">Queued</div>
+            </div>
+          )}
+          
+          {stats.duplicates > 0 && (
+            <div className="bg-white/80 rounded-lg p-4 text-center border border-orange-200">
+              <div className="text-2xl font-bold text-orange-600">{stats.duplicates}</div>
+              <div className="text-xs text-orange-700 font-medium">Duplicates</div>
+            </div>
+          )}
+          
+          {stats.failed > 0 && (
+            <div className="bg-white/80 rounded-lg p-4 text-center border border-red-200">
+              <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
+              <div className="text-xs text-red-700 font-medium">Failed</div>
+            </div>
+          )}
+        </div>
+
+        {/* Content Types Breakdown */}
+        {Object.keys(stats.byType).length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              <Tag className="h-4 w-4 mr-2" />
+              Content Types
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(stats.byType).map(([type, count]) => (
+                <Badge 
+                  key={type} 
+                  variant="outline" 
+                  className={`${getTypeColor(type)} border`}
+                >
+                  {getTypeIcon(type)}
+                  <span className="ml-1 capitalize">{type}</span>
+                  <span className="ml-1 font-semibold">({count})</span>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Successful Uploads */}
+        {stats.recentUploads.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              <Eye className="h-4 w-4 mr-2" />
+              Recent Uploads
+            </h4>
+            <div className="space-y-2">
+              {stats.recentUploads.map((link) => (
+                <div key={link.id} className="bg-white/60 rounded-lg p-3 border border-white/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className={`p-1.5 rounded ${getTypeColor(link.linkType || 'web')}`}>
+                        {getTypeIcon(link.linkType || 'web')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-800 truncate">
+                          {link.title || new URL(link.url).hostname}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {link.url}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {link.predictedTags.slice(0, 2).map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs bg-white/80">
+                          {tag}
+                        </Badge>
+                      ))}
+                      <Badge className="bg-green-100 text-green-700 border-green-200">
+                        ✓ Saved
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Success Rate Progress Bar */}
+        {stats.total > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-gray-700">Success Rate</h4>
+              <span className="text-sm text-gray-600">{stats.successRate}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  stats.successRate >= 80 ? 'bg-green-500' : 
+                  stats.successRate >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                }`}
+                style={{ width: `${stats.successRate}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-center space-x-4 pt-4 border-t border-white/50">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="bg-white/80 hover:bg-white border-blue-200"
+            onClick={() => {
+              // Could export summary as JSON/CSV
+              const summaryData = {
+                timestamp: new Date().toISOString(),
+                stats,
+                links: links.filter(l => l.status === 'saved')
+              };
+              console.log('Export summary:', summaryData);
+              toast.success('Summary exported to console');
+            }}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Export Summary
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="bg-white/80 hover:bg-white border-blue-200"
+            onClick={() => {
+              const failedLinks = links.filter(l => l.status === 'failed');
+              if (failedLinks.length > 0) {
+                // Could retry failed uploads
+                toast.info(`Found ${failedLinks.length} failed uploads to retry`);
+              } else {
+                toast.success('No failed uploads to retry');
+              }
+            }}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Retry Failed
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const ProgressDonut: React.FC = () => {
   const { state } = useBulkUploaderPrefs();
   const { jobState } = state;
@@ -1164,8 +1749,6 @@ const BulkUploaderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })()
   }, [])
 
-
-
   return (
     <BulkUploaderContext.Provider value={{ state, dispatch }}>
       {children}
@@ -1217,6 +1800,7 @@ export default function BulkUploaderPage() {
           </div>
         </div>
 
+        <UploadSummary />
         <ProgressDonut />
       </div>
     </BulkUploaderProvider>

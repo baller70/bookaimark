@@ -11,6 +11,9 @@ const nextConfig = {
     serverMinification: true,
   },
   
+  // Configure the app directory path
+  distDir: '.next',
+  
   // Basic optimizations only
   compress: true,
   poweredByHeader: false,

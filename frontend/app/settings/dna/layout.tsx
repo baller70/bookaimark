@@ -10,14 +10,14 @@ import {
 } from 'lucide-react'
 
 const nav = [
-  { href: '/settings/dna/about-you',         label: 'About You',            icon: <User className="h-4 w-4" /> },
-  { href: '/settings/dna/insight-questions', label: 'Insights',            icon: <HelpCircle className="h-4 w-4" /> },
-  { href: '/settings/dna/importance',        label: 'Importance',          icon: <SlidersHorizontal className="h-4 w-4" /> },
-  { href: '/settings/dna/content-channels',  label: 'Content & Channels',  icon: <LayoutList className="h-4 w-4" /> },
-  { href: '/settings/dna/tags-filters',      label: 'Tags & Filters',      icon: <Tag className="h-4 w-4" /> },
-  { href: '/settings/dna/site-preference',   label: 'Site Preference',     icon: <Globe className="h-4 w-4" /> },
-  { href: '/settings/dna/recommendations',   label: 'Recommendations',     icon: <ListChecks className="h-4 w-4" /> },
-  { href: '/settings/dna/review-save',       label: 'Review & Save',       icon: <Download className="h-4 w-4" /> }
+  { href: '/settings/dna/about-you',         label: 'About You',            icon: User },
+  { href: '/settings/dna/insight-questions', label: 'Insights',            icon: HelpCircle },
+  { href: '/settings/dna/importance',        label: 'Importance',          icon: SlidersHorizontal },
+  { href: '/settings/dna/content-channels',  label: 'Content & Channels',  icon: LayoutList },
+  { href: '/settings/dna/tags-filters',      label: 'Tags & Filters',      icon: Tag },
+  { href: '/settings/dna/site-preference',   label: 'Site Preference',     icon: Globe },
+  { href: '/settings/dna/recommendations',   label: 'Recommendations',     icon: ListChecks },
+  { href: '/settings/dna/review-save',       label: 'Review & Save',       icon: Download }
 ]
 
 export default function DNALayout({ children }: { children: React.ReactNode }) {
@@ -36,19 +36,22 @@ export default function DNALayout({ children }: { children: React.ReactNode }) {
         {/* Sidebar */}
         <ScrollArea className="hidden lg:block w-56 shrink-0 rounded-lg border bg-white p-2 h-fit">
           <div className="space-y-1">
-            {nav.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors',
-                  pathname.startsWith(item.href) && 'bg-muted font-medium text-primary'
-                )}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            ))}
+            {nav.map(item => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors',
+                    pathname.startsWith(item.href) && 'bg-muted font-medium text-primary'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              )
+            })}
           </div>
         </ScrollArea>
 

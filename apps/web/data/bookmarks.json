@@ -1,0 +1,234 @@
+[
+  {
+    "id": 1,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Example Domain",
+    "url": "https://example.com/",
+    "description": "web resource - homepage, website, example",
+    "category": "main",
+    "tags": [
+      "homepage",
+      "website",
+      "example"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "homepage",
+      "website",
+      "example"
+    ],
+    "notes": "",
+    "created_at": "2025-07-06T23:09:43.686Z",
+    "updated_at": "2025-07-06T23:09:43.686Z"
+  },
+  {
+    "id": 2,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Example Domain",
+    "url": "https://example.com/",
+    "description": "web resource - homepage, example, website",
+    "category": "main",
+    "tags": [
+      "homepage",
+      "example",
+      "website"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "homepage",
+      "example",
+      "website"
+    ],
+    "notes": "",
+    "created_at": "2025-07-06T23:13:20.668Z",
+    "updated_at": "2025-07-06T23:13:20.669Z"
+  },
+  {
+    "id": 3,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Example Domain",
+    "url": "https://example.com/",
+    "description": "Test link",
+    "category": "main",
+    "tags": [
+      "homepage",
+      "example",
+      "website"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "homepage",
+      "example",
+      "website"
+    ],
+    "notes": "Test link",
+    "created_at": "2025-07-06T23:19:30.820Z",
+    "updated_at": "2025-07-06T23:19:30.820Z"
+  },
+  {
+    "id": 4,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "GitHub · Build and ship software on a single, collaborative platform · GitHub",
+    "url": "https://github.com/",
+    "description": "Code repository",
+    "category": "Development",
+    "tags": [
+      "development",
+      "code",
+      "repository",
+      "collaboration"
+    ],
+    "ai_summary": "Auto-categorized repo resource",
+    "ai_tags": [
+      "development",
+      "code",
+      "repository",
+      "collaboration"
+    ],
+    "notes": "Code repository",
+    "created_at": "2025-07-06T23:19:35.610Z",
+    "updated_at": "2025-07-06T23:19:35.610Z"
+  },
+  {
+    "id": 5,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Newest Questions - Stack Overflow",
+    "url": "https://stackoverflow.com/",
+    "description": "Q&A site",
+    "category": "developer_resources",
+    "tags": [
+      "qa",
+      "programming",
+      "help",
+      "questions",
+      "community"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "qa",
+      "programming",
+      "help",
+      "questions",
+      "community"
+    ],
+    "notes": "Q&A site",
+    "created_at": "2025-07-06T23:19:35.611Z",
+    "updated_at": "2025-07-06T23:19:35.611Z"
+  },
+  {
+    "id": 6,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "MDN Web Docs",
+    "url": "https://developer.mozilla.org/",
+    "description": "Web docs",
+    "category": "General",
+    "tags": [],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [],
+    "notes": "Web docs",
+    "created_at": "2025-07-06T23:19:35.611Z",
+    "updated_at": "2025-07-06T23:19:35.611Z"
+  },
+  {
+    "id": 7,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "valid-url.com",
+    "url": "https://valid-url.com/",
+    "description": "Should pass",
+    "category": "websites",
+    "tags": [
+      "homepage",
+      "website",
+      "valid-url"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "homepage",
+      "website",
+      "valid-url"
+    ],
+    "notes": "Should pass",
+    "created_at": "2025-07-06T23:19:36.836Z",
+    "updated_at": "2025-07-06T23:19:36.837Z"
+  },
+  {
+    "id": 8,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Replicate - Run AI with an API",
+    "url": "https://replicate.com/",
+    "description": "Run open-source machine learning models with a cloud API",
+    "category": "General",
+    "tags": [],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [],
+    "notes": "Run open-source machine learning models with a cloud API",
+    "created_at": "2025-07-06T23:41:58.607Z",
+    "updated_at": "2025-07-06T23:41:58.607Z"
+  },
+  {
+    "id": 9,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Replicate - Run AI with an API",
+    "url": "https://replicate.com/",
+    "description": "Run open-source machine learning models with a cloud API",
+    "category": "Artificial Intelligence",
+    "tags": [
+      "ai",
+      "machine learning",
+      "platform"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "ai",
+      "machine learning",
+      "platform"
+    ],
+    "notes": "Run open-source machine learning models with a cloud API",
+    "created_at": "2025-07-07T00:28:43.625Z",
+    "updated_at": "2025-07-07T00:28:43.625Z"
+  },
+  {
+    "id": 10,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "REP",
+    "url": "https://replicate.com/",
+    "description": "web resource - ai, machine learning, technology",
+    "category": "Artificial Intelligence",
+    "tags": [
+      "ai",
+      "machine learning",
+      "technology"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "ai",
+      "machine learning",
+      "technology"
+    ],
+    "notes": "",
+    "created_at": "2025-07-07T00:37:46.258Z",
+    "updated_at": "2025-07-07T00:37:46.264Z"
+  },
+  {
+    "id": 11,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Replicate - Run AI with an API",
+    "url": "https://replicate.com/",
+    "description": "Run open-source machine learning models with a cloud API",
+    "category": "AI and Technology",
+    "tags": [
+      "ai",
+      "machine learning",
+      "technology"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "ai",
+      "machine learning",
+      "technology"
+    ],
+    "notes": "Run open-source machine learning models with a cloud API",
+    "created_at": "2025-07-07T00:53:59.198Z",
+    "updated_at": "2025-07-07T00:53:59.198Z"
+  }
+]

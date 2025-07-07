@@ -104,6 +104,9 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
+// Add import for profile utilities
+import { getProfilePicture, onProfilePictureChange } from '@/lib/profile-utils'
+
 // Custom Infinity Board Background Component (no nodes, just background)
 const InfinityBoardBackground = ({ isActive }: { isActive: boolean }) => {
   const [nodes] = useNodesState([]);
@@ -385,8 +388,8 @@ export default function Dashboard() {
   const [bookmarks, setBookmarks] = useState<any[]>([]);
   const [isLoadingBookmarks, setIsLoadingBookmarks] = useState(true);
   
-  // User ID for API calls
-  const userId = '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f';
+  // User ID for API calls - must match the API default
+  const userId = 'dev-user-123';
 
   // Fetch bookmarks from database
   useEffect(() => {

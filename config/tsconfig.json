@@ -25,10 +25,11 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./frontend/*"],
-      "@/components/*": ["./frontend/components/*"],
-      "@/lib/*": ["./frontend/lib/*"],
-      "@/hooks/*": ["./frontend/hooks/*"],
+      "@/*": ["./*"],
+      "@/components/*": ["./components/*"],
+      "@/lib/*": ["./lib/*"],
+      "@/hooks/*": ["./hooks/*"],
+      "@/src/*": ["./src/*"],
       "@/utils/*": ["./backend/utils/*"],
       "@/types/*": ["./backend/types/*"]
     }
