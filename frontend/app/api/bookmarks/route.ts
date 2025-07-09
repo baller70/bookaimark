@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes } = body;
+    const { id, title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes } = body;
     
     // Validate required fields
     if (!title || !url) {
@@ -130,44 +130,87 @@ export async function POST(request: NextRequest) {
     
     // Use dev user ID for bypass mode
     const userId = process.env.DEV_USER_ID || 'dev-user-123';
-    console.log('📝 Creating bookmark in file storage for user:', userId);
     
     // Load existing bookmarks
     const allBookmarks = await loadBookmarks();
     
-    // Generate new ID
-    const newId = Math.max(0, ...allBookmarks.map(b => b.id)) + 1;
-    
-    // Create new bookmark
-    const newBookmark: Bookmark = {
-      id: newId,
-      user_id: userId,
-      title,
-      url,
-      description: description || '',
-      category: category || 'General',
-      tags: tags || [],
-      ai_summary,
-      ai_tags: ai_tags || [],
-      ai_category,
-      notes: notes || '',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    
-    // Add to bookmarks array
-    allBookmarks.push(newBookmark);
-    
-    // Save to file
-    await saveBookmarks(allBookmarks);
-    
-    console.log('✅ Successfully created bookmark:', newBookmark);
-    
-    return NextResponse.json({
-      success: true,
-      bookmark: newBookmark,
-      message: 'Bookmark created successfully'
-    });
+    if (id) {
+      // UPDATE existing bookmark
+      console.log('📝 Updating bookmark in file storage for user:', userId);
+      
+      const bookmarkIndex = allBookmarks.findIndex(b => b.id === parseInt(id) && b.user_id === userId);
+      
+      if (bookmarkIndex === -1) {
+        return NextResponse.json(
+          { error: 'Bookmark not found' },
+          { status: 404 }
+        );
+      }
+      
+      // Update existing bookmark
+      allBookmarks[bookmarkIndex] = {
+        ...allBookmarks[bookmarkIndex],
+        title,
+        url,
+        description: description || '',
+        category: category || 'General',
+        tags: tags || [],
+        ai_summary,
+        ai_tags: ai_tags || [],
+        ai_category,
+        notes: notes || '',
+        updated_at: new Date().toISOString()
+      };
+      
+      // Save to file
+      await saveBookmarks(allBookmarks);
+      
+      console.log('✅ Successfully updated bookmark:', allBookmarks[bookmarkIndex]);
+      
+      return NextResponse.json({
+        success: true,
+        bookmark: allBookmarks[bookmarkIndex],
+        message: 'Bookmark updated successfully'
+      });
+      
+    } else {
+      // CREATE new bookmark
+      console.log('📝 Creating bookmark in file storage for user:', userId);
+      
+      // Generate new ID
+      const newId = Math.max(0, ...allBookmarks.map(b => b.id)) + 1;
+      
+      // Create new bookmark
+      const newBookmark: Bookmark = {
+        id: newId,
+        user_id: userId,
+        title,
+        url,
+        description: description || '',
+        category: category || 'General',
+        tags: tags || [],
+        ai_summary,
+        ai_tags: ai_tags || [],
+        ai_category,
+        notes: notes || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add to bookmarks array
+      allBookmarks.push(newBookmark);
+      
+      // Save to file
+      await saveBookmarks(allBookmarks);
+      
+      console.log('✅ Successfully created bookmark:', newBookmark);
+      
+      return NextResponse.json({
+        success: true,
+        bookmark: newBookmark,
+        message: 'Bookmark created successfully'
+      });
+    }
     
   } catch (error) {
     console.error('❌ Unexpected error:', error);

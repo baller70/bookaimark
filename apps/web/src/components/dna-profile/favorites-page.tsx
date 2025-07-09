@@ -408,7 +408,11 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
                   )}
                 </div>
                 <span>
-                  {new Date(bookmark.updated_at).toLocaleDateString()}
+                  {new Date(bookmark.updated_at).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
                 </span>
               </div>
               
@@ -488,7 +492,7 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
 
       {bookmarks.length > 0 && (
         <div className="px-4 sm:px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatsCard
               title="Total Favorites"
               value={analytics.totalFavorites}
@@ -507,18 +511,7 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
               icon={TrendingUp}
               description="Average visits per favorite"
             />
-            <StatsCard
-              title="Unique Domains"
-              value={analytics.uniqueDomains}
-              icon={Globe}
-              description="Different websites favorited"
-            />
-            <StatsCard
-              title="Folders Used"
-              value={analytics.foldersUsed}
-              icon={FolderIcon}
-              description="Folders containing favorites"
-            />
+
             <StatsCard
               title="Most Visited"
               value={analytics.mostVisited?.visit_count || 0}
@@ -535,18 +528,21 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
             <div className="flex items-center space-x-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
               <div className="flex rounded-lg border border-gray-200 dark:border-gray-700">
-                {viewModes.map((mode) => (
-                  <Button
-                    key={mode.id}
-                    variant={viewMode === mode.id ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode(mode.id as any)}
-                    className="rounded-none first:rounded-l-lg last:rounded-r-lg border-r border-gray-200 dark:border-gray-700 last:border-r-0"
-                    title={mode.name}
-                  >
-                    {mode.icon}
-                  </Button>
-                ))}
+                {viewModes.map((mode) => {
+                  const IconComponent = mode.icon
+                  return (
+                    <Button
+                      key={mode.id}
+                      variant={viewMode === mode.id ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode(mode.id as any)}
+                      className="rounded-none first:rounded-l-lg last:rounded-r-lg border-r border-gray-200 dark:border-gray-700 last:border-r-0"
+                      title={mode.name}
+                    >
+                      <IconComponent className="h-4 w-4" />
+                    </Button>
+                  )
+                })}
               </div>
             </div>
 

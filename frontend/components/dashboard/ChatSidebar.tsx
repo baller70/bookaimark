@@ -1,13 +1,19 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+// Custom SVG component to prevent hydration errors
+const SendIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+  </svg>
+)
 
 interface Message {
   id: string
@@ -60,11 +66,12 @@ export function ChatSidebar() {
   const handleSendMessage = () => {
     if (!newMessage.trim()) return
 
+    const now = new Date()
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `msg-${now.getTime()}`,
       content: newMessage.trim(),
       isUser: true,
-      timestamp: new Date()
+      timestamp: now
     }
 
     setMessages(prev => [...prev, userMessage])
@@ -72,11 +79,12 @@ export function ChatSidebar() {
 
     // Simulate AI response
     setTimeout(() => {
+      const responseTime = new Date()
       const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `msg-${responseTime.getTime()}`,
         content: "Thanks for your message! I'm here to help you with any questions about your dashboard, analytics, or account management.",
         isUser: false,
-        timestamp: new Date()
+        timestamp: responseTime
       }
       setMessages(prev => [...prev, aiResponse])
     }, 1000)
@@ -219,7 +227,7 @@ export function ChatSidebar() {
               size="icon"
               className="bg-blue-600 hover:bg-blue-700"
             >
-              <Send className="h-4 w-4" />
+              <SendIcon className="h-4 w-4" />
             </Button>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">

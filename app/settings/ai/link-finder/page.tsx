@@ -602,7 +602,7 @@ const QueryBuilder: React.FC = () => {
         {/* Content Filters */}
         <CollapsibleSection 
           title="Content Filters" 
-          icon={<Filter className="h-4 w-4 text-blue-500" />}
+          icon={<Settings className="h-4 w-4 text-blue-500" />}
           defaultOpen={true}
         >
           <div className="space-y-4">

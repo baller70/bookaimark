@@ -1471,7 +1471,7 @@ const ImportButton: React.FC = () => {
       });
 
       // Call the bulk uploader API
-      const response = await fetch('/api/ai/bulk-uploader', {
+      const response = await fetch('/api/ai/bulk-uploader?user_id=dev-user-123', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

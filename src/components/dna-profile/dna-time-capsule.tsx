@@ -183,17 +183,18 @@ export default function DnaTimeCapsule() {
   })
 
   const handleCreateCapsule = () => {
+    const now = new Date()
     const capsule: TimeCapsule = {
-      id: Date.now().toString(),
+      id: `capsule-${now.getTime()}`,
       ...newCapsule,
-      createdAt: new Date(),
+      createdAt: now,
       status: 'active',
-      size: Math.random() * 20 + 5,
-      bookmarkCount: 1247 + Math.floor(Math.random() * 50),
-      folderCount: 12 + Math.floor(Math.random() * 3),
-      tagCount: 89 + Math.floor(Math.random() * 10),
+      size: 15.5, // Fixed value to prevent hydration mismatch
+      bookmarkCount: 1247,
+      folderCount: 12,
+      tagCount: 89,
       metadata: {
-        totalVisits: 8934 + Math.floor(Math.random() * 500),
+        totalVisits: 8934,
         avgRating: 4.2,
         topCategories: ['Development', 'Design', 'Tools'],
         createdBy: 'John Doe'
@@ -270,7 +271,11 @@ export default function DnaTimeCapsule() {
         
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-600">{capsule.size.toFixed(1)} MB</span>
-          <span className="text-gray-600">{capsule.createdAt.toLocaleDateString()}</span>
+          <span className="text-gray-600">{capsule.createdAt.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          })}</span>
         </div>
         
         {capsule.changes && (
@@ -319,7 +324,11 @@ export default function DnaTimeCapsule() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg">
-              Capsules on {selectedDate?.toLocaleDateString()}
+              Capsules on {selectedDate?.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -431,7 +440,11 @@ export default function DnaTimeCapsule() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <h4 className="font-medium mb-1">Created</h4>
-                      <p className="text-gray-600">{selectedCapsule.createdAt.toLocaleDateString()}</p>
+                      <p className="text-gray-600">{selectedCapsule.createdAt.toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}</p>
                     </div>
                     <div>
                       <h4 className="font-medium mb-1">Size</h4>
@@ -484,7 +497,11 @@ export default function DnaTimeCapsule() {
                           Frequency: {selectedCapsule.schedule.frequency}
                         </p>
                         <p className="text-gray-600">
-                          Next run: {selectedCapsule.schedule.nextRun.toLocaleDateString()}
+                          Next run: {selectedCapsule.schedule.nextRun.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
                         </p>
                         <p className="text-gray-600">
                           Status: {selectedCapsule.schedule.enabled ? 'Enabled' : 'Disabled'}

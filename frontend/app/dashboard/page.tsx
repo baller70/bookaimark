@@ -592,6 +592,29 @@ export default function Dashboard() {
     }
   ];
 
+  // Load bookmarks from database on component mount
+  useEffect(() => {
+    const loadBookmarks = async () => {
+      try {
+        const response = await fetch('/api/bookmarks?user_id=dev-user-123')
+        const result = await response.json()
+        
+        if (result.success && result.bookmarks) {
+          console.log('✅ Loaded bookmarks from database:', result.bookmarks.length)
+          setBookmarks(result.bookmarks)
+        } else {
+          console.log('⚠️ No bookmarks found, starting with empty array')
+          setBookmarks([])
+        }
+      } catch (error) {
+        console.error('❌ Error loading bookmarks:', error)
+        setBookmarks([])
+      }
+    }
+    
+    loadBookmarks()
+  }, [])
+
   // Ensure any legacy bookmark objects that may still contain tags don't render them on the cards
   useEffect(() => {
     setBookmarks(prev => prev.map(b => ({ ...b, tags: Array.isArray(b.tags) ? b.tags : [] })))
@@ -840,27 +863,23 @@ export default function Dashboard() {
     const updatedBookmark = { ...selectedBookmark, [editingField]: newValue }
 
     try {
-      // Save to Supabase via MCP service
-      const response = await fetch('/api/save', {
+      // Save to bookmarks API endpoint with ID for update
+      const response = await fetch('/api/bookmarks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          table: 'bookmarks',
-          payload: {
-            id: updatedBookmark.id,
-            url: updatedBookmark.url,
-            title: updatedBookmark.title,
-            description: updatedBookmark.description || '',
-            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
-            category: updatedBookmark.category || '',
-            isFavorite: updatedBookmark.isFavorite || false,
-            priority: updatedBookmark.priority || 'medium',
-            siteHealth: updatedBookmark.siteHealth || 'good',
-            usage: updatedBookmark.usage || 0,
-            updated_at: new Date().toISOString()
-          }
+          id: selectedBookmark.id, // Include ID for update
+          title: updatedBookmark.title,
+          url: updatedBookmark.url,
+          description: updatedBookmark.description || '',
+          category: updatedBookmark.category || '',
+          tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+          notes: updatedBookmark.notes || '',
+          ai_summary: updatedBookmark.ai_summary || '',
+          ai_tags: updatedBookmark.ai_tags || [],
+          ai_category: updatedBookmark.ai_category || updatedBookmark.category || ''
         })
       })
 
@@ -922,27 +941,23 @@ export default function Dashboard() {
     const updatedBookmark = { ...selectedBookmark, isFavorite: newFavoriteStatus }
 
     try {
-      // Save to Supabase via MCP service
-      const response = await fetch('/api/save', {
+      // Save to bookmarks API endpoint with ID for update
+      const response = await fetch('/api/bookmarks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          table: 'bookmarks',
-          payload: {
-            id: updatedBookmark.id,
-            url: updatedBookmark.url,
-            title: updatedBookmark.title,
-            description: updatedBookmark.description || '',
-            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
-            category: updatedBookmark.category || '',
-            isFavorite: updatedBookmark.isFavorite,
-            priority: updatedBookmark.priority || 'medium',
-            siteHealth: updatedBookmark.siteHealth || 'good',
-            usage: updatedBookmark.usage || 0,
-            updated_at: new Date().toISOString()
-          }
+          id: selectedBookmark.id, // Include ID for update
+          title: updatedBookmark.title,
+          url: updatedBookmark.url,
+          description: updatedBookmark.description || '',
+          category: updatedBookmark.category || '',
+          tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+          notes: updatedBookmark.notes || '',
+          ai_summary: updatedBookmark.ai_summary || '',
+          ai_tags: updatedBookmark.ai_tags || [],
+          ai_category: updatedBookmark.ai_category || updatedBookmark.category || ''
         })
       })
 
@@ -1284,6 +1299,25 @@ export default function Dashboard() {
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               onClick={(e) => {
                 e.stopPropagation()
+                // Start editing the bookmark title
+                setSelectedBookmark(bookmark)
+                startEditing('title', bookmark.title)
+              }}
+            >
+              <Edit2 className="h-4 w-4 text-gray-400 hover:text-blue-500" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Edit bookmark</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button 
+              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
                 // Share bookmark
                 const shareData = {
                   title: bookmark.title,
@@ -1291,9 +1325,16 @@ export default function Dashboard() {
                   url: bookmark.url,
                 }
                 if (navigator.share) {
-                  navigator.share(shareData).catch(console.error)
+                  navigator.share(shareData).catch((error) => {
+                    console.error('Error sharing:', error)
+                    if (error instanceof Error && error.name === 'InvalidStateError') {
+                      showNotification('Please wait for the previous share to complete')
+                    } else {
+                      showNotification('Failed to share bookmark')
+                    }
+                  })
                 } else {
-                  navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.description}\n${selectedBookmark.url}`).then(() => {
+                  navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.description}\n${bookmark.url}`).then(() => {
                     showNotification('Bookmark details copied to clipboard!')
                   }).catch(() => {
                     showNotification('Failed to share bookmark')
@@ -1301,7 +1342,7 @@ export default function Dashboard() {
                 }
               }}
             >
-              <Edit2 className="h-4 w-4 text-gray-400 hover:text-green-500" />
+              <Share2 className="h-4 w-4 text-gray-400 hover:text-green-500" />
             </button>
           </TooltipTrigger>
           <TooltipContent>
@@ -1366,7 +1407,15 @@ export default function Dashboard() {
   const GridBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
       className="group hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer bg-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
-      onClick={() => handleBookmarkClick(bookmark)}
+      onClick={(e) => {
+        // Don't open modal if we're currently editing this bookmark
+        if (editingField && selectedBookmark?.id === bookmark.id) {
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+        handleBookmarkClick(bookmark)
+      }}
     >
       {/* Background Website Logo with 5% opacity */}
       {(() => {
@@ -1393,15 +1442,58 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 min-w-0">
               {editingField === 'title' && selectedBookmark?.id === bookmark.id ? (
-                <input
-                  type="text"
-                  value={editingValue}
-                  onChange={(e) => setEditingValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onBlur={saveEdit}
-                  className="font-bold text-gray-900 font-audiowide uppercase text-lg bg-transparent border-b-2 border-blue-500 outline-none w-full"
-                  autoFocus
-                />
+                <div 
+                  className="flex items-center space-x-2"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={editingValue}
+                    onChange={(e) => setEditingValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                    }}
+                    className="font-bold text-gray-900 font-audiowide uppercase text-lg bg-transparent border-b-2 border-blue-500 outline-none flex-1"
+                    autoFocus
+                    placeholder="Enter title..."
+                  />
+                  <div className="flex space-x-1">
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        saveEdit()
+                      }}
+                      className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                    >
+                      <Check className="h-3 w-3 text-white" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        cancelEditing()
+                      }}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <h3 
                   className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300 truncate cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5"

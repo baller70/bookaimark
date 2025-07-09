@@ -133,10 +133,10 @@ const StatsCard = React.memo(({
 StatsCard.displayName = 'StatsCard';
 
 const viewModes = [
-  { id: 'grid', name: 'Grid', icon: <Grid3X3 className="w-4 h-4" /> },
-  { id: 'list', name: 'List', icon: <List className="w-4 h-4" /> },
-  { id: 'timeline', name: 'Timeline', icon: <Calendar className="w-4 h-4" /> },
-  { id: 'analytics', name: 'Analytics', icon: <BarChart3 className="w-4 h-4" /> }
+  { id: 'grid', name: 'Grid', icon: Grid3X3 },
+  { id: 'list', name: 'List', icon: List },
+  { id: 'timeline', name: 'Timeline', icon: Calendar },
+  { id: 'analytics', name: 'Analytics', icon: BarChart3 }
 ];
 
 export function FavoritesPage({ userId }: FavoritesPageProps) {
@@ -408,7 +408,11 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
                   )}
                 </div>
                 <span>
-                  {new Date(bookmark.updated_at).toLocaleDateString()}
+                  {new Date(bookmark.updated_at).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
                 </span>
               </div>
               
@@ -535,18 +539,21 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
             <div className="flex items-center space-x-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
               <div className="flex rounded-lg border border-gray-200 dark:border-gray-700">
-                {viewModes.map((mode) => (
-                  <Button
-                    key={mode.id}
-                    variant={viewMode === mode.id ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode(mode.id as any)}
-                    className="rounded-none first:rounded-l-lg last:rounded-r-lg border-r border-gray-200 dark:border-gray-700 last:border-r-0"
-                    title={mode.name}
-                  >
-                    {mode.icon}
-                  </Button>
-                ))}
+                {viewModes.map((mode) => {
+                  const IconComponent = mode.icon
+                  return (
+                    <Button
+                      key={mode.id}
+                      variant={viewMode === mode.id ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode(mode.id as any)}
+                      className="rounded-none first:rounded-l-lg last:rounded-r-lg border-r border-gray-200 dark:border-gray-700 last:border-r-0"
+                      title={mode.name}
+                    >
+                      <IconComponent className="h-4 w-4" />
+                    </Button>
+                  )
+                })}
               </div>
             </div>
 

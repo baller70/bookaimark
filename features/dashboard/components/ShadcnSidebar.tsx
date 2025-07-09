@@ -17,10 +17,23 @@ import {
   TrendingUp,
   Users,
   FolderOpen,
-  Dna,
   ShoppingCart,
-  Brain
+  Tags,
+  Layers
 } from 'lucide-react'
+
+// Custom SVG components to prevent hydration errors
+const DnaIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  </svg>
+)
+
+const BrainIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  </svg>
+)
 
 export function ShadcnSidebar() {
   const [selectedItem, setSelectedItem] = useState('Dashboard')
@@ -29,18 +42,16 @@ export function ShadcnSidebar() {
 
   const navigationItems = [
     { id: 'Dashboard', name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
-    { id: 'DNA Profile', name: 'DNA Profile', icon: Dna, href: '/dna-profile' },
-    { id: 'AI LinkPilot', name: 'AI LinkPilot', icon: Brain, href: '/settings/ai' },
+    { id: 'DNA Profile', name: 'DNA Profile', icon: DnaIcon, href: '/dna-profile' },
+    { id: 'AI LinkPilot', name: 'AI LinkPilot', icon: BrainIcon, href: '/settings/ai' },
     { id: 'Marketplace', name: 'Marketplace', icon: ShoppingCart, href: '/marketplace' },
     { id: 'Setting', name: 'Setting', icon: Settings, href: '/settings' },
   ]
 
-  const categoryItems = [
-    { id: 'Development', name: 'Development', icon: Grid3X3, count: 2 },
-    { id: 'Design', name: 'Design', icon: TrendingUp, count: 2 },
-    { id: 'Productivity', name: 'Productivity', icon: Users, count: 2 },
-    { id: 'Learning', name: 'Learning', icon: FolderOpen, count: 0 },
-    { id: 'Entertainment', name: 'Entertainment', icon: Bookmark, count: 0 }
+  const bookmarkaiAddonItems = [
+    { id: 'Categories', name: 'Categories', icon: Layers, href: '/bookmarkai-addons/categories' },
+    { id: 'Tags', name: 'Tags', icon: Tags, href: '/bookmarkai-addons/tags' },
+    { id: 'Priority', name: 'Priority', icon: TrendingUp, href: '/bookmarkai-addons/priority' }
   ]
 
   const handleItemClick = (itemId: string) => {
@@ -151,56 +162,47 @@ export function ShadcnSidebar() {
                                     </div>
                 </div>
 
-                {/* Categories Section */}
+                {/* Bookmarkai Addons Section */}
                 <div className="space-y-1">
                   {!isCollapsed && (
                     <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-                      Categories
+                      Bookmarkai Addons
                     </h3>
                   )}
                   
                   <div className={cn("space-y-1", isCollapsed && "space-y-2")}>
-                    {categoryItems.map((item) => {
+                    {bookmarkaiAddonItems.map((item) => {
                       const Icon = item.icon
-                      const isSelected = selectedItem === item.id
+                      const isSelected = pathname === item.href
                       
                       return (
-                        <button
-                          key={item.id}
-                          onClick={() => handleItemClick(item.id)}
-                          className={cn(
-                            "flex items-center rounded-md transition-colors group",
-                            isCollapsed 
-                              ? "w-12 h-12 justify-center relative" 
-                              : "w-full justify-between px-3 py-2 text-sm",
-                            isSelected 
-                              ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100" 
-                              : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                          )}
-                          title={isCollapsed ? item.name : undefined}
-                        >
-                          {isCollapsed ? (
-                            <>
-                              <Icon className="h-5 w-5" />
-                              {item.count > 0 && (
-                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-slate-400 rounded-full"></div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex items-center gap-3">
-                                <Icon className="h-4 w-4" />
-                                <span>{item.name}</span>
-                              </div>
-                              <Badge 
-                                variant="secondary" 
-                                className="text-xs px-2 py-0.5 text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800"
-                              >
-                                {item.count}
-                              </Badge>
-                            </>
-                          )}
-                        </button>
+                        <Link key={item.id} href={item.href}>
+                          <button
+                            className={cn(
+                              "flex items-center rounded-md transition-colors group",
+                              isCollapsed 
+                                ? "w-12 h-12 justify-center relative" 
+                                : "w-full justify-between px-3 py-2 text-sm",
+                              isSelected 
+                                ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100" 
+                                : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            )}
+                            title={isCollapsed ? item.name : undefined}
+                          >
+                            {isCollapsed ? (
+                              <>
+                                <Icon className="h-5 w-5" />
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-3">
+                                  <Icon className="h-4 w-4" />
+                                  <span>{item.name}</span>
+                                </div>
+                              </>
+                            )}
+                          </button>
+                        </Link>
                       )
                     })}
                   </div>

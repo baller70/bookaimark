@@ -1,19 +1,15 @@
 'use client'
 
-import { AdvancedAnalyticsDashboard } from '@/src/components/dna-profile/advanced-analytics-dashboard'
-import { AnalyticsPage } from '@/src/components/dna-profile/analytics-page'
+import { ComprehensiveAnalytics } from '@/src/components/dna-profile/comprehensive-analytics'
 import DnaProfileLayout from '@/src/components/dna-profile/dna-profile-layout'
 
-export default function AnalyticsPageRoute() {
+export default function Analytics() {
   return (
     <DnaProfileLayout 
-      title="Analytics" 
-      description="Analyze your browsing patterns and get insights from your DNA profile"
+      title="Analytics Dashboard"
+      description="Comprehensive insights into your bookmark usage and productivity patterns"
     >
-      <div className="space-y-6">
-        <AdvancedAnalyticsDashboard />
-        <AnalyticsPage />
-      </div>
+      <ComprehensiveAnalytics />
     </DnaProfileLayout>
   )
 } 

@@ -80,38 +80,6 @@
     "notes": "Video content and tutorials"
   },
   {
-    "id": 6,
-    "user_id": "dev-user-123",
-    "title": "GitHub",
-    "url": "https://github.com",
-    "description": "Git repository hosting service",
-    "category": "Development",
-    "tags": [
-      "code",
-      "git",
-      "development"
-    ],
-    "created_at": "2024-01-01T00:00:00.000Z",
-    "updated_at": "2024-01-01T00:00:00.000Z",
-    "notes": "Main development platform"
-  },
-  {
-    "id": 7,
-    "user_id": "dev-user-123",
-    "title": "Stack Overflow",
-    "url": "https://stackoverflow.com",
-    "description": "Programming Q&A community",
-    "category": "Development",
-    "tags": [
-      "programming",
-      "help",
-      "community"
-    ],
-    "created_at": "2024-01-02T00:00:00.000Z",
-    "updated_at": "2024-01-02T00:00:00.000Z",
-    "notes": "Best place for programming help"
-  },
-  {
     "id": 8,
     "user_id": "dev-user-123",
     "title": "Figma",
@@ -126,55 +94,6 @@
     "created_at": "2024-01-03T00:00:00.000Z",
     "updated_at": "2024-01-03T00:00:00.000Z",
     "notes": "Primary design tool"
-  },
-  {
-    "id": 9,
-    "user_id": "dev-user-123",
-    "title": "Test URL from API",
-    "url": "https://example.com/test",
-    "description": "Testing single URL functionality",
-    "category": "Testing",
-    "tags": [
-      "test",
-      "api"
-    ],
-    "ai_tags": [],
-    "notes": "Added via API test",
-    "created_at": "2025-07-07T00:24:48.468Z",
-    "updated_at": "2025-07-07T00:24:48.468Z"
-  },
-  {
-    "id": 10,
-    "user_id": "dev-user-123",
-    "title": "Test Single URL Tab",
-    "url": "https://example.com/single-url-test",
-    "description": "Testing single URL tab functionality",
-    "category": "Testing",
-    "tags": [
-      "test",
-      "single-url"
-    ],
-    "ai_tags": [],
-    "notes": "Added via single URL tab test",
-    "created_at": "2025-07-07T00:44:57.602Z",
-    "updated_at": "2025-07-07T00:44:57.602Z"
-  },
-  {
-    "id": 11,
-    "user_id": "dev-user-123",
-    "title": "Test Dashboard Refresh",
-    "url": "https://example.com/dashboard-refresh-test",
-    "description": "Testing dashboard refresh functionality",
-    "category": "Testing",
-    "tags": [
-      "test",
-      "dashboard",
-      "refresh"
-    ],
-    "ai_tags": [],
-    "notes": "Testing automatic refresh",
-    "created_at": "2025-07-07T00:50:59.504Z",
-    "updated_at": "2025-07-07T00:50:59.513Z"
   },
   {
     "id": 12,

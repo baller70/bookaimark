@@ -125,6 +125,8 @@ import { FolderFormDialog, type Folder } from '@/src/components/ui/FolderFormDia
 import { KanbanView } from '@/src/components/ui/BookmarkKanban'
 import { SyncButton } from '@/components/SyncButton'
 import { getProfilePicture, onProfilePictureChange } from '@/lib/profile-utils'
+import { useAnalytics } from '@/src/hooks/useAnalytics'
+import { useRealTimeAnalytics } from '@/lib/real-time-analytics'
 
 // Import React Flow components for custom background
 import ReactFlow, {
@@ -427,6 +429,9 @@ export default function Dashboard() {
   // User ID for API calls - must match the API default
   const userId = 'dev-user-123';
 
+  // Real-time analytics
+  const { analyticsData, globalStats, isLoading: analyticsLoading, trackVisit, getBookmarkAnalytics } = useAnalytics(bookmarks);
+
   // Fetch bookmarks from database
   useEffect(() => {
     const fetchBookmarks = async () => {
@@ -500,6 +505,75 @@ export default function Dashboard() {
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  // Session recovery for viewing time tracking
+  useEffect(() => {
+    const recoverViewingSessions = () => {
+      const storedSession = localStorage.getItem('bookmarkViewSession')
+      if (storedSession) {
+        try {
+          const session = JSON.parse(storedSession)
+          const now = Date.now()
+          const timeSinceStart = now - session.startTime
+          
+          // Recover viewing sessions
+          console.log('🔄 Recovered viewing session for bookmark:', session.bookmarkId, 'time since start:', Math.round(timeSinceStart / (1000 * 60)), 'minutes')
+        } catch (error) {
+          console.error('Error recovering viewing session:', error)
+          localStorage.removeItem('bookmarkViewSession')
+        }
+      }
+    }
+    
+    // Run recovery on mount
+    recoverViewingSessions()
+    
+    // Set up periodic session recovery (every 2 minutes)
+    const recoveryInterval = setInterval(recoverViewingSessions, 2 * 60 * 1000)
+    
+    return () => clearInterval(recoveryInterval)
+  }, [])
+
+  // Test function to manually end session (for debugging)
+  const testEndSession = () => {
+    const storedSession = localStorage.getItem('bookmarkSession')
+    if (storedSession) {
+      try {
+        const session = JSON.parse(storedSession)
+        const sessionEndTime = Date.now()
+        const timeSpentMinutes = Math.round((sessionEndTime - session.startTime) / (1000 * 60))
+        
+        console.log(`🧪 Manual session end test for bookmark ${session.bookmarkId}: ${timeSpentMinutes} minutes`)
+        
+        // Update analytics with time spent
+        fetch('/api/bookmarks/analytics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookmarkId: session.bookmarkId,
+            action: 'timeUpdate',
+            timeSpent: Math.max(timeSpentMinutes, 1),
+            sessionEndTime: new Date().toISOString()
+          })
+        }).then(response => {
+          if (response.ok) {
+            console.log(`📊 Manual test - Time tracking updated: ${timeSpentMinutes} minutes`)
+          } else {
+            console.error('Manual test - Failed to update time tracking')
+          }
+        }).catch(error => {
+          console.error('Manual test - Error:', error)
+        })
+        
+        // Clear session data
+        localStorage.removeItem('bookmarkSession')
+      } catch (error) {
+        console.error('Error in manual session end test:', error)
+      }
+    } else {
+      console.log('🧪 No active session to end')
+    }
+  }
 
   // Load profile picture and listen for changes
   useEffect(() => {
@@ -625,6 +699,29 @@ export default function Dashboard() {
       circularImage: "/placeholder.svg"
     }
   ];
+
+  // Load bookmarks from database on component mount
+  useEffect(() => {
+    const loadBookmarks = async () => {
+      try {
+        const response = await fetch('/api/bookmarks?user_id=dev-user-123')
+        const result = await response.json()
+        
+        if (result.success && result.bookmarks) {
+          console.log('✅ Loaded bookmarks from database:', result.bookmarks.length)
+          setBookmarks(result.bookmarks)
+        } else {
+          console.log('⚠️ No bookmarks found, starting with empty array')
+          setBookmarks([])
+        }
+      } catch (error) {
+        console.error('❌ Error loading bookmarks:', error)
+        setBookmarks([])
+      }
+    }
+    
+    loadBookmarks()
+  }, [])
 
   // Ensure any legacy bookmark objects that may still contain tags don't render them on the cards
   useEffect(() => {
@@ -867,6 +964,18 @@ export default function Dashboard() {
   const handleBookmarkClick = (bookmark: any) => {
     setSelectedBookmark(bookmark)
     setIsModalOpen(true)
+    
+    // Start time tracking for bookmark viewing
+    const sessionStartTime = Date.now()
+    const sessionData = {
+      bookmarkId: bookmark.id,
+      startTime: sessionStartTime,
+      title: bookmark.title,
+      type: 'viewing' // Track viewing time, not external site time
+    }
+    
+    localStorage.setItem('bookmarkViewSession', JSON.stringify(sessionData))
+    console.log('🚀 Started viewing time tracking for:', bookmark.title)
   }
 
   const startEditing = (field: string, currentValue: string | string[]) => {
@@ -897,27 +1006,23 @@ export default function Dashboard() {
     const updatedBookmark = { ...selectedBookmark, [editingField]: newValue }
 
     try {
-      // Save to Supabase via MCP service
-      const response = await fetch('/api/save', {
+      // Save to bookmarks API endpoint with ID for update
+      const response = await fetch('/api/bookmarks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          table: 'bookmarks',
-          payload: {
-            id: updatedBookmark.id,
-            url: updatedBookmark.url,
-            title: updatedBookmark.title,
-            description: updatedBookmark.description || '',
-            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
-            category: updatedBookmark.category || '',
-            isFavorite: updatedBookmark.isFavorite || false,
-            priority: updatedBookmark.priority || 'medium',
-            siteHealth: updatedBookmark.siteHealth || 'good',
-            usage: updatedBookmark.usage || 0,
-            updated_at: new Date().toISOString()
-          }
+          id: selectedBookmark.id, // Include ID for update
+          title: updatedBookmark.title,
+          url: updatedBookmark.url,
+          description: updatedBookmark.description || '',
+          category: updatedBookmark.category || '',
+          tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+          notes: updatedBookmark.notes || '',
+          ai_summary: updatedBookmark.ai_summary || '',
+          ai_tags: updatedBookmark.ai_tags || [],
+          ai_category: updatedBookmark.ai_category || updatedBookmark.category || ''
         })
       })
 
@@ -979,27 +1084,23 @@ export default function Dashboard() {
     const updatedBookmark = { ...selectedBookmark, isFavorite: newFavoriteStatus }
 
     try {
-      // Save to Supabase via MCP service
-      const response = await fetch('/api/save', {
+      // Save to bookmarks API endpoint with ID for update
+      const response = await fetch('/api/bookmarks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          table: 'bookmarks',
-          payload: {
-            id: updatedBookmark.id,
-            url: updatedBookmark.url,
-            title: updatedBookmark.title,
-            description: updatedBookmark.description || '',
-            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
-            category: updatedBookmark.category || '',
-            isFavorite: updatedBookmark.isFavorite,
-            priority: updatedBookmark.priority || 'medium',
-            siteHealth: updatedBookmark.siteHealth || 'good',
-            usage: updatedBookmark.usage || 0,
-            updated_at: new Date().toISOString()
-          }
+          id: selectedBookmark.id, // Include ID for update
+          title: updatedBookmark.title,
+          url: updatedBookmark.url,
+          description: updatedBookmark.description || '',
+          category: updatedBookmark.category || '',
+          tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+          notes: updatedBookmark.notes || '',
+          ai_summary: updatedBookmark.ai_summary || '',
+          ai_tags: updatedBookmark.ai_tags || [],
+          ai_category: updatedBookmark.ai_category || updatedBookmark.category || ''
         })
       })
 
@@ -1084,7 +1185,14 @@ export default function Dashboard() {
 
   const visitSite = () => {
     if (!selectedBookmark) return
+    
+    // Track the visit in real-time analytics (just count visits)
+    trackVisit(selectedBookmark.id)
+    
+    // Open the bookmark URL
     window.open(selectedBookmark.url, '_blank', 'noopener,noreferrer')
+    
+    console.log('🔗 Opened bookmark:', selectedBookmark.title)
   }
 
   const showNotification = (message: string) => {
@@ -1219,13 +1327,62 @@ export default function Dashboard() {
         return 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-200'
       case 'fair':
         return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'poor':
+        return 'text-orange-600 bg-orange-100 dark:bg-orange-900 dark:text-orange-200'
+      case 'broken':
+        return 'text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200'
       default:
         return 'text-gray-600 bg-gray-100 dark:bg-gray-900 dark:text-gray-200'
     }
   }
 
-  // Calculate total visits across all bookmarks for percentage calculation
-  const totalVisits = bookmarks.reduce((sum, bookmark) => sum + bookmark.visits, 0)
+  // Check health of bookmarks
+  const checkBookmarkHealth = async (bookmarkIds: number[]) => {
+    try {
+      const response = await fetch('/api/bookmarks/health', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookmarkIds,
+          userId: 'dev-user-123'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to check bookmark health')
+      }
+
+      const data = await response.json()
+      
+      if (data.success) {
+        // Update bookmarks with new health status
+        setBookmarks(prev => prev.map(bookmark => {
+          const healthResult = data.results.find((r: any) => r.bookmarkId === bookmark.id)
+          if (healthResult) {
+            return {
+              ...bookmark,
+              siteHealth: healthResult.status,
+              lastHealthCheck: healthResult.lastChecked
+            }
+          }
+          return bookmark
+        }))
+        
+        showNotification(`Health check completed for ${data.results.length} bookmarks`)
+      }
+    } catch (error) {
+      console.error('Health check error:', error)
+      showNotification('Failed to check bookmark health')
+    }
+  }
+
+  // Calculate total visits across all bookmarks for percentage calculation - using live analytics data
+  const totalVisits = bookmarks.reduce((sum, bookmark) => {
+    const analytics = getBookmarkAnalytics(bookmark.id)
+    return sum + (analytics ? analytics.visits : bookmark.visits || 0)
+  }, 0)
 
   // Calculate usage percentage for a bookmark
   const getUsagePercentage = (visits: number) => {
@@ -1341,6 +1498,25 @@ export default function Dashboard() {
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               onClick={(e) => {
                 e.stopPropagation()
+                // Start editing the bookmark title
+                setSelectedBookmark(bookmark)
+                startEditing('title', bookmark.title)
+              }}
+            >
+              <Edit2 className="h-4 w-4 text-gray-400 hover:text-blue-500" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Edit bookmark</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button 
+              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
                 // Share bookmark
                 const shareData = {
                   title: bookmark.title,
@@ -1348,9 +1524,16 @@ export default function Dashboard() {
                   url: bookmark.url,
                 }
                 if (navigator.share) {
-                  navigator.share(shareData).catch(console.error)
+                  navigator.share(shareData).catch((error) => {
+                    console.error('Error sharing:', error)
+                    if (error instanceof Error && error.name === 'InvalidStateError') {
+                      showNotification('Please wait for the previous share to complete')
+                    } else {
+                      showNotification('Failed to share bookmark')
+                    }
+                  })
                 } else {
-                  navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.description}\n${selectedBookmark.url}`).then(() => {
+                  navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.description}\n${bookmark.url}`).then(() => {
                     showNotification('Bookmark details copied to clipboard!')
                   }).catch(() => {
                     showNotification('Failed to share bookmark')
@@ -1358,7 +1541,7 @@ export default function Dashboard() {
                 }
               }}
             >
-              <Edit2 className="h-4 w-4 text-gray-400 hover:text-green-500" />
+              <Share2 className="h-4 w-4 text-gray-400 hover:text-green-500" />
             </button>
           </TooltipTrigger>
           <TooltipContent>
@@ -1423,7 +1606,15 @@ export default function Dashboard() {
   const GridBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
       className="group hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer bg-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
-      onClick={() => handleBookmarkClick(bookmark)}
+      onClick={(e) => {
+        // Don't open modal if we're currently editing this bookmark
+        if (editingField && selectedBookmark?.id === bookmark.id) {
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+        handleBookmarkClick(bookmark)
+      }}
     >
       {/* Background Website Logo with 5% opacity */}
       {(() => {
@@ -1450,15 +1641,58 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 min-w-0">
               {editingField === 'title' && selectedBookmark?.id === bookmark.id ? (
-                <input
-                  type="text"
-                  value={editingValue}
-                  onChange={(e) => setEditingValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onBlur={saveEdit}
-                  className="font-bold text-gray-900 font-audiowide uppercase text-lg bg-transparent border-b-2 border-blue-500 outline-none w-full"
-                  autoFocus
-                />
+                <div 
+                  className="flex items-center space-x-2"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={editingValue}
+                    onChange={(e) => setEditingValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                    }}
+                    className="font-bold text-gray-900 font-audiowide uppercase text-lg bg-transparent border-b-2 border-blue-500 outline-none flex-1"
+                    autoFocus
+                    placeholder="Enter title..."
+                  />
+                  <div className="flex space-x-1">
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        saveEdit()
+                      }}
+                      className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                    >
+                      <Check className="h-3 w-3 text-white" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        cancelEditing()
+                      }}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <h3 
                   className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300 truncate cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5"
@@ -1502,9 +1736,109 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-100/80 mb-6 relative">
-          <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
-            <Eye className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600 font-medium">{bookmark.visits} VISITS</span>
+          <div className="flex flex-col space-y-2">
+            <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
+              <Eye className="h-4 w-4 text-gray-500" />
+              <span className="text-sm text-gray-600 font-medium">
+                {(() => {
+                  const analytics = getBookmarkAnalytics(bookmark.id)
+                  return analytics ? analytics.visits : bookmark.visits
+                })()} VISITS
+              </span>
+              {/* Real-time indicator */}
+              {!analyticsLoading && getBookmarkAnalytics(bookmark.id) && (
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live data" />
+              )}
+            </div>
+            <div className="flex items-center space-x-2 bg-green-50/80 rounded-full px-3 py-1.5">
+              <Clock className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-600 font-medium">
+                {(() => {
+                  const analytics = getBookmarkAnalytics(bookmark.id)
+                  const timeSpent = analytics ? analytics.timeSpent : bookmark.timeSpent || 0
+                  return timeSpent > 0 ? `${timeSpent}m` : '0m'
+                })()} TIME
+              </span>
+              {/* Real-time indicator */}
+              {!analyticsLoading && getBookmarkAnalytics(bookmark.id) && (
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live data" />
+              )}
+            </div>
+            <div className="relative overflow-hidden">
+              {(() => {
+                const health = bookmark.siteHealth || 'good'
+                const healthConfig = {
+                  excellent: {
+                    bg: 'bg-gradient-to-r from-emerald-50 to-green-50',
+                    border: 'border-emerald-200',
+                    icon: '🌟',
+                    color: '#059669',
+                    glow: 'shadow-emerald-200/50'
+                  },
+                  good: {
+                    bg: 'bg-gradient-to-r from-blue-50 to-cyan-50',
+                    border: 'border-blue-200',
+                    icon: '💚',
+                    color: '#0369a1',
+                    glow: 'shadow-blue-200/50'
+                  },
+                  fair: {
+                    bg: 'bg-gradient-to-r from-yellow-50 to-amber-50',
+                    border: 'border-yellow-200',
+                    icon: '⚠️',
+                    color: '#d97706',
+                    glow: 'shadow-yellow-200/50'
+                  },
+                  poor: {
+                    bg: 'bg-gradient-to-r from-orange-50 to-red-50',
+                    border: 'border-orange-200',
+                    icon: '🔄',
+                    color: '#ea580c',
+                    glow: 'shadow-orange-200/50'
+                  },
+                  broken: {
+                    bg: 'bg-gradient-to-r from-red-50 to-pink-50',
+                    border: 'border-red-200',
+                    icon: '💔',
+                    color: '#dc2626',
+                    glow: 'shadow-red-200/50'
+                  }
+                }
+                
+                const config = healthConfig[health] || healthConfig.good
+                
+                return (
+                  <div className={`flex items-center space-x-3 ${config.bg} ${config.border} border rounded-xl px-4 py-2.5 shadow-lg ${config.glow} transition-all duration-300 hover:scale-105 group cursor-pointer`}>
+                    {/* Animated background pulse */}
+                    <div className="absolute inset-0 bg-white/30 rounded-xl animate-pulse opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    
+                    {/* Health Icon with animation */}
+                    <div className="relative z-10 text-lg animate-bounce" style={{ animationDuration: '2s' }}>
+                      {config.icon}
+                    </div>
+                    
+                    {/* Health Status */}
+                    <div className="relative z-10 flex flex-col">
+                      <span className="text-xs font-bold uppercase tracking-wider opacity-70" style={{ color: config.color }}>
+                        Site Health
+                      </span>
+                      <span className="text-sm font-bold capitalize" style={{ color: config.color }}>
+                        {health}
+                      </span>
+                    </div>
+                    
+                    {/* Animated indicator dot */}
+                    <div className="relative z-10">
+                      <div 
+                        className="w-3 h-3 rounded-full animate-pulse shadow-lg"
+                        style={{ backgroundColor: config.color }}
+                        title={`${health} health status`}
+                      />
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
           {/* Usage Percentage Hexagon - Moved here to be even with visits */}
           <div className="flex items-center justify-center">
@@ -1512,7 +1846,11 @@ export default function Dashboard() {
               <path
                 d="M35 4 L55 15 L55 40 L35 51 L15 40 L15 15 Z"
                 fill="white"
-                stroke={getPercentageColor(getUsagePercentage(bookmark.visits))}
+                stroke={(() => {
+                  const analytics = getBookmarkAnalytics(bookmark.id)
+                  const percentage = analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+                  return getPercentageColor(percentage)
+                })()}
                 strokeWidth="2"
               />
               <text
@@ -1520,11 +1858,18 @@ export default function Dashboard() {
                 y="30"
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fill={getPercentageColor(getUsagePercentage(bookmark.visits))}
+                fill={(() => {
+                  const analytics = getBookmarkAnalytics(bookmark.id)
+                  const percentage = analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+                  return getPercentageColor(percentage)
+                })()}
                 fontSize="16"
                 fontWeight="bold"
               >
-                {getUsagePercentage(bookmark.visits)}%
+                {(() => {
+                  const analytics = getBookmarkAnalytics(bookmark.id)
+                  return analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+                })()}%
               </text>
             </svg>
           </div>
@@ -1630,9 +1975,13 @@ export default function Dashboard() {
             <div className="flex items-center space-x-1.5">
               <Eye className="h-4 w-4 text-gray-600" />
               <p className="text-sm text-gray-600 font-semibold">
-                {bookmark.visits}
+                {getBookmarkAnalytics(bookmark.id)?.visits || bookmark.visits}
               </p>
               <span className="text-sm text-gray-500 font-medium uppercase">Visits</span>
+              {/* Live indicator */}
+              {!analyticsLoading && getBookmarkAnalytics(bookmark.id) && (
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" title="Live data" />
+              )}
             </div>
             <img 
               src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg"} 
@@ -1655,7 +2004,11 @@ export default function Dashboard() {
             <path
               d="M35 5 L55 15 L55 38 L35 48 L15 38 L15 15 Z"
               fill="white"
-              stroke={getPercentageColor(getUsagePercentage(bookmark.visits))}
+              stroke={(() => {
+                const analytics = getBookmarkAnalytics(bookmark.id)
+                const percentage = analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+                return getPercentageColor(percentage)
+              })()}
               strokeWidth="3"
             />
             <text
@@ -1663,11 +2016,18 @@ export default function Dashboard() {
               y="26"
               textAnchor="middle"
               dominantBaseline="middle"
-              fill={getPercentageColor(getUsagePercentage(bookmark.visits))}
+              fill={(() => {
+                const analytics = getBookmarkAnalytics(bookmark.id)
+                const percentage = analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+                return getPercentageColor(percentage)
+              })()}
               fontSize="16"
               fontWeight="bold"
             >
-              {getUsagePercentage(bookmark.visits)}%
+              {(() => {
+                const analytics = getBookmarkAnalytics(bookmark.id)
+                return analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+              })()}%
             </text>
           </svg>
         </div>
@@ -1946,13 +2306,25 @@ export default function Dashboard() {
           <div className="flex items-center">
             <div className="flex items-center space-x-2 bg-gray-50/80 rounded-full px-3 py-1.5">
               <Bookmark className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-600 font-medium uppercase">{bookmark.visits} VISITS</span>
+              <span className="text-sm text-gray-600 font-medium uppercase">
+                {(() => {
+                  const analytics = getBookmarkAnalytics(bookmark.id)
+                  return analytics ? analytics.visits : bookmark.visits || 0
+                })()} VISITS
+              </span>
+              {/* Live indicator */}
+              {!analyticsLoading && getBookmarkAnalytics(bookmark.id) && (
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live data" />
+              )}
             </div>
           </div>
           
           {/* Bottom Right: Usage Hexagon */}
           <div className="flex items-center space-x-4">
-            <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
+            <UsageHexagon percentage={(() => {
+              const analytics = getBookmarkAnalytics(bookmark.id)
+              return analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+            })()} />
           </div>
         </div>
       </CardContent>
@@ -2014,7 +2386,10 @@ export default function Dashboard() {
           <BookmarkActionIcons bookmark={bookmark} />
           
           {/* Usage Percentage Hexagon */}
-          <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
+          <UsageHexagon percentage={(() => {
+            const analytics = getBookmarkAnalytics(bookmark.id)
+            return analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+          })()} />
         </Card>
       </div>
     )
@@ -2064,7 +2439,10 @@ export default function Dashboard() {
             <BookmarkActionIcons bookmark={bookmark} />
             
             {/* Usage Percentage Hexagon */}
-            <UsageHexagon percentage={getUsagePercentage(bookmark.visits)} />
+            <UsageHexagon percentage={(() => {
+              const analytics = getBookmarkAnalytics(bookmark.id)
+              return analytics ? analytics.usagePercentage : getUsagePercentage(bookmark.visits)
+            })()} />
           </Card>
         </div>
       </div>
@@ -3030,7 +3408,16 @@ export default function Dashboard() {
                       <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
                         <div className="bg-black h-3 rounded-full" style={{width: '75%'}}></div>
                       </div>
-                      <span className="text-xs font-medium text-gray-700">CLICKS/OPENS</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-700">CLICKS/OPENS</span>
+                        {/* Live indicator - show when analytics data is available */}
+                        {!analyticsLoading && analyticsData && Object.keys(analyticsData).length > 0 && (
+                          <div className="flex items-center space-x-1">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live data" />
+                            <span className="text-xs text-green-600 font-medium">LIVE</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3279,6 +3666,22 @@ export default function Dashboard() {
             <Columns className="h-5 w-5" />
             <span className="font-medium">KANBAN 2.0</span>
           </Button>
+          
+          {/* Divider */}
+          <div className="w-px h-8 bg-gray-300 mx-3"></div>
+          
+          {/* Check Health Button */}
+          <Button
+            size="lg"
+            onClick={() => {
+              const bookmarkIds = filteredBookmarks.map(b => b.id)
+              checkBookmarkHealth(bookmarkIds)
+            }}
+            className="h-12 px-6 flex items-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+          >
+            <Shield className="h-5 w-5" />
+            <span className="font-medium">CHECK HEALTH</span>
+          </Button>
         </div>
       </div>
 
@@ -3296,12 +3699,21 @@ export default function Dashboard() {
                 : 'Get started by adding your first bookmark.'}
             </p>
             {!searchQuery && selectedCategory === 'all' && (
-              <div className="mt-6">
+              <div className="mt-6 flex space-x-4">
                 <Button onClick={() => setShowAddBookmark(true)} className="inline-flex items-center">
                   <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   Add Bookmark
+                </Button>
+                <Button 
+                  onClick={() => {
+                    const bookmarkIds = bookmarks.map(b => b.id)
+                    checkBookmarkHealth(bookmarkIds)
+                  }}
+                  className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white"
+                >
+                  🔍 Check All Health
                 </Button>
               </div>
             )}
@@ -3315,6 +3727,46 @@ export default function Dashboard() {
       <Dialog open={isModalOpen} onOpenChange={(open) => {
         setIsModalOpen(open)
         if (!open) {
+          // End time tracking for bookmark viewing
+          const storedSession = localStorage.getItem('bookmarkViewSession')
+          if (storedSession) {
+            try {
+              const session = JSON.parse(storedSession)
+              const sessionEndTime = Date.now()
+              const timeSpentMinutes = Math.round((sessionEndTime - session.startTime) / (1000 * 60))
+              
+              console.log(`⏱️ Viewing session ended for bookmark ${session.bookmarkId}: ${timeSpentMinutes} minutes`)
+              
+              // Track time spent viewing the bookmark (minimum 1 minute for any interaction)
+              if (timeSpentMinutes >= 0) {
+                fetch('/api/bookmarks/analytics', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    bookmarkId: session.bookmarkId,
+                    action: 'timeUpdate',
+                    timeSpent: Math.max(timeSpentMinutes, 1), // Minimum 1 minute
+                    sessionEndTime: new Date().toISOString()
+                  })
+                }).then(response => {
+                  if (response.ok) {
+                    console.log(`📊 Viewing time updated: ${timeSpentMinutes} minutes for bookmark ${session.bookmarkId}`)
+                  } else {
+                    console.error('Failed to update viewing time tracking')
+                  }
+                }).catch(error => {
+                  console.error('Failed to update viewing time tracking:', error)
+                })
+              }
+              
+              // Clear session data
+              localStorage.removeItem('bookmarkViewSession')
+            } catch (error) {
+              console.error('Error processing viewing session end:', error)
+              localStorage.removeItem('bookmarkViewSession')
+            }
+          }
+          
           // Reset editing state when modal closes
           setEditingField(null)
           setEditingValue('')
@@ -3408,6 +3860,14 @@ export default function Dashboard() {
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
                       VISIT SITE
+                    </Button>
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={testEndSession}
+                      className="bg-orange-600 text-white hover:bg-orange-700"
+                    >
+                      🧪 Test End Session
                     </Button>
                   </div>
                 </div>
@@ -3631,22 +4091,50 @@ export default function Dashboard() {
                     <Card className="bg-gradient-to-br from-white via-blue-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-sm hover:shadow-lg transition-all duration-300">
                       <CardContent className="p-6 text-center">
                         <Eye className="h-7 w-7 mx-auto mb-3 text-blue-600" />
-                        <p className="text-3xl font-bold text-gray-900">{selectedBookmark.visits}</p>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {(() => {
+                            const analytics = getBookmarkAnalytics(selectedBookmark.id)
+                            return analytics ? analytics.visits : selectedBookmark.visits || 0
+                          })()}
+                        </p>
                         <p className="text-xs text-muted-foreground font-medium">TOTAL VISITS</p>
+                        {/* Live indicator */}
+                        {!analyticsLoading && getBookmarkAnalytics(selectedBookmark.id) && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mt-1 mx-auto" title="Live data" />
+                        )}
                       </CardContent>
                     </Card>
                     <Card className="bg-gradient-to-br from-white via-green-50/20 to-white border border-gray-200/60 hover:border-green-300/50 shadow-sm hover:shadow-lg transition-all duration-300">
                       <CardContent className="p-6 text-center">
                         <Clock className="h-7 w-7 mx-auto mb-3 text-green-600" />
-                        <p className="text-3xl font-bold text-gray-900">{selectedBookmark.timeSpent}</p>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {(() => {
+                            const analytics = getBookmarkAnalytics(selectedBookmark.id)
+                            const timeSpent = analytics ? analytics.timeSpent : selectedBookmark.timeSpent || 0
+                            return timeSpent > 0 ? `${timeSpent}m` : '0m'
+                          })()}
+                        </p>
                         <p className="text-xs text-muted-foreground font-medium">TIME SPENT</p>
+                        {/* Live indicator */}
+                        {!analyticsLoading && getBookmarkAnalytics(selectedBookmark.id) && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mt-1 mx-auto" title="Live data" />
+                        )}
                       </CardContent>
                     </Card>
                     <Card className="bg-gradient-to-br from-white via-purple-50/20 to-white border border-gray-200/60 hover:border-purple-300/50 shadow-sm hover:shadow-lg transition-all duration-300">
                       <CardContent className="p-6 text-center">
                         <Activity className="h-7 w-7 mx-auto mb-3 text-purple-600" />
-                        <p className="text-3xl font-bold text-gray-900">{selectedBookmark.weeklyVisits}</p>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {(() => {
+                            const analytics = getBookmarkAnalytics(selectedBookmark.id)
+                            return analytics ? analytics.weeklyVisits : selectedBookmark.weeklyVisits || 0
+                          })()}
+                        </p>
                         <p className="text-xs text-muted-foreground font-medium">THIS WEEK</p>
+                        {/* Live indicator */}
+                        {!analyticsLoading && getBookmarkAnalytics(selectedBookmark.id) && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mt-1 mx-auto" title="Live data" />
+                        )}
                       </CardContent>
                     </Card>
                     <Card className="bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-gray-300/50 shadow-sm hover:shadow-lg transition-all duration-300">
@@ -3660,9 +4148,15 @@ export default function Dashboard() {
                   </div>
 
                   {/* View Full Analytics Button */}
-                  <div className="flex justify-center mt-6">
+                  <div className="flex justify-center mt-6 space-x-4">
                     <Button className="px-8 py-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                       VIEW FULL ANALYTICS
+                    </Button>
+                    <Button 
+                      onClick={() => checkBookmarkHealth([selectedBookmark.id])}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                    >
+                      🔍 CHECK HEALTH
                     </Button>
                   </div>
 

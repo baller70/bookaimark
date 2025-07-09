@@ -408,7 +408,11 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
                   )}
                 </div>
                 <span>
-                  {new Date(bookmark.updated_at).toLocaleDateString()}
+                  {new Date(bookmark.updated_at).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
                 </span>
               </div>
               

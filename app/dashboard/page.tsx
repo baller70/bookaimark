@@ -246,205 +246,40 @@ function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
 }
 
 export default function Dashboard() {
-  const [isClient, setIsClient] = useState(false)
-  const [viewMode, setViewMode] = useState('grid')
-  const [showAddBookmark, setShowAddBookmark] = useState(false)
-  const [selectedBookmarks, setSelectedBookmarks] = useState<number[]>([])
+  const [bookmarks, setBookmarks] = useState<any[]>([])
+  const [folders, setFolders] = useState<any[]>([])
   const [selectedBookmark, setSelectedBookmark] = useState<any>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [chartTimePeriod, setChartTimePeriod] = useState('3months')
-  const [newBookmark, setNewBookmark] = useState({
-    title: '',
-    url: '',
-    description: '',
-    tags: '',
-    category: 'Development',
-    priority: 'medium',
-    notes: '',
-    circularImage: '',
-    logo: ''
-  })
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingField, setEditingField] = useState<string | null>(null)
-  const [editingValue, setEditingValue] = useState<string>('')
-  const [notification, setNotification] = useState<string | null>(null)
-  const [userDefaultLogo, setUserDefaultLogo] = useState<string>('')
-  const [showDefaultLogoModal, setShowDefaultLogoModal] = useState(false)
-  const [newDefaultLogo, setNewDefaultLogo] = useState('')
-  // New states for folder-based compact view
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact' | 'infinity'>('grid')
   const [compactViewMode, setCompactViewMode] = useState<'folders' | 'bookmarks'>('folders')
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-  // near top state declarations after other states
-  const [folderAssignments, setFolderAssignments] = useState<FolderHierarchyAssignment[]>([]);
-  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
-  const [selectedGoalFolder, setSelectedGoalFolder] = useState<Folder | null>(null);
-  // Folder creation states
-  const [showAddFolder, setShowAddFolder] = useState(false);
-  const [newFolder, setNewFolder] = useState({
-    name: '',
-    color: '#3b82f6', // Default blue color
-    description: ''
-  });
-
-  // Add Bookmark modal states
-  const [addBookmarkTab, setAddBookmarkTab] = useState<'new' | 'existing'>('new');
-  const [selectedExistingBookmarks, setSelectedExistingBookmarks] = useState<number[]>([]);
-  const [existingBookmarksSearch, setExistingBookmarksSearch] = useState('');
-
-  // HIERARCHY view mode state
-  const [khV1ViewMode, setKhV1ViewMode] = useState<'chart' | 'timeline'>('chart');
-
-  // Add active tab state for bookmark modal
-  const [activeBookmarkTab, setActiveBookmarkTab] = useState('overview');
-  const [hasVisitedMediaTab, setHasVisitedMediaTab] = useState(false);
-
-  // State for mock folders used in Folder 2.0 and Goal 2.0 views
-  const [mockFolders, setMockFolders] = useState([
-    {
-      id: '1',
-      name: 'Development',
-      description: 'All development related bookmarks and resources',
-      color: '#3b82f6'
-    },
-    {
-      id: '2', 
-      name: 'Design',
-      description: 'Design tools, inspiration, and creative resources',
-      color: '#ef4444'
-    },
-    {
-      id: '3',
-      name: 'Productivity',
-      description: 'Tools and apps to boost productivity',
-      color: '#10b981'
-    },
-    {
-      id: '4',
-      name: 'Entertainment',
-      description: 'Fun and entertainment websites',
-      color: '#8b5cf6'
-    },
-    {
-      id: '5',
-      name: 'Social',
-      description: 'Social media and networking platforms',
-      color: '#f59e0b'
-    },
-    {
-      id: '6',
-      name: 'Education',
-      description: 'Learning resources and educational content',
-      color: '#06b6d4'
-    }
-  ]);
-
-  const [mockGoalFolders, setMockGoalFolders] = useState([
-    {
-      id: '1',
-      name: 'Q1 Learning Goals',
-      description: 'Complete React and TypeScript courses',
-      color: '#3b82f6',
-      deadline_date: '2024-03-31',
-      goal_type: 'learn_category',
-      goal_description: 'Master React hooks and TypeScript fundamentals',
-      goal_status: 'in_progress',
-      goal_priority: 'high',
-      goal_progress: 65,
-      goal_notes: 'Making good progress on React hooks'
-    },
-    {
-      id: '2',
-      name: 'Project Organization',
-      description: 'Organize all development resources',
-      color: '#10b981',
-      deadline_date: '2024-02-15',
-      goal_type: 'organize',
-      goal_description: 'Create a systematic approach to project management',
-      goal_status: 'pending',
-      goal_priority: 'medium',
-      goal_progress: 25,
-      goal_notes: 'Need to start organizing soon'
-    },
-    {
-      id: '3',
-      name: 'Research New Technologies',
-      description: 'Explore emerging web technologies',
-      color: '#f59e0b',
-      deadline_date: '2024-04-30',
-      goal_type: 'research_topic',
-      goal_description: 'Research and evaluate new frameworks and tools',
-      goal_status: 'in_progress',
-      goal_priority: 'low',
-      goal_progress: 40,
-      goal_notes: 'Focusing on Next.js 14 and React Server Components'
-    }
-  ]);
-
-  // --- Bookmark data state (fetched from database) ---
-  const [bookmarks, setBookmarks] = useState<any[]>([]);
-  const [isLoadingBookmarks, setIsLoadingBookmarks] = useState(true);
-  
-  // User ID for API calls - must match the API default
-  const userId = 'dev-user-123';
-
-  // Fetch bookmarks from database
-  useEffect(() => {
-    const fetchBookmarks = async () => {
-      try {
-        setIsLoadingBookmarks(true);
-        const response = await fetch(`/api/bookmarks?user_id=${userId}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          setBookmarks(data.bookmarks);
-          console.log(`✅ Loaded ${data.bookmarks.length} bookmarks from database`);
-        } else {
-          console.error('❌ Failed to fetch bookmarks:', data.error);
-          // Fallback to empty array
-          setBookmarks([]);
-        }
-      } catch (error) {
-        console.error('❌ Error fetching bookmarks:', error);
-        // Fallback to empty array
-        setBookmarks([]);
-      } finally {
-        setIsLoadingBookmarks(false);
-      }
-    };
-
-    fetchBookmarks();
-  }, []);
-
-  // ---- Folder category ordering state (for compact & list views) ----
-  const [folderCategories, setFolderCategories] = useState<string[]>([]);
-
-  // Initialize / sync folderCategories with current bookmark categories while preserving user-defined order
-  useEffect(() => {
-    const currentCategories = Array.from(new Set(bookmarks.map((b) => b.category)));
-
-    setFolderCategories((prev) => {
-      if (prev.length === 0) {
-        return currentCategories; // initial load
-      }
-      const missing = currentCategories.filter((c) => !prev.includes(c));
-      if (missing.length === 0) return prev;
-      return [...prev, ...missing];
-    });
-  }, [bookmarks]);
-
-  // Reset compact view mode when switching away from compact/list view
-  useEffect(() => {
-    if (viewMode !== 'compact' && viewMode !== 'list') {
-      setCompactViewMode('folders')
-      setSelectedFolder(null)
-    }
-  }, [viewMode])
-
-  // Client-side only effect
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterPriority, setFilterPriority] = useState('')
+  const [sortBy, setSortBy] = useState('title')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [isAddBookmarkModalOpen, setIsAddBookmarkModalOpen] = useState(false)
+  const [isAddFolderModalOpen, setIsAddFolderModalOpen] = useState(false)
+  const [isAddExistingBookmarksModalOpen, setIsAddExistingBookmarksModalOpen] = useState(false)
+  const [newBookmarkUrl, setNewBookmarkUrl] = useState('')
+  const [newBookmarkTitle, setNewBookmarkTitle] = useState('')
+  const [newBookmarkDescription, setNewBookmarkDescription] = useState('')
+  const [newBookmarkTags, setNewBookmarkTags] = useState('')
+  const [newBookmarkCategory, setNewBookmarkCategory] = useState('')
+  const [newBookmarkPriority, setNewBookmarkPriority] = useState('medium')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [newFolderDescription, setNewFolderDescription] = useState('')
+  const [existingBookmarks, setExistingBookmarks] = useState<any[]>([])
+  const [selectedExistingBookmarks, setSelectedExistingBookmarks] = useState<number[]>([])
+  const [selectedBookmarks, setSelectedBookmarks] = useState<number[]>([])
+  const [notification, setNotification] = useState<string | null>(null)
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [editingValue, setEditingValue] = useState<string>('')
+  const [userDefaultLogo, setUserDefaultLogo] = useState<string | null>(null)
+  const [isDefaultLogoModalOpen, setIsDefaultLogoModalOpen] = useState(false)
+  const [newDefaultLogoUrl, setNewDefaultLogoUrl] = useState('')
+  const [activeBookmarkTab, setActiveBookmarkTab] = useState('overview')
+  const [isSharing, setIsSharing] = useState<Record<number, boolean>>({})
 
   // Load user profile picture from Supabase
   useEffect(() => {
@@ -589,6 +424,29 @@ export default function Dashboard() {
     }
   ];
 
+  // Load bookmarks from database on component mount
+  useEffect(() => {
+    const loadBookmarks = async () => {
+      try {
+        const response = await fetch('/api/bookmarks?user_id=dev-user-123')
+        const result = await response.json()
+        
+        if (result.success && result.bookmarks) {
+          console.log('✅ Loaded bookmarks from database:', result.bookmarks.length)
+          setBookmarks(result.bookmarks)
+        } else {
+          console.log('⚠️ No bookmarks found, starting with empty array')
+          setBookmarks([])
+        }
+      } catch (error) {
+        console.error('❌ Error loading bookmarks:', error)
+        setBookmarks([])
+      }
+    }
+    
+    loadBookmarks()
+  }, [])
+
   // Ensure any legacy bookmark objects that may still contain tags don't render them on the cards
   useEffect(() => {
     setBookmarks(prev => prev.map(b => ({ ...b, tags: Array.isArray(b.tags) ? b.tags : [] })))
@@ -610,7 +468,7 @@ export default function Dashboard() {
                          bookmark.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          bookmark.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
     
-    const matchesCategory = selectedCategory === 'all' || bookmark.category.toLowerCase() === selectedCategory.toLowerCase()
+    const matchesCategory = filterCategory === 'all' || bookmark.category.toLowerCase() === filterCategory.toLowerCase()
     
     return matchesSearch && matchesCategory
   })
@@ -638,19 +496,19 @@ export default function Dashboard() {
 
   const handleAddBookmark = () => {
     // Validate required fields
-    if (!newBookmark.title.trim()) {
+    if (!newBookmarkTitle.trim()) {
       alert('Please enter a bookmark title');
       return;
     }
     
-    if (!newBookmark.url.trim()) {
+    if (!newBookmarkUrl.trim()) {
       alert('Please enter a bookmark URL');
       return;
     }
     
     // Validate URL format
     try {
-      new URL(newBookmark.url);
+      new URL(newBookmarkUrl);
     } catch {
       alert('Please enter a valid URL (e.g., https://example.com)');
       return;
@@ -659,17 +517,17 @@ export default function Dashboard() {
     // Create new bookmark object
     const bookmark = {
       id: bookmarks.length + 1,
-      title: newBookmark.title.toUpperCase(),
-      url: newBookmark.url,
-      description: newBookmark.description || 'No description provided',
-      category: newBookmark.category,
-      tags: newBookmark.tags ? newBookmark.tags.split(',').map(tag => tag.trim().toUpperCase()) : [],
-      priority: newBookmark.priority,
+      title: newBookmarkTitle.toUpperCase(),
+      url: newBookmarkUrl,
+      description: newBookmarkDescription || 'No description provided',
+      category: newBookmarkCategory,
+      tags: newBookmarkTags ? newBookmarkTags.split(',').map(tag => tag.trim().toUpperCase()) : [],
+      priority: newBookmarkPriority,
       isFavorite: false,
       visits: 0,
       lastVisited: new Date().toLocaleDateString(),
       dateAdded: new Date().toLocaleDateString(),
-      favicon: newBookmark.title.charAt(0).toUpperCase(), // Use first letter as fallback
+      favicon: newBookmarkTitle.charAt(0).toUpperCase(), // Use first letter as fallback
       screenshot: "/placeholder.svg",
       circularImage: newBookmark.circularImage || userDefaultLogo || "/placeholder.svg",
       logo: newBookmark.logo || "", // Background logo
@@ -690,7 +548,7 @@ export default function Dashboard() {
     setBookmarks(prev => [...prev, bookmark])
     
     console.log('Bookmark added successfully:', bookmark)
-    setShowAddBookmark(false)
+    setIsAddBookmarkModalOpen(false)
     resetAddBookmarkForm()
   }
 
@@ -709,10 +567,10 @@ export default function Dashboard() {
   }
 
   const handleAddFolder = () => {
-    if (newFolder.name.trim()) {
+    if (newFolderName.trim()) {
       // For now, we'll just show a notification that the folder was created
       // In a real app, this would save to a database
-      showNotification(`Folder "${newFolder.name}" created successfully!`)
+      showNotification(`Folder "${newFolderName}" created successfully!`)
       
       // Reset the form
       setNewFolder({
@@ -722,7 +580,7 @@ export default function Dashboard() {
       })
       
       // Close the modal
-      setShowAddFolder(false)
+      setIsAddFolderModalOpen(false)
     }
   }
 
@@ -773,14 +631,19 @@ export default function Dashboard() {
 
     setBookmarks(prev => [...prev, ...bookmarksToAdd])
     setSelectedExistingBookmarks([])
-    setShowAddBookmark(false)
+    setIsAddBookmarkModalOpen(false)
     showNotification(`Added ${bookmarksToAdd.length} bookmark(s) successfully!`)
   }
 
   const resetAddBookmarkModal = () => {
-    setAddBookmarkTab('new')
+    setIsAddBookmarkModalOpen(false)
     setSelectedExistingBookmarks([])
-    setExistingBookmarksSearch('')
+    setNewBookmarkUrl('')
+    setNewBookmarkTitle('')
+    setNewBookmarkDescription('')
+    setNewBookmarkTags('')
+    setNewBookmarkCategory('')
+    setNewBookmarkPriority('medium')
     resetAddBookmarkForm()
   }
 
@@ -837,27 +700,23 @@ export default function Dashboard() {
     const updatedBookmark = { ...selectedBookmark, [editingField]: newValue }
 
     try {
-      // Save to Supabase via MCP service
-      const response = await fetch('/api/save', {
+      // Save to bookmarks API endpoint with ID for update
+      const response = await fetch('/api/bookmarks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          table: 'bookmarks',
-          payload: {
-            id: updatedBookmark.id,
-            url: updatedBookmark.url,
-            title: updatedBookmark.title,
-            description: updatedBookmark.description || '',
-            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
-            category: updatedBookmark.category || '',
-            isFavorite: updatedBookmark.isFavorite || false,
-            priority: updatedBookmark.priority || 'medium',
-            siteHealth: updatedBookmark.siteHealth || 'good',
-            usage: updatedBookmark.usage || 0,
-            updated_at: new Date().toISOString()
-          }
+          id: selectedBookmark.id, // Include ID for update
+          title: updatedBookmark.title,
+          url: updatedBookmark.url,
+          description: updatedBookmark.description || '',
+          category: updatedBookmark.category || '',
+          tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+          notes: updatedBookmark.notes || '',
+          ai_summary: updatedBookmark.ai_summary || '',
+          ai_tags: updatedBookmark.ai_tags || [],
+          ai_category: updatedBookmark.ai_category || updatedBookmark.category || ''
         })
       })
 
@@ -875,6 +734,7 @@ export default function Dashboard() {
         setSelectedBookmark(updatedBookmark)
         
         showNotification(`${editingField} updated successfully!`)
+        console.log('✅ Bookmark saved successfully:', result.bookmark)
       } else {
         showNotification('Failed to save changes')
         console.error('Save failed:', result.error)
@@ -919,27 +779,23 @@ export default function Dashboard() {
     const updatedBookmark = { ...selectedBookmark, isFavorite: newFavoriteStatus }
 
     try {
-      // Save to Supabase via MCP service
-      const response = await fetch('/api/save', {
+      // Save to bookmarks API endpoint with ID for update
+      const response = await fetch('/api/bookmarks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          table: 'bookmarks',
-          payload: {
-            id: updatedBookmark.id,
-            url: updatedBookmark.url,
-            title: updatedBookmark.title,
-            description: updatedBookmark.description || '',
-            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags.join(',') : updatedBookmark.tags || '',
-            category: updatedBookmark.category || '',
-            isFavorite: updatedBookmark.isFavorite,
-            priority: updatedBookmark.priority || 'medium',
-            siteHealth: updatedBookmark.siteHealth || 'good',
-            usage: updatedBookmark.usage || 0,
-            updated_at: new Date().toISOString()
-          }
+          id: selectedBookmark.id, // Include ID for update
+          title: updatedBookmark.title,
+          url: updatedBookmark.url,
+          description: updatedBookmark.description || '',
+          category: updatedBookmark.category || '',
+          tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+          notes: updatedBookmark.notes || '',
+          ai_summary: updatedBookmark.ai_summary || '',
+          ai_tags: updatedBookmark.ai_tags || [],
+          ai_category: updatedBookmark.ai_category || updatedBookmark.category || ''
         })
       })
 
@@ -957,6 +813,7 @@ export default function Dashboard() {
         setSelectedBookmark(updatedBookmark)
         
         showNotification(newFavoriteStatus ? 'Added to favorites!' : 'Removed from favorites!')
+        console.log('✅ Bookmark favorite status updated:', result.bookmark)
       } else {
         showNotification('Failed to update favorite status')
         console.error('Save failed:', result.error)
@@ -970,6 +827,14 @@ export default function Dashboard() {
   const shareBookmark = async () => {
     if (!selectedBookmark) return
 
+    // Prevent multiple simultaneous share operations for the selected bookmark
+    if (isSharing[selectedBookmark.id]) {
+      showNotification('Please wait for the previous share to complete')
+      return
+    }
+
+    setIsSharing(prev => ({ ...prev, [selectedBookmark.id]: true }))
+
     const shareData = {
       title: selectedBookmark.title,
       text: selectedBookmark.description,
@@ -980,6 +845,7 @@ export default function Dashboard() {
       // Try to use Web Share API if available
       if (navigator.share) {
         await navigator.share(shareData)
+        showNotification('Bookmark shared successfully!')
       } else {
         // Fallback to copying to clipboard
         await navigator.clipboard.writeText(`${selectedBookmark.title}\n${selectedBookmark.description}\n${selectedBookmark.url}`)
@@ -987,14 +853,23 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error sharing:', error)
-      // Fallback to copying URL only
-      try {
-        await navigator.clipboard.writeText(selectedBookmark.url)
-        showNotification('Bookmark URL copied to clipboard!')
-      } catch (clipboardError) {
-        console.error('Clipboard error:', clipboardError)
-        showNotification('Unable to share or copy bookmark')
+      if (error instanceof Error && error.name === 'InvalidStateError') {
+        showNotification('Please wait for the previous share to complete')
+      } else {
+        // Fallback to copying URL only
+        try {
+          await navigator.clipboard.writeText(selectedBookmark.url)
+          showNotification('Bookmark URL copied to clipboard!')
+        } catch (clipboardError) {
+          console.error('Clipboard error:', clipboardError)
+          showNotification('Unable to share or copy bookmark')
+        }
       }
+    } finally {
+      // Reset sharing state after a delay to prevent rapid clicking
+      setTimeout(() => {
+        setIsSharing(prev => ({ ...prev, [selectedBookmark.id]: false }))
+      }, 1000)
     }
   }
 
@@ -1034,9 +909,7 @@ export default function Dashboard() {
 
   const deleteBookmark = async (bookmarkId: number) => {
     try {
-      const response = await fetch(`/api/bookmarks?id=${bookmarkId}&user_id=${userId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(`/api/bookmarks?id=${bookmarkId}&user_id=${userId}`);
       
       const data = await response.json();
       
@@ -1056,22 +929,22 @@ export default function Dashboard() {
 
   const handleSetDefaultLogo = () => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('userDefaultLogo', newDefaultLogo)
-      setUserDefaultLogo(newDefaultLogo)
-      setShowDefaultLogoModal(false)
-      setNewDefaultLogo('')
+      localStorage.setItem('userDefaultLogo', newDefaultLogoUrl)
+      setUserDefaultLogo(newDefaultLogoUrl)
+      setIsDefaultLogoModalOpen(false)
+      setNewDefaultLogoUrl('')
       showNotification('Default logo updated successfully!')
     }
   }
 
   const openDefaultLogoModal = () => {
-    setNewDefaultLogo(userDefaultLogo)
-    setShowDefaultLogoModal(true)
+    setNewDefaultLogoUrl(userDefaultLogo || '')
+    setIsDefaultLogoModalOpen(true)
   }
 
   const handleTabChange = (value: string) => {
     console.log('Tab changed to:', value)
-    setActiveBookmarkTab(value)
+    setActiveTab(value)
     if (value === 'media') {
       console.log('Media tab visited - setting hasVisitedMediaTab to true')
       setHasVisitedMediaTab(true)
@@ -1281,28 +1154,68 @@ export default function Dashboard() {
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               onClick={(e) => {
                 e.stopPropagation()
-                // Share bookmark
-                const shareData = {
-                  title: bookmark.title,
-                  text: bookmark.description,
-                  url: bookmark.url,
-                }
-                if (navigator.share) {
-                  navigator.share(shareData).catch(console.error)
-                } else {
-                  navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.description}\n${selectedBookmark.url}`).then(() => {
-                    showNotification('Bookmark details copied to clipboard!')
-                  }).catch(() => {
-                    showNotification('Failed to share bookmark')
-                  })
-                }
+                // Start editing the bookmark title
+                setSelectedBookmark(bookmark)
+                startEditing('title', bookmark.title)
               }}
             >
-              <Edit2 className="h-4 w-4 text-gray-400 hover:text-green-500" />
+              <Edit2 className="h-4 w-4 text-gray-400 hover:text-blue-500" />
             </button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Share bookmark</p>
+            <p>Edit bookmark</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button 
+              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              onClick={async (e) => {
+                e.stopPropagation()
+                
+                // Prevent multiple simultaneous share operations
+                if (isSharing[bookmark.id]) {
+                  return
+                }
+                
+                setIsSharing(prev => ({ ...prev, [bookmark.id]: true }))
+                
+                try {
+                  const shareData = {
+                    title: bookmark.title,
+                    text: bookmark.description,
+                    url: bookmark.url,
+                  }
+                  
+                  if (navigator.share) {
+                    await navigator.share(shareData)
+                    showNotification('Bookmark shared successfully!')
+                  } else {
+                    await navigator.clipboard.writeText(`${bookmark.title}\n${bookmark.description}\n${bookmark.url}`)
+                    showNotification('Bookmark details copied to clipboard!')
+                  }
+                                 } catch (error) {
+                   console.error('Error sharing:', error)
+                   if (error instanceof Error && error.name === 'InvalidStateError') {
+                     showNotification('Please wait for the previous share to complete')
+                   } else {
+                     showNotification('Failed to share bookmark')
+                   }
+                 } finally {
+                  // Reset sharing state after a delay to prevent rapid clicking
+                  setTimeout(() => {
+                    setIsSharing(prev => ({ ...prev, [bookmark.id]: false }))
+                  }, 1000)
+                }
+              }}
+              disabled={isSharing[bookmark.id]}
+            >
+              <Share2 className={`h-4 w-4 ${isSharing[bookmark.id] ? 'text-gray-300' : 'text-gray-400 hover:text-green-500'}`} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{isSharing[bookmark.id] ? 'Sharing...' : 'Share bookmark'}</p>
           </TooltipContent>
         </Tooltip>
 
@@ -1363,7 +1276,15 @@ export default function Dashboard() {
   const GridBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
       className="group hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer bg-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
-      onClick={() => handleBookmarkClick(bookmark)}
+      onClick={(e) => {
+        // Don't open modal if we're currently editing this bookmark
+        if (editingField && selectedBookmark?.id === bookmark.id) {
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+        handleBookmarkClick(bookmark)
+      }}
     >
       {/* Background Website Logo with 5% opacity */}
       {(() => {
@@ -1390,15 +1311,62 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 min-w-0">
               {editingField === 'title' && selectedBookmark?.id === bookmark.id ? (
-                <input
-                  type="text"
-                  value={editingValue}
-                  onChange={(e) => setEditingValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onBlur={saveEdit}
-                  className="font-bold text-gray-900 font-audiowide uppercase text-lg bg-transparent border-b-2 border-blue-500 outline-none w-full"
-                  autoFocus
-                />
+                <div 
+                  className="flex items-center space-x-2"
+                  onClick={(e) => {
+                    // Completely stop any event propagation when editing
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onMouseDown={(e) => {
+                    // Also prevent mouse events from propagating
+                    e.stopPropagation()
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={editingValue}
+                    onChange={(e) => setEditingValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onClick={(e) => {
+                      // Stop propagation on input click
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onMouseDown={(e) => {
+                      // Stop propagation on input mouse down
+                      e.stopPropagation()
+                    }}
+                    className="font-bold text-gray-900 font-audiowide uppercase text-lg bg-transparent border-b-2 border-blue-500 outline-none flex-1"
+                    autoFocus
+                    placeholder="Enter title..."
+                  />
+                  <div className="flex space-x-1">
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        saveEdit()
+                      }}
+                      className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                    >
+                      <Check className="h-3 w-3 text-white" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        cancelEditing()
+                      }}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <h3 
                   className="font-bold text-gray-900 font-audiowide uppercase text-lg group-hover:text-blue-900 transition-colors duration-300 truncate cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5"
@@ -1524,7 +1492,15 @@ export default function Dashboard() {
   const CompactBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <div 
       className="group cursor-pointer"
-      onClick={() => handleBookmarkClick(bookmark)}
+      onClick={(e) => {
+        // Don't open modal if we're currently editing this bookmark
+        if (editingField && selectedBookmark?.id === bookmark.id) {
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+        handleBookmarkClick(bookmark)
+      }}
     >
       {/* Square Box Design matching folder cards - SAME SIZE */}
       <div className="aspect-square w-full bg-white border border-black relative overflow-hidden rounded-lg">
@@ -1822,7 +1798,15 @@ export default function Dashboard() {
   const ListBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
       className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-white border border-black hover:border-blue-600 backdrop-blur-sm relative overflow-hidden rounded-lg"
-      onClick={() => handleBookmarkClick(bookmark)}
+      onClick={(e) => {
+        // Don't open modal if we're currently editing this bookmark
+        if (editingField && selectedBookmark?.id === bookmark.id) {
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+        handleBookmarkClick(bookmark)
+      }}
     >
       {/* Background Website Logo with 5% opacity */}
       {(() => {
@@ -2517,8 +2501,8 @@ export default function Dashboard() {
                 <KHV1InfinityBoard 
                   folders={foldersForHierarchyV1}
                   bookmarks={bookmarks}
-                  onCreateFolder={() => setShowAddFolder(true)}
-                  onAddBookmark={() => setShowAddBookmark(true)}
+                  onCreateFolder={() => setIsAddFolderModalOpen(true)}
+                  onAddBookmark={() => setIsAddBookmarkModalOpen(true)}
                   onOpenDetail={handleBookmarkClick}
                   isActive={true}
                 />
@@ -2636,7 +2620,7 @@ export default function Dashboard() {
               <Button
                 onClick={() => {
                   setSelectedGoalFolder(null);
-                  setGoalDialogOpen(true);
+                  setIsAddExistingBookmarksModalOpen(true);
                 }}
                 className="flex items-center space-x-2"
               >
@@ -2681,8 +2665,8 @@ export default function Dashboard() {
             </ClientOnlyDndProvider>
             
             <FolderFormDialog
-              open={goalDialogOpen}
-              onOpenChange={setGoalDialogOpen}
+              open={isAddExistingBookmarksModalOpen}
+              onOpenChange={setIsAddExistingBookmarksModalOpen}
               folder={selectedGoalFolder}
               onSubmit={handleGoalSubmit}
             />
@@ -2819,7 +2803,7 @@ export default function Dashboard() {
               </Select>
               <SyncButton />
               <Button 
-                onClick={() => setShowAddBookmark(true)}
+                onClick={() => setIsAddBookmarkModalOpen(true)}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -3255,7 +3239,6 @@ export default function Dashboard() {
                               value={editingValue}
                               onChange={(e) => setEditingValue(e.target.value)}
                               onKeyDown={handleKeyDown}
-                              onBlur={saveEdit}
                               className="text-2xl font-audiowide uppercase bg-transparent border-b-2 border-blue-500 outline-none"
                               placeholder="Enter title..."
                               autoFocus
@@ -3306,8 +3289,10 @@ export default function Dashboard() {
                       variant="outline" 
                       size="sm"
                       onClick={shareBookmark}
+                      disabled={selectedBookmark && isSharing[selectedBookmark.id]}
                     >
-                      <Share2 className="h-4 w-4" />
+                      <Share2 className={`h-4 w-4 ${selectedBookmark && isSharing[selectedBookmark.id] ? 'text-gray-300' : ''}`} />
+                      {selectedBookmark && isSharing[selectedBookmark.id] && <span className="ml-1 text-xs">Sharing...</span>}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -3775,8 +3760,8 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Add Bookmark Modal */}
-      <Dialog open={showAddBookmark} onOpenChange={(open) => {
-        setShowAddBookmark(open)
+      <Dialog open={isAddBookmarkModalOpen} onOpenChange={(open) => {
+        setIsAddBookmarkModalOpen(open)
         if (!open) resetAddBookmarkModal()
       }}>
         <DialogContent className="max-w-2xl bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
@@ -3934,7 +3919,7 @@ export default function Dashboard() {
                 />
               </div>
               <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowAddBookmark(false)}>
+                <Button variant="outline" onClick={() => setIsAddBookmarkModalOpen(false)}>
                   CANCEL
                 </Button>
                 <Button onClick={handleAddBookmark}>
@@ -4029,7 +4014,7 @@ export default function Dashboard() {
                   {selectedExistingBookmarks.length} bookmark(s) selected
                 </div>
                 <div className="flex space-x-2">
-                  <Button variant="outline" onClick={() => setShowAddBookmark(false)}>
+                  <Button variant="outline" onClick={() => setIsAddBookmarkModalOpen(false)}>
                     CANCEL
                   </Button>
                   <Button 
@@ -4046,7 +4031,7 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Add Folder Modal */}
-      <Dialog open={showAddFolder} onOpenChange={setShowAddFolder}>
+      <Dialog open={isAddFolderModalOpen} onOpenChange={setIsAddFolderModalOpen}>
         <DialogContent className="max-w-md bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
           <DialogHeader>
             <DialogTitle>ADD NEW FOLDER</DialogTitle>
@@ -4116,7 +4101,7 @@ export default function Dashboard() {
             
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => {
-                setShowAddFolder(false)
+                setIsAddFolderModalOpen(false)
                 resetAddFolderForm()
               }}>
                 CANCEL
@@ -4130,7 +4115,7 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Default Logo Modal */}
-      <Dialog open={showDefaultLogoModal} onOpenChange={setShowDefaultLogoModal}>
+      <Dialog open={isDefaultLogoModalOpen} onOpenChange={setIsDefaultLogoModalOpen}>
         <DialogContent className="max-w-md bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
           <DialogHeader>
             <DialogTitle>SET DEFAULT LOGO</DialogTitle>
@@ -4143,19 +4128,19 @@ export default function Dashboard() {
               <label className="text-sm font-medium">LOGO URL</label>
               <Input
                 placeholder="https://example.com/logo.png"
-                value={newDefaultLogo}
-                onChange={(e) => setNewDefaultLogo(e.target.value)}
+                value={newDefaultLogoUrl}
+                onChange={(e) => setNewDefaultLogoUrl(e.target.value)}
               />
             </div>
             
             {/* Preview */}
-            {newDefaultLogo && (
+            {newDefaultLogoUrl && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">PREVIEW</label>
                 <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
                   <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 transition-all duration-300 shadow-sm overflow-hidden">
                     <img 
-                      src={newDefaultLogo} 
+                      src={newDefaultLogoUrl} 
                       alt="Default logo preview" 
                       className="w-full h-full object-cover rounded-xl"
                       onError={(e) => {
@@ -4192,7 +4177,7 @@ export default function Dashboard() {
                       onClick={() => {
                         setUserDefaultLogo('')
                         localStorage.removeItem('userDefaultLogo')
-                        setShowDefaultLogoModal(false)
+                        setIsDefaultLogoModalOpen(false)
                         showNotification('Default logo removed!')
                       }}
                       className="mt-1 h-7 text-xs"
@@ -4205,10 +4190,10 @@ export default function Dashboard() {
             )}
             
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowDefaultLogoModal(false)}>
+              <Button variant="outline" onClick={() => setIsDefaultLogoModalOpen(false)}>
                 CANCEL
               </Button>
-              <Button onClick={handleSetDefaultLogo} disabled={!newDefaultLogo}>
+              <Button onClick={handleSetDefaultLogo} disabled={!newDefaultLogoUrl}>
                 SET DEFAULT
               </Button>
             </div>

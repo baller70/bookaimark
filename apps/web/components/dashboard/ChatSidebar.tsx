@@ -66,11 +66,12 @@ export function ChatSidebar() {
   const handleSendMessage = () => {
     if (!newMessage.trim()) return
 
+    const now = new Date()
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `msg-${now.getTime()}`,
       content: newMessage.trim(),
       isUser: true,
-      timestamp: new Date()
+      timestamp: now
     }
 
     setMessages(prev => [...prev, userMessage])
@@ -78,11 +79,12 @@ export function ChatSidebar() {
 
     // Simulate AI response
     setTimeout(() => {
+      const responseTime = new Date()
       const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `msg-${responseTime.getTime()}`,
         content: "Thanks for your message! I'm here to help you with any questions about your dashboard, analytics, or account management.",
         isUser: false,
-        timestamp: new Date()
+        timestamp: responseTime
       }
       setMessages(prev => [...prev, aiResponse])
     }, 1000)

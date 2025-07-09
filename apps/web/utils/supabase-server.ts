@@ -23,4 +23,7 @@ export const createServiceRoleClient = () => {
 }
 
 // Default export for backward compatibility
-export default createServerSupabaseClient 
+export default createServerSupabaseClient
+
+// Export createClient for backward compatibility
+export { createClient } from '@supabase/supabase-js' 
