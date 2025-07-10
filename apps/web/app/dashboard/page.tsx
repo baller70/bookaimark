@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu'
 
 import { 
   Search, 
@@ -59,6 +60,7 @@ import {
   MessageSquare,
   ArrowLeft,
   ChevronRight,
+  ChevronDown,
   BookmarkIcon as BookmarkIconLucide,
   Building,
   Columns,
@@ -125,10 +127,12 @@ import { FolderOrgChartView } from '@/src/components/ui/folder-org-chart-view'
 import { FolderCard, type BookmarkWithRelations } from '@/src/components/ui/FolderCard'
 import { FolderFormDialog, type Folder } from '@/src/components/ui/FolderFormDialog'
 import { KanbanView } from '@/src/components/ui/BookmarkKanban'
+import TrelloBoard from '@/src/components/ui/TrelloBoard'
 import { SyncButton } from '@/components/SyncButton'
 import { getProfilePicture, onProfilePictureChange } from '@/lib/profile-utils'
 import { useAnalytics } from '@/src/hooks/useAnalytics'
 import { useRealTimeAnalytics } from '@/lib/real-time-analytics'
+import { toast } from 'sonner'
 
 // Import React Flow components for custom background
 import ReactFlow, {
@@ -442,6 +446,86 @@ export default function Dashboard() {
   // Health check loading state for individual bookmarks
   const [healthCheckLoading, setHealthCheckLoading] = useState<{ [key: number]: boolean }>({});
   const [uploadingBackground, setUploadingBackground] = useState(false);
+  
+  // Theme color state
+  const [themeColor, setThemeColor] = useState('#3b82f6'); // Default blue
+  const [isThemeLoading, setIsThemeLoading] = useState(true);
+  
+  // Username state
+  const [username, setUsername] = useState('TOM');
+  
+  // Analytics metrics state
+  const [selectedMetrics, setSelectedMetrics] = useState(['Total Visits', 'Engagement Score']);
+  const [isMetricsDropdownOpen, setIsMetricsDropdownOpen] = useState(false);
+  
+  // Available metrics options
+  const availableMetrics = [
+    'Total Visits',
+    'Engagement Score', 
+    'Click-through Rate',
+    'Session Duration',
+    'Bounce Rate',
+    'Page Views',
+    'User Retention',
+    'Conversion Rate',
+    'Active Users',
+    'Revenue Generated'
+  ];
+
+  // Load theme color and username from settings
+  useEffect(() => {
+    const loadSettings = () => {
+      try {
+        setIsThemeLoading(true);
+        
+        // Load from localStorage first
+        const savedSettings = localStorage.getItem('userSettings');
+        if (savedSettings) {
+          const settings = JSON.parse(savedSettings);
+          const accentColor = settings.appearance?.accentColor;
+          const customColor = settings.appearance?.customColor;
+          
+          // Load username from profile settings
+          if (settings.profile?.name) {
+            setUsername(settings.profile.name);
+          }
+          
+          // Define color palette mapping
+          const colorPalettes = {
+            'blue': '#3b82f6',
+            'green': '#10b981', 
+            'purple': '#8b5cf6',
+            'red': '#ef4444',
+            'orange': '#f97316'
+          };
+          
+          // Use custom color if accent is custom, otherwise use palette color
+          const finalColor = accentColor === 'custom' ? customColor : colorPalettes[accentColor] || '#3b82f6';
+          setThemeColor(finalColor);
+          
+          console.log('🎨 Theme color loaded:', finalColor);
+          console.log('👤 Username loaded:', settings.profile?.name || 'TOM');
+        }
+        
+        // Listen for settings updates
+        const handleSettingsUpdate = () => {
+          loadSettings();
+        };
+        
+        window.addEventListener('userSettingsUpdated', handleSettingsUpdate);
+        
+        return () => {
+          window.removeEventListener('userSettingsUpdated', handleSettingsUpdate);
+        };
+      } catch (error) {
+        console.error('❌ Error loading settings:', error);
+      } finally {
+        setIsThemeLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, []);
 
   // Fetch bookmarks from database
   useEffect(() => {
@@ -1683,7 +1767,7 @@ export default function Dashboard() {
                 e.stopPropagation()
                 // Open bookmark detail modal
                 setSelectedBookmark(bookmark)
-                setIsDetailModalOpen(true)
+                setIsModalOpen(true)
               }}
             >
               <Eye className="h-4 w-4 text-gray-400 hover:text-blue-500" />
@@ -2049,9 +2133,6 @@ export default function Dashboard() {
         <div className={`flex justify-center mx-auto mb-3 ${getHealthColor()}`}>
           {getHealthIcon()}
         </div>
-        <p className="text-xs text-muted-foreground font-medium">
-          {getHealthText()}
-        </p>
         {getStatusIndicator()}
       </div>
     );
@@ -2090,7 +2171,19 @@ export default function Dashboard() {
 
   const GridBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
-      className="group hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer bg-white border border-gray-300 hover:border-blue-600 backdrop-blur-sm relative overflow-hidden"
+      className="group hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white border border-gray-300 backdrop-blur-sm relative overflow-hidden"
+      style={{
+        borderColor: 'rgb(209 213 219)', // gray-300
+        transition: 'all 0.5s ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = themeColor;
+        e.currentTarget.style.boxShadow = `0 25px 50px -12px ${themeColor}20`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'rgb(209 213 219)';
+        e.currentTarget.style.boxShadow = '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)';
+      }}
       onClick={(e) => {
         // Don't open modal if we're currently editing this bookmark
         if (editingField && selectedBookmark?.id === bookmark.id) {
@@ -2133,8 +2226,21 @@ export default function Dashboard() {
       <CardContent className="p-6 relative z-20">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
-              {bookmark.favicon}
+            <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
+              {(() => {
+                const domain = extractDomain(bookmark.url);
+                const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                return (
+                  <img 
+                    src={faviconUrl} 
+                    alt={`${bookmark.title} favicon`}
+                    className="w-8 h-8 rounded-lg"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                );
+              })()}
             </div>
             <div className="flex-1 min-w-0">
               {editingField === 'title' && selectedBookmark?.id === bookmark.id ? (
@@ -2298,23 +2404,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Clickable Site Health Component - Separate from analytics */}
-        <div className="mb-4">
-          <SiteHealthComponentModal 
-            bookmark={bookmark}
-            onClick={() => checkBookmarkHealth([bookmark.id])}
-            isLoading={healthCheckLoading[bookmark.id] || false}
-          />
-        </div>
+
 
         {/* Project Information Section - Moved to bottom and separated */}
         <div className="border-t border-gray-200/60 pt-3 mt-2">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{bookmark.project?.name || "PROJECT"}</span>
             </div>
-            <span className="text-xs text-gray-500 font-medium">{bookmark.project?.status || "Active"}</span>
+            <span className="text-xs text-gray-500 font-medium">{bookmark.project?.progress || 0}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
@@ -2392,12 +2490,25 @@ export default function Dashboard() {
           }
         })()}
         <div className="p-2 h-full flex flex-col justify-between relative z-10">
-          {/* Top section with favicon and title */}
+                    {/* Top section with favicon and title */}
           <div>
             <div className="mb-1">
               <div className="w-12 h-12">
-                <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center text-white font-bold text-sm ring-1 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm m-1">
-                  {bookmark.favicon}
+                <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center ring-1 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm m-1">
+                  {(() => {
+                    const domain = extractDomain(bookmark.url);
+                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                    return (
+                      <img 
+                        src={faviconUrl} 
+                        alt={`${bookmark.title} favicon`}
+                        className="w-6 h-6 rounded"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -2685,7 +2796,19 @@ export default function Dashboard() {
 
   const ListBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
-      className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-white border border-black hover:border-blue-600 backdrop-blur-sm relative overflow-hidden rounded-lg"
+      className="group hover:shadow-xl transition-all duration-400 cursor-pointer bg-white border border-black backdrop-blur-sm relative overflow-hidden rounded-lg"
+      style={{
+        borderColor: 'rgb(0 0 0)', // black
+        transition: 'all 0.4s ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = themeColor;
+        e.currentTarget.style.boxShadow = `0 20px 25px -5px ${themeColor}15`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'rgb(0 0 0)';
+        e.currentTarget.style.boxShadow = '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)';
+      }}
       onClick={() => handleBookmarkClick(bookmark)}
     >
       {/* Background Website Logo with 5% opacity - Custom background takes priority */}
@@ -2721,8 +2844,21 @@ export default function Dashboard() {
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center space-x-4 mb-2">
-              <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center text-white font-bold text-xl ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
-                {bookmark.favicon}
+              <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
+                {(() => {
+                  const domain = extractDomain(bookmark.url);
+                  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                  return (
+                    <img 
+                      src={faviconUrl} 
+                      alt={`${bookmark.title} favicon`}
+                      className="w-10 h-10 rounded-lg"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  );
+                })()}
               </div>
               <div className="flex-1">
                 <div className="flex items-center space-x-4 mb-1">
@@ -2827,7 +2963,20 @@ export default function Dashboard() {
         >
           <GripVertical className="h-4 w-4 text-gray-700" />
         </div>
-        <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-300 hover:border-blue-600" onClick={() => handleBookmarkClick(bookmark)}>
+        <Card 
+          className="p-4 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-300" 
+          style={{
+            borderColor: 'rgb(209 213 219)', // gray-300
+            transition: 'all 0.3s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = themeColor;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgb(209 213 219)';
+          }}
+          onClick={() => handleBookmarkClick(bookmark)}
+        >
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <FolderIcon className="h-5 w-5 text-blue-600" />
@@ -2880,7 +3029,20 @@ export default function Dashboard() {
               <div className="w-1 h-1 bg-gray-400 rounded-full ml-1"></div>
             </div>
           </div>
-          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-300 hover:border-blue-600" onClick={() => handleBookmarkClick(bookmark)}>
+          <Card 
+            className="p-4 hover:shadow-md transition-shadow cursor-pointer relative border border-gray-300" 
+            style={{
+              borderColor: 'rgb(209 213 219)', // gray-300
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = themeColor;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgb(209 213 219)';
+            }}
+            onClick={() => handleBookmarkClick(bookmark)}
+          >
             <div className="flex items-center space-x-3">
               <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
                 <div className="text-blue-600 font-bold text-lg">{bookmark.favicon}</div>
@@ -3583,52 +3745,25 @@ export default function Dashboard() {
           </div>
         )
       case 'kanban2':
-        // Create mock folders for kanban demo
-        const kanbanFolders: Folder[] = [
-          {
-            id: '1',
-            name: 'Development',
-            description: 'All development related bookmarks and resources',
-            color: '#3b82f6'
-          },
-          {
-            id: '2', 
-            name: 'Design',
-            description: 'Design tools, inspiration, and creative resources',
-            color: '#ef4444'
-          },
-          {
-            id: '3',
-            name: 'Productivity',
-            description: 'Tools and apps to boost productivity',
-            color: '#10b981'
-          }
-        ];
+        // Convert bookmarks to the format expected by TrelloBoard
+        const bookmarkItems = filteredBookmarks.map(bookmark => ({
+          id: bookmark.id.toString(),
+          title: bookmark.title,
+          url: bookmark.url,
+          favicon: `https://www.google.com/s2/favicons?domain=${extractDomain(bookmark.url)}&sz=64`
+        }));
 
         return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Kanban 2.0</h2>
-              <p className="text-gray-600">Advanced drag-and-drop kanban board for bookmark organization</p>
-            </div>
-            
-            <KanbanView
-              bookmarks={filteredBookmarks as any}
-              onBookmarkClick={(bookmark) => {
-                setSelectedBookmark(bookmark as any);
+          <TrelloBoard
+            bookmarks={bookmarkItems}
+            onBookmarkClick={(bookmark) => {
+              const originalBookmark = filteredBookmarks.find(b => b.id.toString() === bookmark.id);
+              if (originalBookmark) {
+                setSelectedBookmark(originalBookmark);
                 setIsModalOpen(true);
-              }}
-              onFavorite={(bookmark) => {
-                const updatedBookmark = { ...bookmark };
-                setBookmarks(prev => prev.map(b => b.id === (bookmark as any).id ? updatedBookmark as any : b));
-                showNotification('Bookmark updated successfully!');
-              }}
-              loading={false}
-              selectedCategory={undefined}
-              selectedFolder={undefined}
-              onCategoryChange={undefined}
-            />
-          </div>
+              }
+            }}
+          />
         )
       default: // grid
         return (
@@ -3717,7 +3852,16 @@ export default function Dashboard() {
               <SyncButton />
               <Button 
                 onClick={() => setShowAddBookmark(true)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="text-white font-medium transition-all duration-200 hover:shadow-lg"
+                style={{ 
+                  backgroundColor: themeColor
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.filter = 'brightness(0.9)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.filter = 'brightness(1)';
+                }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 ADD BOOKMARK
@@ -3731,44 +3875,7 @@ export default function Dashboard() {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 density-gap mb-8">
             {/* Learning Card - Spans 2 columns - Exact copy from screenshot */}
-            <Card className="md:col-span-2 relative overflow-hidden bg-gradient-to-br from-white via-blue-50/10 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
-              <CardContent className="density-p relative">
-                {/* Decorative elements scattered around */}
-                <div className="absolute top-4 left-8">
-                  <div className="w-2 h-2 bg-blue-500 rotate-45"></div>
-                </div>
-                <div className="absolute top-12 left-1/3">
-                  <div className="w-2 h-2 bg-blue-600 rotate-45"></div>
-                </div>
-                <div className="absolute top-6 right-16">
-                  <div className="w-2 h-2 bg-orange-500 rotate-45"></div>
-                </div>
-                <div className="absolute top-20 right-8">
-                  <div className="w-2 h-2 bg-teal-500 rotate-45"></div>
-                </div>
-                <div className="absolute top-32 right-1/4">
-                  <div className="w-2 h-2 bg-blue-500 rotate-45"></div>
-                </div>
-                <div className="absolute bottom-20 left-12">
-                  <div className="w-2 h-2 bg-teal-400 rotate-45"></div>
-                </div>
-                <div className="absolute bottom-12 left-1/3">
-                  <div className="w-2 h-2 bg-blue-400 rotate-45"></div>
-                </div>
-                <div className="absolute bottom-8 right-12">
-                  <div className="w-2 h-2 bg-red-500 rotate-45"></div>
-                </div>
-                <div className="absolute bottom-16 right-1/3">
-                  <div className="w-2 h-2 bg-orange-400 rotate-45"></div>
-                </div>
-                <div className="absolute top-1/2 left-4">
-                  <div className="w-2 h-2 bg-teal-500 rotate-45"></div>
-                </div>
-                <div className="absolute top-3/4 right-4">
-                  <div className="w-2 h-2 bg-blue-600 rotate-45"></div>
-                </div>
-              </CardContent>
-            </Card>
+
 
 
 
@@ -3779,7 +3886,7 @@ export default function Dashboard() {
           <Card className="mb-8 bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="space-y-1">
-                <CardTitle className="text-base font-medium">TOTAL VISITORS</CardTitle>
+                <CardTitle className="text-xl font-bold">{username.toUpperCase()} ANALYTICS CHART</CardTitle>
                 <p className="text-sm text-muted-foreground">{currentChartData.title}</p>
               </div>
               <div className="flex items-center space-x-1">
@@ -3809,59 +3916,239 @@ export default function Dashboard() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="pb-4">
-              <div className="h-[200px] w-full">
-                <svg className="h-full w-full" viewBox="0 0 800 200" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
+            <CardContent className="p-6">
+              <div className="flex flex-col space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-black">Analytics Chart</h3>
+                      <p className="text-sm text-gray-500 mt-1">Last 28 days</p>
+                    </div>
+                    
+                    {/* Metrics Dropdown */}
+                    <DropdownMenu open={isMetricsDropdownOpen} onOpenChange={setIsMetricsDropdownOpen}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="flex items-center space-x-2">
+                          <span>Metrics ({selectedMetrics.length})</span>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        {availableMetrics.map((metric) => (
+                          <DropdownMenuCheckboxItem
+                            key={metric}
+                            checked={selectedMetrics.includes(metric)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedMetrics([...selectedMetrics, metric])
+                              } else {
+                                setSelectedMetrics(selectedMetrics.filter(m => m !== metric))
+                              }
+                            }}
+                          >
+                            {metric}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                   
-                  {/* Grid lines */}
-                  <defs>
-                    <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
-                      <path d="M 40 0 L 0 0 0 20" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" opacity="0.3"/>
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#grid)" />
-                  
-                  {/* Area fill - Dynamic based on selected time period */}
-                  <path
-                    d={currentChartData.areaPath}
-                    fill="url(#areaGradient)"
-                  />
-                  
-                  {/* Main line - Dynamic based on selected time period */}
-                  <path
-                    d={currentChartData.path}
-                    fill="none"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  
-                  {/* X-axis labels INSIDE the chart area */}
-                  <g className="text-xs" fill="hsl(var(--muted-foreground))">
-                    {currentChartData.labels.map((label, index) => {
-                      const x = 20 + (index * (760 / (currentChartData.labels.length - 1)))
+                  <div className="flex items-center space-x-8">
+                    {selectedMetrics.map((metric, index) => {
+                      const getValue = () => {
+                        switch (metric) {
+                          case 'Total Visits':
+                            return analyticsData ? Object.values(analyticsData).reduce((sum: number, data: any) => sum + data.visits, 0) : 0
+                          case 'Engagement Score':
+                            return analyticsData ? Math.round(Object.values(analyticsData).reduce((sum: number, data: any) => sum + (data.visits * data.timeSpent), 0) / Math.max(Object.values(analyticsData).length, 1)) : 0
+                          case 'Click-through Rate':
+                            return Math.round(Math.random() * 15 + 5) + '%'
+                          case 'Session Duration':
+                            return Math.round(Math.random() * 300 + 120) + 's'
+                          case 'Bounce Rate':
+                            return Math.round(Math.random() * 40 + 20) + '%'
+                          case 'Page Views':
+                            return Math.round(Math.random() * 1000 + 500)
+                          case 'User Retention':
+                            return Math.round(Math.random() * 30 + 60) + '%'
+                          case 'Conversion Rate':
+                            return Math.round(Math.random() * 8 + 2) + '%'
+                          case 'Active Users':
+                            return Math.round(Math.random() * 200 + 100)
+                          case 'Revenue Generated':
+                            return '$' + Math.round(Math.random() * 5000 + 1000)
+                          default:
+                            return 0
+                        }
+                      }
+                      
+                      const getColor = (index: number) => {
+                        const colors = ['blue', 'purple', 'green', 'orange', 'red', 'indigo', 'pink', 'teal', 'yellow', 'gray']
+                        return colors[index % colors.length]
+                      }
+                      
+                      const color = getColor(index)
+                      
                       return (
-                        <text 
-                          key={index} 
-                          x={x} 
-                          y="185" 
-                          textAnchor="middle" 
-                          fontSize="10"
-                          fill="hsl(var(--muted-foreground))"
-                        >
-                          {label}
-                        </text>
+                        <div key={metric} className={`text-right cursor-pointer hover:bg-${color}-50 p-2 rounded-lg transition-colors group`} onClick={() => {
+                          toast.success(`📊 ${metric}: ${getValue()}`)
+                        }}>
+                          <p className={`text-sm text-gray-500 group-hover:text-${color}-600`}>{metric}</p>
+                          <p className={`text-2xl font-bold text-black group-hover:text-${color}-700`}>
+                            {getValue()}
+                          </p>
+                        </div>
                       )
                     })}
-                  </g>
-                </svg>
+                  </div>
+                </div>
+
+                {/* Interactive Chart */}
+                <div className="relative h-[200px] w-full group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/20 rounded-lg transition-all duration-500 group-hover:from-blue-50/50 group-hover:to-purple-50/30" />
+                  
+                  {/* Interactive Bar Chart */}
+                  <div className="relative h-full flex items-end justify-between px-4 pb-8">
+                    {/* Generate 10 bars matching the date labels */}
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const dateLabels = ['Apr 1', 'Apr 6', 'Apr 11', 'Apr 16', 'Apr 21', 'Apr 27', 'May 2', 'May 7', 'May 13', 'May 20'];
+                      const dayLabel = dateLabels[i];
+                      
+                      // Color function - define before use
+                      const getColor = (index: number) => {
+                        const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#14b8a6', '#eab308', '#6b7280'];
+                        return colors[index % colors.length];
+                      };
+                      
+                      // Generate data for each selected metric
+                      const metricData = selectedMetrics.map((metric, metricIndex) => {
+                        const getValue = () => {
+                          switch (metric) {
+                            case 'Total Visits':
+                              return Math.floor(Math.random() * 15) + 5; // 5-20
+                            case 'Engagement Score':
+                              return Math.floor(Math.random() * 25) + 10; // 10-35
+                            case 'Click-through Rate':
+                              return Math.floor(Math.random() * 15) + 5; // 5-20
+                            case 'Session Duration':
+                              return Math.floor(Math.random() * 300) + 120; // 120-420
+                            case 'Bounce Rate':
+                              return Math.floor(Math.random() * 40) + 20; // 20-60
+                            case 'Page Views':
+                              return Math.floor(Math.random() * 50) + 20; // 20-70
+                            case 'User Retention':
+                              return Math.floor(Math.random() * 30) + 60; // 60-90
+                            case 'Conversion Rate':
+                              return Math.floor(Math.random() * 8) + 2; // 2-10
+                            case 'Active Users':
+                              return Math.floor(Math.random() * 40) + 20; // 20-60
+                            case 'Revenue Generated':
+                              return Math.floor(Math.random() * 50) + 10; // 10-60
+                            default:
+                              return Math.floor(Math.random() * 20) + 5;
+                          }
+                        };
+                        
+                        const rawValue = getValue();
+                        const scaledHeight = Math.max(15, (rawValue / 100) * 80); // Scale to max 80px
+                        
+                        return {
+                          metric,
+                          value: rawValue,
+                          height: scaledHeight,
+                          color: getColor(metricIndex)
+                        };
+                      });
+                      
+                      return (
+                        <div key={i} className="flex flex-col items-center space-y-1 cursor-pointer group/bar relative">
+                          {/* Hover tooltip */}
+                          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                            <div className="text-center">
+                              <div className="font-semibold">{dayLabel}</div>
+                              {metricData.map((data, idx) => (
+                                <div key={idx}>
+                                  {data.metric}: {data.value}
+                                  {data.metric.includes('Rate') || data.metric.includes('Retention') ? '%' : ''}
+                                  {data.metric === 'Session Duration' ? 's' : ''}
+                                  {data.metric === 'Revenue Generated' ? '$' : ''}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Side-by-side bars container */}
+                          <div className="flex items-end space-x-1">
+                            {metricData.map((data, metricIndex) => (
+                              <div 
+                                key={metricIndex}
+                                className="w-2 rounded-sm opacity-70 hover:opacity-100 transition-all duration-200 transform hover:scale-110"
+                                style={{ 
+                                  height: `${data.height}px`,
+                                  backgroundColor: data.color
+                                }}
+                                onClick={() => {
+                                  const displayValue = data.metric.includes('Rate') || data.metric.includes('Retention') ? `${data.value}%` :
+                                                     data.metric === 'Session Duration' ? `${data.value}s` :
+                                                     data.metric === 'Revenue Generated' ? `$${data.value}` : data.value;
+                                  toast.success(`📅 ${dayLabel}: ${data.metric} - ${displayValue}`)
+                                }}
+                                title={`${dayLabel}: ${data.metric} - ${data.value}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Interactive X-axis labels */}
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-between px-4 text-xs text-gray-500">
+                    {['Apr 1', 'Apr 6', 'Apr 11', 'Apr 16', 'Apr 21', 'Apr 27', 'May 2', 'May 7', 'May 13', 'May 20'].map((date, i) => (
+                      <span 
+                        key={i}
+                        className="cursor-pointer hover:font-medium transition-all duration-200 px-1 py-1 rounded hover:bg-gray-50"
+                        style={{
+                          color: 'rgb(107, 114, 128)' // Default gray-500
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = themeColor;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = 'rgb(107, 114, 128)';
+                        }}
+                        onClick={() => {
+                          toast.success(`📊 Filtering data for ${date}`)
+                        }}
+                      >
+                        {date}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Interactive Legend */}
+                  <div className="absolute top-2 right-2 flex items-center space-x-2 bg-white/80 backdrop-blur-sm rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    {selectedMetrics.map((metric, index) => {
+                      const getColor = (index: number) => {
+                        const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#14b8a6', '#eab308', '#6b7280'];
+                        return colors[index % colors.length];
+                      };
+                      
+                      return (
+                        <div key={metric} className="flex items-center space-x-1 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: getColor(index) }}
+                          ></div>
+                          <span className="text-xs font-medium text-gray-700">
+                            {metric.length > 10 ? metric.substring(0, 10) + '...' : metric}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

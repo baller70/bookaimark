@@ -70,7 +70,6 @@ export function SyncButton({ variant = 'outline', size = 'default', showStatus =
         disabled={syncing}
         className="flex items-center gap-2"
       >
-        <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
         {syncing ? 'Syncing...' : 'Sync All'}
       </Button>
 

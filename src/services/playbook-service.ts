@@ -1,4 +1,10 @@
-import { toast } from 'sonner'
+// import { toast } from 'sonner'
+// Note: This service is in the wrong location. It should be in apps/web/src/services/
+// For now, we'll create a mock toast function to prevent errors
+const toast = {
+  success: (message: string) => console.log('✅', message),
+  error: (message: string) => console.error('❌', message)
+}
 
 // Types
 export interface PlaybookData {

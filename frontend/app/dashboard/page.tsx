@@ -91,6 +91,7 @@ import { FolderOrgChartView } from '@/src/components/ui/folder-org-chart-view'
 import { FolderCard, type BookmarkWithRelations } from '@/src/components/ui/FolderCard'
 import { FolderFormDialog, type Folder } from '@/src/components/ui/FolderFormDialog'
 import { KanbanView } from '@/src/components/ui/BookmarkKanban'
+import { TrelloBoard } from '@/src/components/ui/TrelloBoard'
 import { SyncButton } from '@/components/SyncButton'
 
 // Import React Flow components for custom background
@@ -2790,52 +2791,25 @@ export default function Dashboard() {
           </div>
         )
       case 'kanban2':
-        // Create mock folders for kanban demo
-        const kanbanFolders: Folder[] = [
-          {
-            id: '1',
-            name: 'Development',
-            description: 'All development related bookmarks and resources',
-            color: '#3b82f6'
-          },
-          {
-            id: '2', 
-            name: 'Design',
-            description: 'Design tools, inspiration, and creative resources',
-            color: '#ef4444'
-          },
-          {
-            id: '3',
-            name: 'Productivity',
-            description: 'Tools and apps to boost productivity',
-            color: '#10b981'
-          }
-        ];
+        // Convert bookmarks to the format expected by TrelloBoard
+        const bookmarkItems = filteredBookmarks.map(bookmark => ({
+          id: bookmark.id.toString(),
+          title: bookmark.title,
+          url: bookmark.url,
+          favicon: `https://www.google.com/s2/favicons?domain=${extractDomain(bookmark.url)}&sz=64`
+        }));
 
         return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Kanban 2.0</h2>
-              <p className="text-gray-600">Advanced drag-and-drop kanban board for bookmark organization</p>
-            </div>
-            
-            <KanbanView
-              bookmarks={filteredBookmarks as any}
-              onBookmarkClick={(bookmark) => {
-                setSelectedBookmark(bookmark as any);
+          <TrelloBoard
+            bookmarks={bookmarkItems}
+            onBookmarkClick={(bookmark) => {
+              const originalBookmark = filteredBookmarks.find(b => b.id.toString() === bookmark.id);
+              if (originalBookmark) {
+                setSelectedBookmark(originalBookmark);
                 setIsModalOpen(true);
-              }}
-              onFavorite={(bookmark) => {
-                const updatedBookmark = { ...bookmark };
-                setBookmarks(prev => prev.map(b => b.id === (bookmark as any).id ? updatedBookmark as any : b));
-                showNotification('Bookmark updated successfully!');
-              }}
-              loading={false}
-              selectedCategory={undefined}
-              selectedFolder={undefined}
-              onCategoryChange={undefined}
-            />
-          </div>
+              }
+            }}
+          />
         )
       default: // grid
         return (

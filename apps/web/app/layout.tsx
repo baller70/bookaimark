@@ -1,7 +1,8 @@
 import './globals.css'
 import { Saira, Audiowide } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
-import { Toaster } from '@/components/ui/sonner'
+import { Toaster } from 'sonner'
+import { StagewiseWrapper } from '@/components/StagewiseWrapper'
 
 const saira = Saira({ subsets: ['latin'] })
 const audiowide = Audiowide({ 
@@ -29,6 +30,8 @@ export default function RootLayout({
           </div>
           {/* Global toast notifications */}
           <Toaster />
+          {/* Stagewise toolbar for AI-powered editing */}
+          <StagewiseWrapper />
         </ThemeProvider>
       </body>
     </html>
