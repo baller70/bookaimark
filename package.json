@@ -19,5 +19,9 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.15.0"
+  "packageManager": "pnpm@8.15.0",
+  "dependencies": {
+    "@tabler/icons-react": "^3.34.0",
+    "framer-motion": "^12.23.2"
+  }
 }

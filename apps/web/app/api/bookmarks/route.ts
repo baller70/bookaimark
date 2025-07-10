@@ -20,6 +20,13 @@ interface Bookmark {
   notes?: string;
   created_at: string;
   updated_at: string;
+  site_health?: 'excellent' | 'working' | 'fair' | 'poor' | 'broken';
+  last_health_check?: string;
+  healthCheckCount?: number;
+  customBackground?: string;
+  visits?: number;
+  time_spent?: number;
+  relatedBookmarks?: number[];
 }
 
 // Ensure data directory exists
@@ -93,7 +100,7 @@ export async function GET(request: NextRequest) {
       tags: bookmark.tags || [],
       priority: 'medium',
       isFavorite: false,
-      visits: Math.floor(Math.random() * 50) + 1,
+      visits: bookmark.visits || Math.floor(Math.random() * 50) + 1,
       lastVisited: new Date(bookmark.created_at).toLocaleDateString(),
       dateAdded: new Date(bookmark.created_at).toLocaleDateString(),
       favicon: bookmark.title?.charAt(0)?.toUpperCase() || 'B',
@@ -103,12 +110,17 @@ export async function GET(request: NextRequest) {
       notes: bookmark.notes || 'No notes',
       timeSpent: '0m',
       weeklyVisits: Math.floor(Math.random() * 20) + 1,
-      siteHealth: 'good',
+      siteHealth: bookmark.site_health || 'unknown',
+      site_health: bookmark.site_health || 'unknown',
+      healthCheckCount: bookmark.healthCheckCount || 0,
+      last_health_check: bookmark.last_health_check,
+      customBackground: bookmark.customBackground,
       project: {
         name: bookmark.ai_category || "GENERAL",
         progress: Math.floor(Math.random() * 100),
         status: "Active"
-      }
+      },
+      relatedBookmarks: bookmark.relatedBookmarks || []
     }));
     
     return NextResponse.json({
@@ -129,7 +141,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes } = body;
+    const { id, title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes, customBackground, relatedBookmarks } = body;
     
     // Validate required fields
     if (!title || !url) {
@@ -170,6 +182,8 @@ export async function POST(request: NextRequest) {
         ai_tags: ai_tags || [],
         ai_category,
         notes: notes || '',
+        customBackground,
+        relatedBookmarks: relatedBookmarks || [],
         updated_at: new Date().toISOString()
       };
       
@@ -206,6 +220,7 @@ export async function POST(request: NextRequest) {
         ai_tags: ai_tags || [],
         ai_category,
         notes: notes || '',
+        relatedBookmarks: relatedBookmarks || [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };

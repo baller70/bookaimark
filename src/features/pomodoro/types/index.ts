@@ -22,6 +22,7 @@ export interface Task {
   isCompleted: boolean;
   estimatedPomodoros: number;
   completedPomodoros: number;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
   dueDate?: Date;
@@ -45,6 +46,7 @@ export interface TaskList {
   description?: string;
   color: string;
   taskIds: string[]; // References to Task IDs (max 5 items)
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
   isArchived: boolean;
@@ -64,6 +66,7 @@ export interface PomodoroSession {
   type: 'work' | 'shortBreak' | 'longBreak';
   isCompleted: boolean;
   wasInterrupted: boolean;
+  userId: string;
   interruptionReason?: string;
   notes?: string;
 }
@@ -71,15 +74,14 @@ export interface PomodoroSession {
 // Analytics Types
 export interface PomodoroAnalytics {
   totalSessions: number;
-  completedSessions: number;
   totalFocusTime: number; // in minutes
   averageSessionLength: number; // in minutes
-  tasksCompleted: number;
-  streakDays: number;
-  bestStreak: number;
+  completedTasks: number;
+  totalTasks: number;
+  productivity: number;
+  currentStreak: number;
   weeklyData: WeeklyData[];
   monthlyData: MonthlyData[];
-  productivityScore: number;
 }
 
 export interface WeeklyData {

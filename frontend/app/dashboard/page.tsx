@@ -391,6 +391,12 @@ export default function Dashboard() {
   // User ID for API calls - must match the API default
   const userId = 'dev-user-123';
 
+  // Real-time analytics
+  const { analyticsData, globalStats, isLoading: analyticsLoading, trackVisit, getBookmarkAnalytics } = useAnalytics(bookmarks);
+
+  // Health check loading state for individual bookmarks
+  const [healthCheckLoading, setHealthCheckLoading] = useState<{ [key: number]: boolean }>({});
+
   // Fetch bookmarks from database
   useEffect(() => {
     const fetchBookmarks = async () => {
@@ -702,7 +708,7 @@ export default function Dashboard() {
       notes: newBookmark.notes || 'No notes added',
       timeSpent: '0m',
       weeklyVisits: 0,
-      siteHealth: 'good',
+      siteHealth: 'working',
       project: {
         name: "NEW PROJECT",
         progress: 0,
@@ -789,7 +795,7 @@ export default function Dashboard() {
       notes: 'Added from available bookmarks',
       timeSpent: '0m',
       weeklyVisits: 0,
-      siteHealth: 'good',
+      siteHealth: 'working',
       project: {
         name: "IMPORTED",
         progress: 0,
@@ -2963,60 +2969,7 @@ export default function Dashboard() {
                   <div className="w-2 h-2 bg-blue-600 rotate-45"></div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  {/* Left content */}
-                  <div className="flex-1 space-y-6">
-                    <div>
-                      <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                        Hi, Andrew <span className="inline-block">👋</span>
-                      </h2>
-                      <h3 className="text-2xl font-semibold text-gray-800 mb-4 leading-tight">
-                        What Do You Want To Learn Today With<br />Your Partner?
-                      </h3>
-                      <p className="text-gray-600 text-lg leading-relaxed">
-                        Discover Courses, Track Progress, And Achieve Your<br />Learning Goals Seamlessly.
-                      </p>
-                    </div>
-                    
-                    <Button className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-lg text-base font-medium">
-                      EXPLORE COURSE
-                    </Button>
-                  </div>
 
-                  {/* Right illustration */}
-                  <div className="flex-shrink-0 ml-8">
-                    <div className="relative w-48 h-40">
-                      {/* Person illustration */}
-                      <div className="absolute bottom-0 right-8">
-                        {/* Books/Platform */}
-                        <div className="w-32 h-8 bg-gray-800 rounded-full mb-2"></div>
-                        <div className="w-28 h-6 bg-gray-300 rounded-full absolute bottom-0 right-2"></div>
-                        
-                        {/* Person figure */}
-                        <div className="absolute bottom-8 right-6">
-                          {/* Head */}
-                          <div className="w-8 h-8 bg-gray-400 rounded-full mb-1 relative">
-                            <div className="w-6 h-4 bg-gray-600 rounded-t-full absolute top-1 left-1"></div>
-                          </div>
-                          {/* Body */}
-                          <div className="w-6 h-12 bg-gray-700 rounded-t-lg mx-1"></div>
-                          {/* Arms */}
-                          <div className="w-3 h-8 bg-pink-300 rounded absolute -left-2 top-8"></div>
-                          <div className="w-3 h-8 bg-pink-300 rounded absolute -right-2 top-8"></div>
-                          {/* Legs */}
-                          <div className="w-2 h-8 bg-gray-800 absolute left-1 top-16"></div>
-                          <div className="w-2 h-8 bg-gray-800 absolute right-1 top-16"></div>
-                        </div>
-                        
-                        {/* Graduation cap */}
-                        <div className="absolute -top-2 right-4">
-                          <div className="w-6 h-6 bg-black transform rotate-12"></div>
-                          <div className="w-1 h-3 bg-black absolute top-1 right-2"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
@@ -3772,7 +3725,10 @@ export default function Dashboard() {
                         size="sm"
                         className="text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                         onClick={() => {
-                          showNotification('Browse all bookmarks to add more relations!')
+                          console.log('Opening browse all bookmarks modal');
+                          // Open the add bookmark modal and switch to existing bookmarks tab
+                          setShowAddBookmark(true);
+                          setAddBookmarkTab('existing');
                         }}
                       >
                         <Plus className="h-4 w-4 mr-2" />

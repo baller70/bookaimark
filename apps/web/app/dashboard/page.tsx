@@ -90,7 +90,9 @@ import {
   Users2,
   TrendingDown,
   Filter as FilterIcon,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle,
+  AlertCircle
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -138,6 +140,11 @@ import ReactFlow, {
   useEdgesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+
+// Import the Perplexity-style search component
+import DnaSearch from '@/src/components/dna-profile/dna-search'
+// Import Oracle component
+import Oracle from '@/src/components/oracle/Oracle'
 
 // Custom Infinity Board Background Component (no nodes, just background)
 const InfinityBoardBackground = ({ isActive }: { isActive: boolean }) => {
@@ -432,6 +439,10 @@ export default function Dashboard() {
   // Real-time analytics
   const { analyticsData, globalStats, isLoading: analyticsLoading, trackVisit, getBookmarkAnalytics } = useAnalytics(bookmarks);
 
+  // Health check loading state for individual bookmarks
+  const [healthCheckLoading, setHealthCheckLoading] = useState<{ [key: number]: boolean }>({});
+  const [uploadingBackground, setUploadingBackground] = useState(false);
+
   // Fetch bookmarks from database
   useEffect(() => {
     const fetchBookmarks = async () => {
@@ -700,26 +711,27 @@ export default function Dashboard() {
     }
   ];
 
-  // Load bookmarks from database on component mount
-  useEffect(() => {
-    const loadBookmarks = async () => {
-      try {
-        const response = await fetch('/api/bookmarks?user_id=dev-user-123')
-        const result = await response.json()
-        
-        if (result.success && result.bookmarks) {
-          console.log('✅ Loaded bookmarks from database:', result.bookmarks.length)
-          setBookmarks(result.bookmarks)
-        } else {
-          console.log('⚠️ No bookmarks found, starting with empty array')
-          setBookmarks([])
-        }
-      } catch (error) {
-        console.error('❌ Error loading bookmarks:', error)
+  // Load bookmarks from database
+  const loadBookmarks = async () => {
+    try {
+      const response = await fetch('/api/bookmarks?user_id=dev-user-123')
+      const result = await response.json()
+      
+      if (result.success && result.bookmarks) {
+        console.log('✅ Loaded bookmarks from database:', result.bookmarks.length)
+        setBookmarks(result.bookmarks)
+      } else {
+        console.log('⚠️ No bookmarks found, starting with empty array')
         setBookmarks([])
       }
+    } catch (error) {
+      console.error('❌ Error loading bookmarks:', error)
+      setBookmarks([])
     }
-    
+  }
+
+  // Load bookmarks from database on component mount
+  useEffect(() => {
     loadBookmarks()
   }, [])
 
@@ -793,7 +805,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddBookmark = () => {
+  const handleAddBookmark = async () => {
     // Validate required fields
     if (!newBookmark.title.trim()) {
       alert('Please enter a bookmark title');
@@ -813,42 +825,45 @@ export default function Dashboard() {
       return;
     }
     
-    // Create new bookmark object
-    const bookmark = {
-      id: bookmarks.length + 1,
-      title: newBookmark.title.toUpperCase(),
-      url: newBookmark.url,
-      description: newBookmark.description || 'No description provided',
-      category: newBookmark.category,
-      tags: newBookmark.tags ? newBookmark.tags.split(',').map(tag => tag.trim().toUpperCase()) : [],
-      priority: newBookmark.priority,
-      isFavorite: false,
-      visits: 0,
-      lastVisited: new Date().toLocaleDateString(),
-      dateAdded: new Date().toLocaleDateString(),
-      favicon: newBookmark.title.charAt(0).toUpperCase(), // Use first letter as fallback
-      screenshot: "/placeholder.svg",
-      circularImage: newBookmark.circularImage || userDefaultLogo || "/placeholder.svg",
-      logo: newBookmark.logo || "", // Background logo
-      notes: newBookmark.notes || 'No notes added',
-      timeSpent: '0m',
-      weeklyVisits: 0,
-      siteHealth: 'good',
-      project: {
-        name: "NEW PROJECT",
-        progress: 0,
-        status: "Planning"
+    try {
+      console.log('🚀 Saving bookmark to database...');
+      
+      // Call the API to save the bookmark
+      const response = await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: newBookmark.title,
+          url: newBookmark.url,
+          description: newBookmark.description || 'No description provided',
+          category: newBookmark.category,
+          tags: newBookmark.tags ? newBookmark.tags.split(',').map(tag => tag.trim()) : [],
+          notes: newBookmark.notes || 'No notes added',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save bookmark');
       }
+
+      console.log('✅ Bookmark saved successfully:', result.bookmark);
+      
+      // Reload bookmarks from the database to get the latest data
+      await loadBookmarks();
+      
+      console.log('✅ Bookmarks reloaded from database');
+      setShowAddBookmark(false);
+      resetAddBookmarkForm();
+      showNotification('Bookmark saved successfully!');
+      
+    } catch (error) {
+      console.error('❌ Error saving bookmark:', error);
+      alert(`Failed to save bookmark: ${(error as Error).message}`);
     }
-    
-    console.log('New bookmark created with circularImage:', bookmark.circularImage)
-    
-    // Add bookmark to the array
-    setBookmarks(prev => [...prev, bookmark])
-    
-    console.log('Bookmark added successfully:', bookmark)
-    setShowAddBookmark(false)
-    resetAddBookmarkForm()
   }
 
   const resetAddBookmarkForm = () => {
@@ -900,38 +915,102 @@ export default function Dashboard() {
     )
   }
 
-  const handleAddExistingBookmarks = () => {
+  const handleAddExistingBookmarks = async () => {
     if (selectedExistingBookmarks.length === 0) {
       showNotification('Please select at least one bookmark to add')
       return
     }
 
-    const bookmarksToAdd = availableBookmarks.filter(bookmark => 
-      selectedExistingBookmarks.includes(bookmark.id)
-    ).map(bookmark => ({
-      ...bookmark,
-      id: bookmarks.length + bookmark.id, // Ensure unique IDs
-      isFavorite: false,
-      visits: 0,
-      lastVisited: new Date().toLocaleDateString(),
-      dateAdded: new Date().toLocaleDateString(),
-      favicon: bookmark.title.charAt(0).toUpperCase(),
-      screenshot: "/placeholder.svg",
-      notes: 'Added from available bookmarks',
-      timeSpent: '0m',
-      weeklyVisits: 0,
-      siteHealth: 'good',
-      project: {
-        name: "IMPORTED",
-        progress: 0,
-        status: "New"
-      }
-    }))
+    // Check if we're adding related bookmarks (modal is open with selected bookmark)
+    if (isModalOpen && selectedBookmark) {
+      // Add as related bookmarks to the selected bookmark
+      const relatedBookmarkIds = selectedExistingBookmarks.map(id => 
+        bookmarks.find(b => b.id === id)?.id || id
+      ).filter(id => id !== selectedBookmark.id) // Don't add bookmark as related to itself
 
-    setBookmarks(prev => [...prev, ...bookmarksToAdd])
+      if (relatedBookmarkIds.length === 0) {
+        showNotification('Cannot add bookmark as related to itself')
+        return
+      }
+
+      // Update the selected bookmark with new related bookmarks
+      const updatedBookmark = {
+        ...selectedBookmark,
+        relatedBookmarks: [...(selectedBookmark.relatedBookmarks || []), ...relatedBookmarkIds]
+      }
+
+      // Update bookmarks array
+      setBookmarks(prev => prev.map(bookmark => 
+        bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+      ))
+
+      // Update selected bookmark for immediate UI update
+      setSelectedBookmark(updatedBookmark)
+      
+      // Save the updated bookmark to the backend
+      try {
+        const response = await fetch('/api/bookmarks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: updatedBookmark.id,
+            title: updatedBookmark.title,
+            url: updatedBookmark.url,
+            description: updatedBookmark.description || '',
+            category: updatedBookmark.category || '',
+            tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+            notes: updatedBookmark.notes || '',
+            ai_summary: updatedBookmark.ai_summary || '',
+            ai_tags: updatedBookmark.ai_tags || [],
+            ai_category: updatedBookmark.ai_category || updatedBookmark.category || '',
+            relatedBookmarks: updatedBookmark.relatedBookmarks || []
+          })
+        })
+
+        const result = await response.json()
+        
+        if (result.success) {
+          showNotification(`Added ${relatedBookmarkIds.length} related bookmark(s) successfully!`)
+        } else {
+          showNotification('Failed to save related bookmarks')
+          console.error('Save failed:', result.error)
+        }
+      } catch (error) {
+        showNotification('Error saving related bookmarks')
+        console.error('Save error:', error)
+      }
+    } else {
+      // Original functionality: Add as new bookmarks to workspace
+      const bookmarksToAdd = availableBookmarks.filter(bookmark => 
+        selectedExistingBookmarks.includes(bookmark.id)
+      ).map(bookmark => ({
+        ...bookmark,
+        id: bookmarks.length + bookmark.id, // Ensure unique IDs
+        isFavorite: false,
+        visits: 0,
+        lastVisited: new Date().toLocaleDateString(),
+        dateAdded: new Date().toLocaleDateString(),
+        favicon: bookmark.title.charAt(0).toUpperCase(),
+        screenshot: "/placeholder.svg",
+        notes: 'Added from available bookmarks',
+        timeSpent: '0m',
+        weeklyVisits: 0,
+        siteHealth: 'working',
+        project: {
+          name: "IMPORTED",
+          progress: 0,
+          status: "New"
+        }
+      }))
+
+      setBookmarks(prev => [...prev, ...bookmarksToAdd])
+      showNotification(`Added ${bookmarksToAdd.length} bookmark(s) successfully!`)
+    }
+
     setSelectedExistingBookmarks([])
     setShowAddBookmark(false)
-    showNotification(`Added ${bookmarksToAdd.length} bookmark(s) successfully!`)
   }
 
   const resetAddBookmarkModal = () => {
@@ -951,6 +1030,18 @@ export default function Dashboard() {
   }).filter(availableBookmark => 
     // Only show bookmarks that aren't already added to the workspace
     !bookmarks.some(existingBookmark => existingBookmark.url === availableBookmark.url)
+  )
+
+  // Filter existing user bookmarks for the existing bookmarks tab
+  const filteredExistingBookmarks = bookmarks.filter(bookmark => {
+    const searchLower = existingBookmarksSearch.toLowerCase()
+    return bookmark.title.toLowerCase().includes(searchLower) ||
+           bookmark.description.toLowerCase().includes(searchLower) ||
+           bookmark.category.toLowerCase().includes(searchLower) ||
+           (Array.isArray(bookmark.tags) && bookmark.tags.some((tag: string) => tag.toLowerCase().includes(searchLower)))
+  }).filter(bookmark => 
+    // Exclude the currently selected bookmark from the list
+    selectedBookmark ? bookmark.id !== selectedBookmark.id : true
   )
 
   const handleBookmarkSelect = (bookmarkId: number) => {
@@ -1237,6 +1328,71 @@ export default function Dashboard() {
     setShowDefaultLogoModal(true)
   }
 
+  const handleBackgroundUpload = async () => {
+    if (!selectedBookmark) return;
+    
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        setUploadingBackground(true)
+        try {
+          const reader = new FileReader()
+          reader.onload = async (e) => {
+            const backgroundUrl = e.target?.result as string
+            
+            // Save to database via API
+            const response = await fetch('/api/bookmarks', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                id: selectedBookmark.id,
+                customBackground: backgroundUrl,
+                // Include all existing bookmark data
+                title: selectedBookmark.title,
+                url: selectedBookmark.url,
+                description: selectedBookmark.description,
+                category: selectedBookmark.category,
+                tags: selectedBookmark.tags,
+                notes: selectedBookmark.notes,
+                ai_summary: selectedBookmark.ai_summary,
+                ai_tags: selectedBookmark.ai_tags,
+                ai_category: selectedBookmark.ai_category
+              })
+            })
+
+            if (!response.ok) {
+              throw new Error('Failed to save background')
+            }
+
+            // Update local state
+            setBookmarks(prev => prev.map(bookmark => 
+              bookmark.id === selectedBookmark.id 
+                ? { ...bookmark, customBackground: backgroundUrl }
+                : bookmark
+            ))
+            
+            // Update selected bookmark
+            setSelectedBookmark({ ...selectedBookmark, customBackground: backgroundUrl })
+            
+            showNotification('Background uploaded and saved successfully!')
+          }
+          reader.readAsDataURL(file)
+        } catch (error) {
+          console.error('Background upload error:', error)
+          showNotification('Failed to upload background')
+        } finally {
+          setUploadingBackground(false)
+        }
+      }
+    }
+    input.click()
+  }
+
   const handleTabChange = (value: string) => {
     console.log('Tab changed to:', value)
     setActiveBookmarkTab(value)
@@ -1325,6 +1481,8 @@ export default function Dashboard() {
         return 'text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-200'
       case 'good':
         return 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-200'
+      case 'working':
+        return 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-200'
       case 'fair':
         return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200'
       case 'poor':
@@ -1339,6 +1497,13 @@ export default function Dashboard() {
   // Check health of bookmarks
   const checkBookmarkHealth = async (bookmarkIds: number[]) => {
     try {
+      // Set loading state for each bookmark
+      const loadingStates: { [key: number]: boolean } = {};
+      bookmarkIds.forEach(id => {
+        loadingStates[id] = true;
+      });
+      setHealthCheckLoading(prev => ({ ...prev, ...loadingStates }));
+
       const response = await fetch('/api/bookmarks/health', {
         method: 'POST',
         headers: {
@@ -1346,7 +1511,7 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           bookmarkIds,
-          userId: 'dev-user-123'
+          userId: userId
         })
       })
 
@@ -1357,24 +1522,40 @@ export default function Dashboard() {
       const data = await response.json()
       
       if (data.success) {
-        // Update bookmarks with new health status
+        // Update bookmarks with new health status - the API already increments the count
         setBookmarks(prev => prev.map(bookmark => {
           const healthResult = data.results.find((r: any) => r.bookmarkId === bookmark.id)
           if (healthResult) {
             return {
               ...bookmark,
-              siteHealth: healthResult.status,
-              lastHealthCheck: healthResult.lastChecked
+              site_health: healthResult.status,
+              siteHealth: healthResult.status, // Keep both for compatibility
+              last_health_check: healthResult.lastChecked,
+              lastHealthCheck: healthResult.lastChecked, // Keep both for compatibility
+              // Don't increment here - the API already incremented and saved the count
+              // We'll get the updated count when we reload bookmarks from the database
             }
           }
           return bookmark
         }))
+        
+        // Reload bookmarks from database to get the updated health check count
+        setTimeout(() => {
+          loadBookmarks()
+        }, 100)
         
         showNotification(`Health check completed for ${data.results.length} bookmarks`)
       }
     } catch (error) {
       console.error('Health check error:', error)
       showNotification('Failed to check bookmark health')
+    } finally {
+      // Clear loading state for all checked bookmarks
+      const clearedStates: { [key: number]: boolean } = {};
+      bookmarkIds.forEach(id => {
+        clearedStates[id] = false;
+      });
+      setHealthCheckLoading(prev => ({ ...prev, ...clearedStates }));
     }
   }
 
@@ -1448,7 +1629,7 @@ export default function Dashboard() {
   // Action icons component for top right corner
   const BookmarkActionIcons = ({ bookmark }: { bookmark: any }) => (
     <TooltipProvider>
-      <div className="absolute top-12 right-2 flex flex-col items-center space-y-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <div className="absolute top-12 right-2 flex flex-col items-center space-y-1 opacity-40 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip>
           <TooltipTrigger asChild>
             <button 
@@ -1462,14 +1643,35 @@ export default function Dashboard() {
                     ? { ...b, isFavorite: newFavoriteStatus }
                     : b
                 ))
-                showNotification(newFavoriteStatus ? 'Added to favorites!' : 'Removed from favorites!')
+                
+                // Save to backend
+                fetch('/api/bookmarks', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    id: bookmark.id,
+                    user_id: 'dev-user-123',
+                    title: bookmark.title,
+                    url: bookmark.url,
+                    description: bookmark.description,
+                    category: bookmark.category,
+                    tags: bookmark.tags,
+                    notes: bookmark.notes,
+                    isFavorite: newFavoriteStatus,
+                    ai_summary: bookmark.ai_summary,
+                    ai_tags: bookmark.ai_tags,
+                    ai_category: bookmark.ai_category
+                  }),
+                })
               }}
             >
-              <Heart className={`h-4 w-4 ${bookmark.isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'}`} />
+              <Heart className={`h-4 w-4 ${bookmark.isFavorite ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-red-500'}`} />
             </button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{bookmark.isFavorite ? 'Remove from favorites' : 'Add to favorites'}</p>
+            <p>Add to favorites</p>
           </TooltipContent>
         </Tooltip>
 
@@ -1479,9 +1681,9 @@ export default function Dashboard() {
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               onClick={(e) => {
                 e.stopPropagation()
-                // Open bookmark details modal
+                // Open bookmark detail modal
                 setSelectedBookmark(bookmark)
-                setIsModalOpen(true)
+                setIsDetailModalOpen(true)
               }}
             >
               <Eye className="h-4 w-4 text-gray-400 hover:text-blue-500" />
@@ -1508,6 +1710,71 @@ export default function Dashboard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>Edit bookmark</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button 
+              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              onClick={async (e) => {
+                e.stopPropagation()
+                console.log('🔄 Duplicate button clicked for bookmark:', bookmark.title)
+                try {
+                  // Create duplicate bookmark object
+                  const duplicatedBookmark = {
+                    user_id: 'dev-user-123',
+                    title: `${bookmark.title} (Copy)`,
+                    url: bookmark.url,
+                    description: bookmark.description || '',
+                    category: bookmark.category || 'General',
+                    tags: bookmark.tags || [],
+                    notes: bookmark.notes || '',
+                    ai_summary: bookmark.ai_summary || '',
+                    ai_tags: bookmark.ai_tags || [],
+                    ai_category: bookmark.ai_category || bookmark.category || 'General'
+                  }
+
+                  console.log('📋 Creating duplicate bookmark:', duplicatedBookmark)
+
+                  // Save to backend
+                  const response = await fetch('/api/bookmarks', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(duplicatedBookmark),
+                  })
+
+                  console.log('🌐 API Response status:', response.status)
+
+                  if (response.ok) {
+                    const result = await response.json()
+                    console.log('✅ API Response:', result)
+                    if (result.success) {
+                      // Reload bookmarks to show the new duplicate
+                      console.log('🔄 Reloading bookmarks...')
+                      loadBookmarks()
+                      showNotification('Bookmark duplicated successfully!')
+                    } else {
+                      console.error('❌ API returned failure:', result)
+                      showNotification('Failed to duplicate bookmark')
+                    }
+                  } else {
+                    console.error('❌ API request failed with status:', response.status)
+                    showNotification('Failed to duplicate bookmark')
+                  }
+                } catch (error) {
+                  console.error('❌ Error duplicating bookmark:', error)
+                  showNotification('Failed to duplicate bookmark')
+                }
+              }}
+            >
+              <Copy className="h-4 w-4 text-gray-400 hover:text-purple-500" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Duplicate bookmark</p>
           </TooltipContent>
         </Tooltip>
 
@@ -1572,6 +1839,224 @@ export default function Dashboard() {
     </TooltipProvider>
   )
 
+  // Enhanced Site Health Component with modal analytics card design
+  const SiteHealthComponent = ({ bookmark, onClick, isLoading = false }: { 
+    bookmark: any; 
+    onClick?: () => void; 
+    isLoading?: boolean;
+  }) => {
+    const health = bookmark.site_health || bookmark.siteHealth || 'working';
+    const isClickable = !!onClick;
+    
+    const getHealthIcon = () => {
+      if (isLoading) {
+        return <RotateCcw className="h-7 w-7 animate-spin" />;
+      }
+      
+      switch (health) {
+        case 'excellent':
+          return <CheckCircle className="h-7 w-7" />;
+        case 'good':
+          return <Shield className="h-7 w-7" />;
+        case 'working':
+          return <Shield className="h-7 w-7" />;
+        case 'fair':
+          return <AlertTriangle className="h-7 w-7" />;
+        case 'poor':
+          return <AlertTriangle className="h-7 w-7" />;
+        case 'broken':
+          return <X className="h-7 w-7" />;
+        default:
+          return <Globe className="h-7 w-7" />;
+      }
+    };
+    
+    const getHealthColor = () => {
+      switch (health) {
+        case 'excellent':
+          return 'text-emerald-600';
+        case 'good':
+          return 'text-green-600';
+        case 'working':
+          return 'text-green-600';
+        case 'fair':
+          return 'text-amber-600';
+        case 'poor':
+          return 'text-orange-600';
+        case 'broken':
+          return 'text-red-600';
+        default:
+          return 'text-gray-600';
+      }
+    };
+    
+    const getHealthText = () => {
+      if (isLoading) return 'CHECKING...';
+      
+      switch (health) {
+        case 'excellent':
+          return 'WORKING';
+        case 'good':
+          return 'WORKING';
+        case 'working':
+          return 'WORKING';
+        case 'fair':
+          return 'WORKING';
+        case 'poor':
+          return 'BROKEN';
+        case 'broken':
+          return 'BROKEN';
+        default:
+          return 'BROKEN';
+      }
+    };
+
+    const getHealthCheckCount = () => {
+      if (isLoading) return '...';
+      
+      // Get health check count from bookmark data
+      const healthCheckCount = bookmark.healthCheckCount || 0;
+      
+      return healthCheckCount;
+    };
+
+    const getStatusIndicator = () => {
+      if (isLoading) return null;
+      
+      return (
+        <div className={`w-2 h-2 rounded-full mt-1 mx-auto ${
+          health === 'working' || health === 'good' || health === 'excellent' 
+            ? 'bg-green-500 animate-pulse' 
+            : health === 'fair' 
+            ? 'bg-yellow-500' 
+            : 'bg-red-500'
+        }`} title="Live status indicator" />
+      );
+    };
+
+    return (
+      <div 
+        className={`text-center w-full ${
+          isClickable ? 'cursor-pointer hover:scale-105 transition-all duration-200 hover:shadow-lg' : ''
+        }`}
+        onClick={isClickable ? onClick : undefined}
+        title={isClickable ? `Click to check ${bookmark.title} health` : `Site health: ${health}`}
+      >
+        <div className={`flex justify-center mx-auto mb-3 ${getHealthColor()}`}>
+          {getHealthIcon()}
+        </div>
+        <p className={`text-3xl font-bold ${getHealthColor()}`}>
+          {getHealthCheckCount()}
+        </p>
+        <p className="text-xs text-muted-foreground font-medium">
+          {getHealthText()}
+        </p>
+        {getStatusIndicator()}
+      </div>
+    );
+  };
+
+  const SiteHealthComponentModal = ({ bookmark, onClick, isLoading = false }: { 
+    bookmark: any; 
+    onClick?: () => void; 
+    isLoading?: boolean;
+  }) => {
+    const health = bookmark.site_health || bookmark.siteHealth || 'unknown';
+
+    const getHealthIcon = () => {
+      if (isLoading) {
+        return <RotateCcw className="h-8 w-8 animate-spin" />;
+      }
+      
+      switch (health) {
+        case 'excellent':
+          return <Shield className="h-8 w-8" />;
+        case 'good':
+          return <Shield className="h-8 w-8" />;
+        case 'working':
+          return <Shield className="h-8 w-8" />;
+        case 'fair':
+          return <AlertTriangle className="h-8 w-8" />;
+        case 'poor':
+          return <AlertCircle className="h-8 w-8" />;
+        default:
+          return <Shield className="h-8 w-8" />;
+      }
+    };
+
+    const getHealthColor = () => {
+      if (isLoading) return 'text-blue-500';
+      
+      switch (health) {
+        case 'excellent':
+          return 'text-green-600';
+        case 'good':
+          return 'text-green-500';
+        case 'working':
+          return 'text-green-500';
+        case 'fair':
+          return 'text-yellow-500';
+        case 'poor':
+          return 'text-red-500';
+        default:
+          return 'text-gray-500';
+      }
+    };
+
+    const getHealthText = () => {
+      if (isLoading) return 'CHECKING...';
+      
+      switch (health) {
+        case 'excellent':
+          return 'WORKING';
+        case 'good':
+          return 'WORKING';
+        case 'working':
+          return 'WORKING';
+        case 'fair':
+          return 'WORKING';
+        case 'poor':
+          return 'BROKEN';
+        case 'broken':
+          return 'BROKEN';
+        default:
+          return 'BROKEN';
+      }
+    };
+
+    const getStatusIndicator = () => {
+      if (isLoading) return null;
+      
+      return (
+        <div className={`w-2 h-2 rounded-full mt-1 mx-auto ${
+          health === 'working' || health === 'good' || health === 'excellent' 
+            ? 'bg-green-500 animate-pulse' 
+            : health === 'fair' 
+            ? 'bg-yellow-500' 
+            : 'bg-red-500'
+        }`} title="Live status indicator" />
+      );
+    };
+
+    return (
+      <div 
+        className={`text-center w-full ${
+          onClick ? 'cursor-pointer hover:scale-105 transition-all duration-200 hover:shadow-lg' : ''
+        }`}
+        onClick={onClick}
+        title={onClick ? `Click to check ${bookmark.title} health` : `Site health: ${health}`}
+      >
+        <div className={`flex justify-center mx-auto mb-3 ${getHealthColor()}`}>
+          {getHealthIcon()}
+        </div>
+        <p className="text-xs text-muted-foreground font-medium">
+          {getHealthText()}
+        </p>
+        {getStatusIndicator()}
+      </div>
+    );
+  };
+
   const SortableGridBookmarkCard = ({ bookmark }: { bookmark: any }) => {
     const {
       attributes,
@@ -1616,19 +2101,31 @@ export default function Dashboard() {
         handleBookmarkClick(bookmark)
       }}
     >
-      {/* Background Website Logo with 5% opacity */}
+      {/* Background Website Logo with 5% opacity - Custom background takes priority */}
       {(() => {
-        const domain = extractDomain(bookmark.url);
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-        return (
-          <div 
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
-            style={{
-              backgroundImage: `url(${faviconUrl})`,
-              opacity: 0.10
-            }}
-          />
-        );
+        if (bookmark.customBackground) {
+          return (
+            <div 
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
+              style={{
+                backgroundImage: `url(${bookmark.customBackground})`,
+                opacity: 0.10
+              }}
+            />
+          );
+        } else {
+          const domain = extractDomain(bookmark.url);
+          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+          return (
+            <div 
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
+              style={{
+                backgroundImage: `url(${faviconUrl})`,
+                opacity: 0.10
+              }}
+            />
+          );
+        }
       })()}
       
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/3 via-transparent to-purple-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -1764,84 +2261,9 @@ export default function Dashboard() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live data" />
               )}
             </div>
-            <div className="relative overflow-hidden">
-              {(() => {
-                const health = bookmark.siteHealth || 'good'
-                const healthConfig = {
-                  excellent: {
-                    bg: 'bg-gradient-to-r from-emerald-50 to-green-50',
-                    border: 'border-emerald-200',
-                    icon: '🌟',
-                    color: '#059669',
-                    glow: 'shadow-emerald-200/50'
-                  },
-                  good: {
-                    bg: 'bg-gradient-to-r from-blue-50 to-cyan-50',
-                    border: 'border-blue-200',
-                    icon: '💚',
-                    color: '#0369a1',
-                    glow: 'shadow-blue-200/50'
-                  },
-                  fair: {
-                    bg: 'bg-gradient-to-r from-yellow-50 to-amber-50',
-                    border: 'border-yellow-200',
-                    icon: '⚠️',
-                    color: '#d97706',
-                    glow: 'shadow-yellow-200/50'
-                  },
-                  poor: {
-                    bg: 'bg-gradient-to-r from-orange-50 to-red-50',
-                    border: 'border-orange-200',
-                    icon: '🔄',
-                    color: '#ea580c',
-                    glow: 'shadow-orange-200/50'
-                  },
-                  broken: {
-                    bg: 'bg-gradient-to-r from-red-50 to-pink-50',
-                    border: 'border-red-200',
-                    icon: '💔',
-                    color: '#dc2626',
-                    glow: 'shadow-red-200/50'
-                  }
-                }
-                
-                const config = healthConfig[health] || healthConfig.good
-                
-                return (
-                  <div className={`flex items-center space-x-3 ${config.bg} ${config.border} border rounded-xl px-4 py-2.5 shadow-lg ${config.glow} transition-all duration-300 hover:scale-105 group cursor-pointer`}>
-                    {/* Animated background pulse */}
-                    <div className="absolute inset-0 bg-white/30 rounded-xl animate-pulse opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    
-                    {/* Health Icon with animation */}
-                    <div className="relative z-10 text-lg animate-bounce" style={{ animationDuration: '2s' }}>
-                      {config.icon}
-                    </div>
-                    
-                    {/* Health Status */}
-                    <div className="relative z-10 flex flex-col">
-                      <span className="text-xs font-bold uppercase tracking-wider opacity-70" style={{ color: config.color }}>
-                        Site Health
-                      </span>
-                      <span className="text-sm font-bold capitalize" style={{ color: config.color }}>
-                        {health}
-                      </span>
-                    </div>
-                    
-                    {/* Animated indicator dot */}
-                    <div className="relative z-10">
-                      <div 
-                        className="w-3 h-3 rounded-full animate-pulse shadow-lg"
-                        style={{ backgroundColor: config.color }}
-                        title={`${health} health status`}
-                      />
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
           </div>
           {/* Usage Percentage Hexagon - Moved here to be even with visits */}
-          <div className="flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center">
             <svg width="70" height="62" viewBox="0 0 70 62" className="drop-shadow-sm">
               <path
                 d="M35 4 L55 15 L55 40 L35 51 L15 40 L15 15 Z"
@@ -1872,7 +2294,17 @@ export default function Dashboard() {
                 })()}%
               </text>
             </svg>
+            <span className="text-xs text-gray-600 font-medium mt-1">USAGE.</span>
           </div>
+        </div>
+
+        {/* Clickable Site Health Component - Separate from analytics */}
+        <div className="mb-4">
+          <SiteHealthComponentModal 
+            bookmark={bookmark}
+            onClick={() => checkBookmarkHealth([bookmark.id])}
+            isLoading={healthCheckLoading[bookmark.id] || false}
+          />
         </div>
 
         {/* Project Information Section - Moved to bottom and separated */}
@@ -1933,19 +2365,31 @@ export default function Dashboard() {
     >
       {/* Square Box Design matching folder cards - SAME SIZE */}
       <div className="aspect-square w-full bg-white border border-black relative overflow-hidden rounded-lg">
-        {/* Background Website Logo with 5% opacity */}
+        {/* Background Website Logo with 5% opacity - Custom background takes priority */}
         {(() => {
-          const domain = extractDomain(bookmark.url);
-          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-          return (
-            <div 
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-              style={{
-                backgroundImage: `url(${faviconUrl})`,
-                opacity: 0.10
-              }}
-            />
-          );
+          if (bookmark.customBackground) {
+            return (
+              <div 
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style={{
+                  backgroundImage: `url(${bookmark.customBackground})`,
+                  opacity: 0.10
+                }}
+              />
+            );
+          } else {
+            const domain = extractDomain(bookmark.url);
+            const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+            return (
+              <div 
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style={{
+                  backgroundImage: `url(${faviconUrl})`,
+                  opacity: 0.10
+                }}
+              />
+            );
+          }
         })()}
         <div className="p-2 h-full flex flex-col justify-between relative z-10">
           {/* Top section with favicon and title */}
@@ -2244,19 +2688,31 @@ export default function Dashboard() {
       className="group hover:shadow-xl hover:shadow-blue-500/15 transition-all duration-400 cursor-pointer bg-white border border-black hover:border-blue-600 backdrop-blur-sm relative overflow-hidden rounded-lg"
       onClick={() => handleBookmarkClick(bookmark)}
     >
-      {/* Background Website Logo with 5% opacity */}
+      {/* Background Website Logo with 5% opacity - Custom background takes priority */}
       {(() => {
-        const domain = extractDomain(bookmark.url);
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-        return (
-          <div 
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-            style={{
-              backgroundImage: `url(${faviconUrl})`,
-              opacity: 0.10
-            }}
-          />
-        );
+        if (bookmark.customBackground) {
+          return (
+            <div 
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url(${bookmark.customBackground})`,
+                opacity: 0.10
+              }}
+            />
+          );
+        } else {
+          const domain = extractDomain(bookmark.url);
+          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+          return (
+            <div 
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url(${faviconUrl})`,
+                opacity: 0.10
+              }}
+            />
+          );
+        }
       })()}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/2 via-transparent to-purple-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
       
@@ -3233,15 +3689,6 @@ export default function Dashboard() {
               <p className="text-gray-600 mt-1">Your Digital Workspace</p>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search bookmarks..."
-                  className="pl-10 w-64 border-gray-200"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-40 border-gray-200">
                   <SelectValue placeholder="Category" />
@@ -3250,9 +3697,21 @@ export default function Dashboard() {
                   <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="development">Development</SelectItem>
                   <SelectItem value="design">Design</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
                   <SelectItem value="productivity">Productivity</SelectItem>
-                  <SelectItem value="learning">Learning</SelectItem>
+                  <SelectItem value="research">Research</SelectItem>
+                  <SelectItem value="education">Education</SelectItem>
                   <SelectItem value="entertainment">Entertainment</SelectItem>
+                  <SelectItem value="news">News</SelectItem>
+                  <SelectItem value="shopping">Shopping</SelectItem>
+                  <SelectItem value="social">Social</SelectItem>
+                  <SelectItem value="travel">Travel</SelectItem>
+                  <SelectItem value="health">Health</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="sports">Sports</SelectItem>
+                  <SelectItem value="technology">Technology</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
               <SyncButton />
@@ -3265,6 +3724,9 @@ export default function Dashboard() {
               </Button>
             </div>
           </div>
+
+          {/* Oracle Component */}
+          <Oracle />
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 density-gap mb-8">
@@ -3305,197 +3767,10 @@ export default function Dashboard() {
                 <div className="absolute top-3/4 right-4">
                   <div className="w-2 h-2 bg-blue-600 rotate-45"></div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  {/* Left content */}
-                  <div className="flex-1 space-y-6">
-                    <div>
-                      <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                        Hi, Andrew <span className="inline-block">👋</span>
-                      </h2>
-                      <h3 className="text-2xl font-semibold text-gray-800 mb-4 leading-tight">
-                        What Do You Want To Learn Today With<br />Your Partner?
-                      </h3>
-                      <p className="text-gray-600 text-lg leading-relaxed">
-                        Discover Courses, Track Progress, And Achieve Your<br />Learning Goals Seamlessly.
-                      </p>
-                    </div>
-                    
-                    <Button className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-lg text-base font-medium">
-                      EXPLORE COURSE
-                    </Button>
-                  </div>
-
-                  {/* Right illustration */}
-                  <div className="flex-shrink-0 ml-8">
-                    <div className="relative w-48 h-40">
-                      {/* Person illustration */}
-                      <div className="absolute bottom-0 right-8">
-                        {/* Books/Platform */}
-                        <div className="w-32 h-8 bg-gray-800 rounded-full mb-2"></div>
-                        <div className="w-28 h-6 bg-gray-300 rounded-full absolute bottom-0 right-2"></div>
-                        
-                        {/* Person figure */}
-                        <div className="absolute bottom-8 right-6">
-                          {/* Head */}
-                          <div className="w-8 h-8 bg-gray-400 rounded-full mb-1 relative">
-                            <div className="w-6 h-4 bg-gray-600 rounded-t-full absolute top-1 left-1"></div>
-                          </div>
-                          {/* Body */}
-                          <div className="w-6 h-12 bg-gray-700 rounded-t-lg mx-1"></div>
-                          {/* Arms */}
-                          <div className="w-3 h-8 bg-pink-300 rounded absolute -left-2 top-8"></div>
-                          <div className="w-3 h-8 bg-pink-300 rounded absolute -right-2 top-8"></div>
-                          {/* Legs */}
-                          <div className="w-2 h-8 bg-gray-800 absolute left-1 top-16"></div>
-                          <div className="w-2 h-8 bg-gray-800 absolute right-1 top-16"></div>
-                        </div>
-                        
-                        {/* Graduation cap */}
-                        <div className="absolute -top-2 right-4">
-                          <div className="w-6 h-6 bg-black transform rotate-12"></div>
-                          <div className="w-1 h-3 bg-black absolute top-1 right-2"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
-            {/* Bookmark Overview Card - Exact copy from screenshot */}
-            <Card className="density-p bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
-              <CardContent className="p-0">
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">BOOKMARK OVERVIEW</h3>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      Here Are Some Year-Long Metrics You Could Surface In Your BookmarkHub Dashboard
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    {/* Saved Bookmarks */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-3xl font-bold text-gray-900">{totalBookmarks}</span>
-                        <span className="text-sm text-gray-500">bookmarks</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
-                        <div className="bg-black h-3 rounded-full" style={{width: '85%'}}></div>
-                      </div>
-                      <span className="text-xs font-medium text-gray-700">SAVED BOOKMARKS</span>
-                    </div>
 
-                    {/* Favorite Bookmarks */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-3xl font-bold text-gray-900">{favorites}</span>
-                        <span className="text-sm text-gray-500">bookmarks</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
-                        <div className="bg-gray-500 h-3 rounded-full" style={{width: '60%'}}></div>
-                      </div>
-                      <span className="text-xs font-medium text-gray-700">FAVORITE BOOKMARKS</span>
-                    </div>
-
-                    {/* Clicks/Opens */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-3xl font-bold text-gray-900">{totalVisits}</span>
-                        <span className="text-sm text-gray-500">clicks</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
-                        <div className="bg-black h-3 rounded-full" style={{width: '75%'}}></div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-700">CLICKS/OPENS</span>
-                        {/* Live indicator - show when analytics data is available */}
-                        {!analyticsLoading && analyticsData && Object.keys(analyticsData).length > 0 && (
-                          <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live data" />
-                            <span className="text-xs text-green-600 font-medium">LIVE</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Project Efficiency Card with Bigger Donut Chart */}
-            <Card className="density-p bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-blue-300/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
-              <CardContent className="p-0">
-                <div className="space-y-6">
-                  {/* Header with date range and dropdown */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">January - June 2026</span>
-                    <div className="flex items-center space-x-2 bg-gray-100 rounded-lg px-3 py-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                      <span className="text-sm text-gray-700">April</span>
-                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
-                  
-                  {/* Title */}
-                  <h3 className="text-2xl font-bold text-gray-900">PROJECT EFFICIENCY</h3>
-                  
-                  {/* Bigger Donut Chart */}
-                  <div className="flex items-center justify-center pt-4">
-                    <div className="relative w-64 h-64">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 256 256">
-                        {/* Donut chart with multiple segments - bigger size */}
-                        {/* Large dark gray segment (top-right) */}
-                        <path
-                          d="M 128 16 A 112 112 0 0 1 222.63 94 L 194.18 94 A 84 84 0 0 0 128 44 Z"
-                          fill="#4b5563"
-                        />
-                        {/* Black segment (right) */}
-                        <path
-                          d="M 222.63 94 A 112 112 0 0 1 222.63 162 L 194.18 162 A 84 84 0 0 0 194.18 94 Z"
-                          fill="#1f2937"
-                        />
-                        {/* Light gray segment (bottom-right) */}
-                        <path
-                          d="M 222.63 162 A 112 112 0 0 1 128 240 L 128 212 A 84 84 0 0 0 194.18 162 Z"
-                          fill="#d1d5db"
-                        />
-                        {/* Medium gray segment (bottom-left) */}
-                        <path
-                          d="M 128 240 A 112 112 0 0 1 33.37 162 L 61.82 162 A 84 84 0 0 0 128 212 Z"
-                          fill="#9ca3af"
-                        />
-                        {/* Dark segment (left) */}
-                        <path
-                          d="M 33.37 162 A 112 112 0 0 1 33.37 94 L 61.82 94 A 84 84 0 0 0 61.82 162 Z"
-                          fill="#374151"
-                        />
-                        {/* Black segment (top-left) */}
-                        <path
-                          d="M 33.37 94 A 112 112 0 0 1 128 16 L 128 44 A 84 84 0 0 0 61.82 94 Z"
-                          fill="#111827"
-                        />
-                        
-                        {/* Small disconnected segment at bottom - bigger */}
-                        <path
-                          d="M 108 248 A 16 16 0 0 1 148 248 L 148 240 A 8 8 0 0 0 108 240 Z"
-                          fill="#9ca3af"
-                        />
-                      </svg>
-                      
-                      {/* Center text */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-5xl font-bold text-gray-900">173</span>
-                        <span className="text-base text-gray-600">Visitors</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
 
           </div>
@@ -3665,22 +3940,6 @@ export default function Dashboard() {
           >
             <Columns className="h-5 w-5" />
             <span className="font-medium">KANBAN 2.0</span>
-          </Button>
-          
-          {/* Divider */}
-          <div className="w-px h-8 bg-gray-300 mx-3"></div>
-          
-          {/* Check Health Button */}
-          <Button
-            size="lg"
-            onClick={() => {
-              const bookmarkIds = filteredBookmarks.map(b => b.id)
-              checkBookmarkHealth(bookmarkIds)
-            }}
-            className="h-12 px-6 flex items-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-          >
-            <Shield className="h-5 w-5" />
-            <span className="font-medium">CHECK HEALTH</span>
           </Button>
         </div>
       </div>
@@ -3861,14 +4120,6 @@ export default function Dashboard() {
                       <ExternalLink className="h-4 w-4 mr-2" />
                       VISIT SITE
                     </Button>
-                    <Button 
-                      size="sm"
-                      variant="outline"
-                      onClick={testEndSession}
-                      className="bg-orange-600 text-white hover:bg-orange-700"
-                    >
-                      🧪 Test End Session
-                    </Button>
                   </div>
                 </div>
               </DialogHeader>
@@ -3955,6 +4206,16 @@ export default function Dashboard() {
                         >
                           <ImageIcon className="h-3 w-3 mr-2" />
                           Set Default Logo
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleBackgroundUpload}
+                          disabled={uploadingBackground}
+                          className="text-xs"
+                        >
+                          <Upload className="h-3 w-3 mr-2" />
+                          {uploadingBackground ? 'Uploading...' : 'Upload Background'}
                         </Button>
                       </div>
                     </div>
@@ -4137,26 +4398,40 @@ export default function Dashboard() {
                         )}
                       </CardContent>
                     </Card>
-                    <Card className="bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 hover:border-gray-300/50 shadow-sm hover:shadow-lg transition-all duration-300">
+                    <Card className="bg-gradient-to-br from-white via-green-50/20 to-white border border-gray-200/60 hover:border-green-300/50 shadow-sm hover:shadow-lg transition-all duration-300">
                       <CardContent className="p-6 text-center">
-                        <Badge className={`${getSiteHealthColor(selectedBookmark.siteHealth)} border-transparent hover:bg-primary/80 shadow-sm`}>
-                          {selectedBookmark.siteHealth}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-3 font-medium">SITE HEALTH</p>
+                        <SiteHealthComponent 
+                          bookmark={selectedBookmark}
+                          onClick={() => checkBookmarkHealth([selectedBookmark.id])}
+                          isLoading={healthCheckLoading[selectedBookmark.id] || false}
+                        />
                       </CardContent>
                     </Card>
                   </div>
 
                   {/* View Full Analytics Button */}
                   <div className="flex justify-center mt-6 space-x-4">
-                    <Button className="px-8 py-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                    <Button 
+                      onClick={() => window.location.href = '/analytics'}
+                      className="px-8 py-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                    >
                       VIEW FULL ANALYTICS
                     </Button>
                     <Button 
                       onClick={() => checkBookmarkHealth([selectedBookmark.id])}
-                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                      disabled={healthCheckLoading[selectedBookmark.id] || false}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:cursor-not-allowed disabled:transform-none"
                     >
-                      🔍 CHECK HEALTH
+                      {healthCheckLoading[selectedBookmark.id] ? (
+                        <>
+                          <RotateCcw className="h-4 w-4 mr-2 animate-spin" />
+                          CHECKING...
+                        </>
+                      ) : (
+                        <>
+                          🔍 CHECK HEALTH
+                        </>
+                      )}
                     </Button>
                   </div>
 
@@ -4169,7 +4444,152 @@ export default function Dashboard() {
                         variant="outline"
                         onClick={() => {
                           console.log('Opening browse all bookmarks modal');
-                          // Add logic to open browse all bookmarks modal
+                          // Open the add bookmark modal and switch to existing bookmarks tab
+                          setShowAddBookmark(true);
+                          setAddBookmarkTab('existing');
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        BROWSE ALL BOOKMARKS TO ADD MORE
+                      </Button>
+                    </div>
+
+                    {/* Related Bookmarks Grid with Drag and Drop */}
+                    <ClientOnlyDndProvider>
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(event) => {
+                          // Handle drag end for related bookmarks
+                          const { active, over } = event
+                          if (active.id !== over?.id) {
+                            showNotification('Related bookmark reordered!')
+                          }
+                        }}
+                      >
+                        <SortableContext items={(selectedBookmark?.relatedBookmarks || []).map(id => `related-${id}`)} strategy={rectSortingStrategy}>
+                          {(selectedBookmark?.relatedBookmarks || []).length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                              <p>No related bookmarks yet.</p>
+                              <p className="text-sm mt-2">Click "Browse All Bookmarks to add more" to add related bookmarks.</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {(selectedBookmark?.relatedBookmarks || []).map((relatedId) => {
+                                const bookmark = bookmarks.find(b => b.id === relatedId)
+                                if (!bookmark) return null
+                                return (
+                              <div key={`related-${bookmark.id}`} className="relative group">
+                                {/* Drag Handle for Related Bookmarks */}
+                                <div className="absolute top-2 left-2 z-20 p-1.5 rounded-md bg-white/90 hover:bg-white shadow-md border border-gray-300/50 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105">
+                                  <GripVertical className="h-4 w-4 text-gray-700" />
+                                </div>
+                                
+                                <Card className="p-4 hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-300 hover:border-blue-400 bg-gradient-to-br from-white via-gray-50/20 to-white backdrop-blur-sm shadow-sm hover:shadow-blue-500/10">
+                                  <div className="flex items-start space-x-3">
+                                    {/* Circular Image */}
+                                    <div className="flex-shrink-0">
+                                      <img
+                                        src={userDefaultLogo || bookmark.circularImage || "/placeholder.svg"}
+                                        alt={`${bookmark.title} image`}
+                                        className="w-10 h-10 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-1 ring-gray-200/50"
+                                      />
+                                    </div>
+                                    
+                                    {/* Content */}
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="font-semibold text-sm text-gray-900 truncate font-audiowide uppercase mb-1">
+                                        {bookmark.title}
+                                      </h4>
+                                      <p className="text-xs text-gray-600 truncate mb-2">
+                                        {bookmark.description}
+                                      </p>
+                                      <div className="flex items-center justify-between">
+                                        <Badge variant="outline" className="text-xs bg-white/50 border-gray-300/50">
+                                          {bookmark.category}
+                                        </Badge>
+                                        <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                          <Eye className="h-3 w-3" />
+                                          <span>{bookmark.visits}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Remove Button */}
+                                    <Button
+                                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-600"
+                                      onClick={async (e) => {
+                                        e.stopPropagation()
+                                        if (selectedBookmark) {
+                                          const updatedBookmark = {
+                                            ...selectedBookmark,
+                                            relatedBookmarks: (selectedBookmark.relatedBookmarks || []).filter(id => id !== bookmark.id)
+                                          }
+                                          setBookmarks(prev => prev.map(b => 
+                                            b.id === selectedBookmark.id ? updatedBookmark : b
+                                          ))
+                                          setSelectedBookmark(updatedBookmark)
+                                          
+                                          // Save the updated bookmark to the backend
+                                          try {
+                                            const response = await fetch('/api/bookmarks', {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                              },
+                                              body: JSON.stringify({
+                                                id: updatedBookmark.id,
+                                                title: updatedBookmark.title,
+                                                url: updatedBookmark.url,
+                                                description: updatedBookmark.description || '',
+                                                category: updatedBookmark.category || '',
+                                                tags: Array.isArray(updatedBookmark.tags) ? updatedBookmark.tags : [],
+                                                notes: updatedBookmark.notes || '',
+                                                ai_summary: updatedBookmark.ai_summary || '',
+                                                ai_tags: updatedBookmark.ai_tags || [],
+                                                ai_category: updatedBookmark.ai_category || updatedBookmark.category || '',
+                                                relatedBookmarks: updatedBookmark.relatedBookmarks || []
+                                              })
+                                            })
+
+                                            const result = await response.json()
+                                            
+                                            if (result.success) {
+                                              showNotification('Related bookmark removed!')
+                                            } else {
+                                              showNotification('Failed to remove related bookmark')
+                                              console.error('Save failed:', result.error)
+                                            }
+                                          } catch (error) {
+                                            showNotification('Error removing related bookmark')
+                                            console.error('Save error:', error)
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </Card>
+                              </div>
+                                )})}
+                              </div>
+                            )}
+                          </SortableContext>
+                      </DndContext>
+                    </ClientOnlyDndProvider>
+
+                    {/* Add More Related Bookmarks */}
+                    <div className="mt-4 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                        onClick={() => {
+                          console.log('Opening browse all bookmarks modal');
+                          // Open the add bookmark modal and switch to existing bookmarks tab
+                          setShowAddBookmark(true);
+                          setAddBookmarkTab('existing');
                         }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -4726,15 +5146,12 @@ export default function Dashboard() {
                                   </div>
                                   <div className="flex gap-4 text-sm">
                                     <div className="flex items-center gap-1">
-                                      <Database className="h-4 w-4 text-blue-600" />
                                       <span className="text-gray-600">Supabase: Connected</span>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                      <GitBranch className="h-4 w-4 text-purple-600" />
                                       <span className="text-gray-600">GitHub: Synced</span>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                      <Smartphone className="h-4 w-4 text-orange-600" />
                                       <span className="text-gray-600">Local: Cached</span>
                                     </div>
                                   </div>
@@ -4749,7 +5166,6 @@ export default function Dashboard() {
                                     }}
                                     className="text-green-700 border-green-300 hover:bg-green-100"
                                   >
-                                    <RotateCcw className="h-4 w-4 mr-1" />
                                     Sync Now
                                   </Button>
                                   <Button
@@ -4760,7 +5176,6 @@ export default function Dashboard() {
                                     }}
                                     className="bg-green-600 hover:bg-green-700 text-white"
                                   >
-                                    <GitBranch className="h-4 w-4 mr-1" />
                                     Commit & Push
                                   </Button>
                                 </div>
@@ -5167,7 +5582,7 @@ export default function Dashboard() {
             <div className="space-y-4">
               {/* Search Bar */}
               <div>
-                <label className="text-sm font-medium">SEARCH AVAILABLE BOOKMARKS</label>
+                <label className="text-sm font-medium">SEARCH YOUR EXISTING BOOKMARKS</label>
                 <Input
                   placeholder="Search by name, description, or category..."
                   value={existingBookmarksSearch}
@@ -5175,14 +5590,14 @@ export default function Dashboard() {
                 />
               </div>
               
-              {/* Available Bookmarks List */}
+              {/* Existing Bookmarks List */}
               <div className="max-h-96 overflow-y-auto space-y-2">
-                {filteredAvailableBookmarks.length === 0 ? (
+                {filteredExistingBookmarks.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    {existingBookmarksSearch ? 'No bookmarks match your search' : 'All available bookmarks have been added'}
+                    {existingBookmarksSearch ? 'No bookmarks match your search' : 'No existing bookmarks to add'}
                   </div>
                 ) : (
-                  filteredAvailableBookmarks.map((bookmark) => (
+                  filteredExistingBookmarks.map((bookmark) => (
                     <div
                       key={bookmark.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -5194,9 +5609,9 @@ export default function Dashboard() {
                     >
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0">
-                          {bookmark.logo ? (
+                          {bookmark.favicon ? (
                             <img
-                              src={bookmark.logo}
+                              src={bookmark.favicon}
                               alt={bookmark.title}
                               className="w-10 h-10 rounded-lg object-cover"
                               onError={(e) => {
@@ -5205,7 +5620,7 @@ export default function Dashboard() {
                               }}
                             />
                           ) : null}
-                          <div className={`w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-sm font-medium text-blue-600 ${bookmark.logo ? 'hidden' : ''}`}>
+                          <div className={`w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-sm font-medium text-blue-600 ${bookmark.favicon ? 'hidden' : ''}`}>
                             {bookmark.title.charAt(0)}
                           </div>
                         </div>

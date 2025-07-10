@@ -10,70 +10,104 @@ export const useNotifications = (bookmarkId?: string) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const userId = 'dev-user-123' // In production, this would come from auth context
+
   // Load notifications for a specific bookmark or all user notifications
   const loadNotifications = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      // TODO: Replace with actual API call
-      const mockNotifications: NotificationSettings[] = [
-        {
-          id: '1',
-          bookmarkId: bookmarkId || '1',
-          userId: 'user-1',
-          title: 'Daily Review Reminder',
-          message: 'Time to review your bookmarked resources',
-          type: 'reminder',
-          frequency: 'daily',
-          deliveryMethods: ['in-app', 'email'],
-          scheduledTime: new Date('2024-01-20T09:00:00'),
-          isActive: true,
-          createdAt: new Date('2024-01-15'),
-          updatedAt: new Date('2024-01-15'),
-          nextSend: new Date('2024-01-20T09:00:00')
-        }
-      ]
-      setNotifications(mockNotifications)
+      const params = new URLSearchParams({
+        user_id: userId,
+        type: 'notifications'
+      })
+      
+      if (bookmarkId) {
+        params.append('bookmark_id', bookmarkId)
+      }
+
+      const response = await fetch(`/api/notifications?${params}`)
+      const result = await response.json()
+
+      if (result.success) {
+        setNotifications(result.data || [])
+      } else {
+        throw new Error(result.error || 'Failed to load notifications')
+      }
     } catch (err) {
-      setError('Failed to load notifications')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load notifications'
+      setError(errorMessage)
+      console.error('Error loading notifications:', err)
     } finally {
       setLoading(false)
     }
-  }, [bookmarkId])
+  }, [bookmarkId, userId])
 
   // Create a new notification
   const createNotification = useCallback(async (notification: Omit<NotificationSettings, 'id' | 'createdAt' | 'updatedAt'>) => {
     setLoading(true)
     setError(null)
     try {
-      const newNotification: NotificationSettings = {
-        ...notification,
-        id: Date.now().toString(),
-        createdAt: new Date(),
-        updatedAt: new Date()
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'notification',
+          action: 'create',
+          data: notification
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Reload notifications to get the updated list
+        await loadNotifications()
+        return result
+      } else {
+        throw new Error(result.error || 'Failed to create notification')
       }
-      setNotifications(prev => [...prev, newNotification])
-      return newNotification
     } catch (err) {
-      setError('Failed to create notification')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create notification'
+      setError(errorMessage)
+      console.error('Error creating notification:', err)
       throw err
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadNotifications])
 
   // Update an existing notification
   const updateNotification = useCallback(async (id: string, updates: Partial<NotificationSettings>) => {
     setLoading(true)
     setError(null)
     try {
-      setNotifications(prev => prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, ...updates, updatedAt: new Date() }
-          : notification
-      ))
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'notification',
+          action: 'update',
+          data: { id, ...updates }
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update local state
+        setNotifications((prev: NotificationSettings[]) => prev.map((notification: NotificationSettings) => 
+          notification.id === id 
+            ? { ...notification, ...updates, updatedAt: new Date() }
+            : notification
+        ))
+      } else {
+        throw new Error(result.error || 'Failed to update notification')
+      }
     } catch (err) {
-      setError('Failed to update notification')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update notification'
+      setError(errorMessage)
+      console.error('Error updating notification:', err)
       throw err
     } finally {
       setLoading(false)
@@ -85,56 +119,153 @@ export const useNotifications = (bookmarkId?: string) => {
     setLoading(true)
     setError(null)
     try {
-      setNotifications(prev => prev.filter(notification => notification.id !== id))
+      const response = await fetch(`/api/notifications?id=${id}&user_id=${userId}`, {
+        method: 'DELETE'
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update local state
+        setNotifications(prev => prev.filter(notification => notification.id !== id))
+      } else {
+        throw new Error(result.error || 'Failed to delete notification')
+      }
     } catch (err) {
-      setError('Failed to delete notification')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete notification'
+      setError(errorMessage)
+      console.error('Error deleting notification:', err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+
+  // Toggle notification active status
+  const toggleNotification = useCallback(async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'notification',
+          action: 'toggle',
+          data: { id }
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update local state
+        setNotifications(prev => prev.map(notification => 
+          notification.id === id 
+            ? { ...notification, isActive: !notification.isActive, updatedAt: new Date() }
+            : notification
+        ))
+      } else {
+        throw new Error(result.error || 'Failed to toggle notification')
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to toggle notification'
+      setError(errorMessage)
+      console.error('Error toggling notification:', err)
       throw err
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Toggle notification active status
-  const toggleNotification = useCallback(async (id: string) => {
-    await updateNotification(id, { 
-      isActive: !notifications.find(n => n.id === id)?.isActive 
-    })
-  }, [notifications, updateNotification])
-
   // Load notification history
   const loadHistory = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
-      // TODO: Replace with actual API call
-      const mockHistory: NotificationHistory[] = []
-      setHistory(mockHistory)
+      const params = new URLSearchParams({
+        user_id: userId,
+        type: 'history'
+      })
+      
+      if (bookmarkId) {
+        params.append('bookmark_id', bookmarkId)
+      }
+
+      const response = await fetch(`/api/notifications?${params}`)
+      const result = await response.json()
+
+      if (result.success) {
+        setHistory(result.data || [])
+      } else {
+        throw new Error(result.error || 'Failed to load notification history')
+      }
     } catch (err) {
-      setError('Failed to load notification history')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load notification history'
+      setError(errorMessage)
+      console.error('Error loading notification history:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [bookmarkId, userId])
 
   // Load user preferences
   const loadPreferences = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      // TODO: Replace with actual API call
-      const mockPreferences: UserNotificationPreferences = {
-        userId: 'user-1',
-        enableInApp: true,
-        enableEmail: true,
-        enableSMS: false,
-        enablePush: true,
-        quietHours: {
-          start: '22:00',
-          end: '08:00',
-          timezone: 'America/New_York'
-        },
-        emailDigest: 'daily'
+      const params = new URLSearchParams({
+        user_id: userId,
+        type: 'preferences'
+      })
+
+      const response = await fetch(`/api/notifications?${params}`)
+      const result = await response.json()
+
+      if (result.success) {
+        setPreferences(result.data || null)
+      } else {
+        throw new Error(result.error || 'Failed to load preferences')
       }
-      setPreferences(mockPreferences)
     } catch (err) {
-      setError('Failed to load preferences')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load preferences'
+      setError(errorMessage)
+      console.error('Error loading preferences:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+
+  // Update user preferences
+  const updatePreferences = useCallback(async (updates: Partial<UserNotificationPreferences>) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'preferences',
+          action: 'update',
+          data: updates
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update local state
+        setPreferences(prev => prev ? { ...prev, ...updates, updatedAt: new Date() } : null)
+      } else {
+        throw new Error(result.error || 'Failed to update preferences')
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update preferences'
+      setError(errorMessage)
+      console.error('Error updating preferences:', err)
+      throw err
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -154,6 +285,7 @@ export const useNotifications = (bookmarkId?: string) => {
     updateNotification,
     deleteNotification,
     toggleNotification,
+    updatePreferences,
     loadNotifications,
     loadHistory,
     loadPreferences

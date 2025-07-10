@@ -74,29 +74,20 @@ export function SyncButton({ variant = 'outline', size = 'default', showStatus =
         {syncing ? 'Syncing...' : 'Sync All'}
       </Button>
 
-      {showStatus && (
+      {showStatus && lastSyncResult && (
         <div className="flex items-center gap-1">
-          {/* Sync Status Indicators */}
-          <div className="flex items-center gap-1">
-            <Database className="h-3 w-3 text-blue-500" title="localStorage" />
-            <Cloud className="h-3 w-3 text-green-500" title="Supabase" />
-            <Github className="h-3 w-3 text-gray-700" title="GitHub" />
-          </div>
-
           {/* Last Sync Status */}
-          {lastSyncResult && (
-            <Badge 
-              variant={lastSyncResult.success ? 'default' : 'destructive'}
-              className="text-xs"
-            >
-              {lastSyncResult.success ? (
-                <CheckCircle className="h-3 w-3 mr-1" />
-              ) : (
-                <AlertCircle className="h-3 w-3 mr-1" />
-              )}
-              {lastSyncResult.success ? 'Synced' : 'Failed'}
-            </Badge>
-          )}
+          <Badge 
+            variant={lastSyncResult.success ? 'default' : 'destructive'}
+            className="text-xs"
+          >
+            {lastSyncResult.success ? (
+              <CheckCircle className="h-3 w-3 mr-1" />
+            ) : (
+              <AlertCircle className="h-3 w-3 mr-1" />
+            )}
+            {lastSyncResult.success ? 'Synced' : 'Failed'}
+          </Badge>
 
           {/* Last Sync Time */}
           {status.lastSyncTime && (

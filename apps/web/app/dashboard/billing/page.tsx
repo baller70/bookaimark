@@ -84,10 +84,7 @@ export default function BillingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
-  const supabase = createClientComponentClient({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fake-supabase-url.supabase.co',
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'fake-anon-key-for-build'
-  })
+  const supabase = createDemoSupabaseClient()
   const router = useRouter()
 
   const checkUser = useCallback(async () => {
@@ -113,41 +110,10 @@ export default function BillingPage() {
 
   async function fetchBillingData(userId: string) {
     try {
-      // Fetch current subscription
-      const { data: subscription, error: subError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .maybeSingle()
-
-      if (subError) {
-        console.error('Error fetching subscription:', subError)
-        // Don't set error for no subscription found
-        if (subError.code !== 'PGRST116') {
-          setError('Error loading subscription data')
-        }
-      } else if (subscription) {
-        setCurrentSubscription(subscription)
-      }
-
-      // Fetch billing history
-      const { data: history, error: historyError } = await supabase
-        .from('billing_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (historyError) {
-        console.error('Error fetching billing history:', historyError)
-        // Don't set error for no history found
-        if (historyError.code !== 'PGRST116') {
-          setError('Error loading billing history')
-        }
-      } else {
-        setBillingHistory(history || [])
-      }
+      // In demo mode, just set empty data
+      console.log('Demo mode: Skipping billing data fetch')
+      setCurrentSubscription(null)
+      setBillingHistory([])
     } catch (err) {
       console.error('Error fetching billing data:', err)
       setError('Failed to load billing information')

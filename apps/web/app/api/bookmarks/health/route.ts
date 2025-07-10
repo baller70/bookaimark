@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadBookmarks, saveBookmarks } from '@/lib/file-storage'
 
-export type HealthStatus = 'excellent' | 'good' | 'fair' | 'poor' | 'broken'
+export type HealthStatus = 'excellent' | 'working' | 'fair' | 'poor' | 'broken'
 
 interface HealthCheckResult {
   bookmarkId: number
@@ -37,12 +37,12 @@ const checkUrlHealth = async (url: string): Promise<{ status: HealthStatus; stat
       if (responseTime < 500) {
         status = 'excellent'
       } else if (responseTime < 1500) {
-        status = 'good'
+        status = 'working'
       } else {
         status = 'fair'
       }
     } else if (response.status >= 300 && response.status < 400) {
-      status = 'good' // Redirects are generally okay
+      status = 'working' // Redirects are generally okay
     } else if (response.status >= 400 && response.status < 500) {
       status = 'poor'
     } else {
@@ -111,13 +111,15 @@ export async function POST(request: NextRequest) {
         lastChecked: new Date().toISOString()
       })
 
-      // Update bookmark with new health status
+      // Update bookmark with new health status and increment health check count
       const bookmarkIndex = allBookmarks.findIndex(b => b.id === bookmarkId)
       if (bookmarkIndex !== -1) {
+        const currentBookmark = allBookmarks[bookmarkIndex]
         allBookmarks[bookmarkIndex] = {
-          ...allBookmarks[bookmarkIndex],
+          ...currentBookmark,
           site_health: healthResult.status,
-          last_health_check: new Date().toISOString()
+          last_health_check: new Date().toISOString(),
+          healthCheckCount: (currentBookmark.healthCheckCount || 0) + 1
         }
       }
     }

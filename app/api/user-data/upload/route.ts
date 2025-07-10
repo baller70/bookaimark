@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase-server';
+
+// Check if Supabase is configured
+const isSupabaseConfigured = () => {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+};
 
 // POST /api/user-data/upload - Upload file to Supabase storage and save metadata
 export async function POST(request: NextRequest) {
   try {
+    // If Supabase is not configured, return error
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ 
+        error: 'File upload not configured - Supabase not available', 
+        success: false 
+      }, { status: 503 });
+    }
+
+    // Import Supabase client only if configured
+    const { createClient } = await import('@/utils/supabase-server');
     const supabase = createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -101,6 +115,16 @@ export async function POST(request: NextRequest) {
 // GET /api/user-data/upload - Get upload status or signed URL for large files
 export async function GET(request: NextRequest) {
   try {
+    // If Supabase is not configured, return error
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ 
+        error: 'File upload not configured - Supabase not available', 
+        success: false 
+      }, { status: 503 });
+    }
+
+    // Import Supabase client only if configured
+    const { createClient } = await import('@/utils/supabase-server');
     const supabase = createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 

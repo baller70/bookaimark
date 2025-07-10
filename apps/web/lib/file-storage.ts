@@ -2,7 +2,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 
 // File path for bookmarks data
-const BOOKMARKS_FILE = path.join(process.cwd(), 'apps/web/data/bookmarks.json')
+const BOOKMARKS_FILE = path.join(process.cwd(), 'data/bookmarks.json')
 
 export interface BookmarkData {
   id: number
@@ -14,8 +14,10 @@ export interface BookmarkData {
   user_id: string
   created_at: string
   updated_at?: string
-  site_health?: 'excellent' | 'good' | 'fair' | 'poor' | 'broken'
+  site_health?: 'excellent' | 'working' | 'fair' | 'poor' | 'broken'
   last_health_check?: string
+  healthCheckCount?: number
+  customBackground?: string
   visits?: number
   time_spent?: number
   notes?: string
