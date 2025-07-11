@@ -1,17 +1,35 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Button,
+  Label,
+  Textarea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  RadioGroup,
+  RadioGroupItem,
+  Switch,
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@bookaimark/ui';
 import { toast } from 'sonner';
 import { 
   ShieldCheck, 
@@ -114,6 +132,7 @@ type LinkValidatorAction =
 const LinkValidatorContext = createContext<{
   state: LinkValidatorState;
   dispatch: React.Dispatch<LinkValidatorAction>;
+  savePreferences: (prefs: LinkValidatorPrefs) => Promise<void>;
 } | null>(null);
 
 // Helper functions
@@ -345,7 +364,7 @@ const HealthBadge: React.FC<{
 };
 
 const UnsavedChangesBar: React.FC = () => {
-  const { state, dispatch } = useLinkValidator();
+  const { state, dispatch, savePreferences } = useLinkValidator();
 
   if (!state.hasUnsavedChanges) return null;
 
@@ -900,112 +919,53 @@ const ScanButton: React.FC = () => {
   const { state, dispatch } = useLinkValidator();
 
   const handleScan = async () => {
-    // Mock data for demonstration
-    const mockBookmarks = [
-      { id: '1', url: 'https://github.com/vercel/next.js', title: 'Next.js Repository' },
-      { id: '2', url: 'https://reactjs.org', title: 'React Documentation' },
-      { id: '3', url: 'https://invalid-url-example.com', title: 'Broken Link' },
-      { id: '4', url: 'https://httpbin.org/redirect/1', title: 'Redirect Test' },
-      { id: '5', url: 'https://httpbin.org/delay/10', title: 'Timeout Test' }
-    ];
-
-    const totalLinks = mockBookmarks.length;
-    
-    dispatch({ 
-      type: 'SET_VALIDATION_JOB', 
-      payload: { 
-        isRunning: true, 
-        total: totalLinks, 
-        completed: 0, 
-        failed: 0,
-        eta: totalLinks * 2,
-        startedAt: new Date().toISOString()
-      } 
-    });
-
-    const results: ValidatorResult[] = [];
-
-    for (let i = 0; i < mockBookmarks.length; i++) {
-      const bookmark = mockBookmarks[i];
-      
-      // Simulate validation
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-
-      // Mock different results
-      let status: HealthStatus;
-      let redirectTo: string | undefined;
-      let error: string | undefined;
-
-      if (bookmark.url.includes('invalid-url')) {
-        status = 'broken';
-        error = 'HTTP 404';
-      } else if (bookmark.url.includes('redirect')) {
-        status = 'redirect';
-        redirectTo = 'https://httpbin.org/get';
-      } else if (bookmark.url.includes('delay')) {
-        status = 'timeout';
-        error = 'Request timeout';
-      } else {
-        status = 'ok';
-      }
-
-      const result: ValidatorResult = {
-        bookmarkId: bookmark.id,
-        url: bookmark.url,
-        title: bookmark.title,
-        status,
-        checkedAt: new Date().toISOString(),
-        redirectTo,
-        error,
-        selected: false
-      };
-
-      results.push(result);
-
-      dispatch({ 
-        type: 'SET_VALIDATION_JOB', 
-        payload: { 
-          completed: i + 1,
-          failed: results.filter(r => r.status === 'broken' || r.status === 'timeout').length,
-          eta: (totalLinks - i - 1) * 2
-        } 
-      });
+    // Load user information
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('Please sign in to validate links');
+      return;
     }
-
+    // Fetch user bookmarks
+    const response = await fetch(`/api/bookmarks?user_id=${user.id}`);
+    const json = await response.json();
+    const savedBookmarks = Array.isArray(json.data) ? json.data : [];
+    const bookmarksList = savedBookmarks.map((b: any) => ({ id: b.id, url: b.url, title: b.title || b.url }));
+    // Include extra links entered manually
+    const extraLinks = state.extraLinks
+      .split('\n')
+      .map(u => u.trim())
+      .filter(u => u)
+      .map(url => ({ id: generateId(), url, title: url }));
+    // Determine scope of validation
+    const linksToValidate = state.prefs.scope === 'all'
+      ? [...bookmarksList, ...extraLinks]
+      : bookmarksList.filter(b => state.prefs.selectedIds.includes(b.id));
+    const totalLinks = linksToValidate.length;
+    // Initialize validation job
+    dispatch({ type: 'SET_VALIDATION_JOB', payload: { isRunning: true, total: totalLinks, completed: 0, failed: 0, eta: totalLinks * 2, startedAt: new Date().toISOString() } });
+    const results: ValidatorResult[] = [];
+    // Perform validation for each link
+    for (let i = 0; i < linksToValidate.length; i++) {
+      const bookmark = linksToValidate[i];
+      const { status, redirectTo, error } = await validateURL(bookmark.url);
+      const result: ValidatorResult = { bookmarkId: bookmark.id, url: bookmark.url, title: bookmark.title, status, checkedAt: new Date().toISOString(), redirectTo, error, selected: false };
+      results.push(result);
+      // Update progress
+      dispatch({ type: 'SET_VALIDATION_JOB', payload: { completed: i + 1, failed: results.filter(r => r.status === 'broken' || r.status === 'timeout').length, eta: (totalLinks - i - 1) * 2 } });
+    }
+    // Finalize results
     dispatch({ type: 'SET_RESULTS', payload: results });
-    dispatch({ 
-      type: 'SET_VALIDATION_JOB', 
-      payload: { isRunning: false } 
-    });
-
-    // Add to history
-    const historyEntry: HistoryEntry = {
-      id: generateId(),
-      runAt: new Date().toISOString(),
-      scope: state.prefs.scope,
-      totalChecked: totalLinks,
-      results: results.reduce((acc, result) => {
-        acc[result.status] = (acc[result.status] || 0) + 1;
-        return acc;
-      }, {} as Record<HealthStatus, number>)
-    };
-
+    dispatch({ type: 'SET_VALIDATION_JOB', payload: { isRunning: false } });
+    // Record history
+    const historyEntry: HistoryEntry = { id: generateId(), runAt: new Date().toISOString(), scope: state.prefs.scope, totalChecked: totalLinks, results: results.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<HealthStatus, number>) };
     dispatch({ type: 'ADD_HISTORY_ENTRY', payload: historyEntry });
     dispatch({ type: 'SET_PREFS', payload: { lastRunAt: new Date().toISOString() } });
-
+    // Notify user
     const brokenCount = results.filter(r => r.status === 'broken').length;
     const redirectCount = results.filter(r => r.status === 'redirect').length;
-    
     toast.success(
       `Scan completed! ${results.length - brokenCount - redirectCount} OK, ${redirectCount} redirects, ${brokenCount} broken`,
-      {
-        action: {
-          label: 'View Results',
-          onClick: () => {
-            document.getElementById('results-table')?.scrollIntoView({ behavior: 'smooth' });
-          }
-        }
-      }
+      { action: { label: 'View Results', onClick: () => { document.getElementById('results-table')?.scrollIntoView({ behavior: 'smooth' }); } } }
     );
   };
 
@@ -1058,8 +1018,9 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } = await supabase.auth.getUser()
       if (user) {
         try {
-          const remote = await getOracleSetting<LinkValidatorPrefs>(user.id, 'link_validator', defaultPrefs)
+          const remote = await getAISetting<LinkValidatorPrefs>(user.id, 'link_validator', defaultPrefs)
           dispatch({ type: 'SET_PREFS', payload: remote })
+          dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false })
         } catch (error) {
           console.error('Failed to load link validator settings:', error)
         }
@@ -1083,7 +1044,7 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   return (
-    <LinkValidatorContext.Provider value={{ state, dispatch }}>
+    <LinkValidatorContext.Provider value={{ state, dispatch, savePreferences }}>
       {children}
     </LinkValidatorContext.Provider>
   );

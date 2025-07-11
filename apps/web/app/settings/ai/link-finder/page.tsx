@@ -42,7 +42,8 @@ import {
   Zap,
   BookOpen,
   Eye,
-  Heart
+  Heart,
+  Filter
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase'
 import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
@@ -118,6 +119,7 @@ type LinkFinderAction =
 const LinkFinderContext = createContext<{
   state: LinkFinderState;
   dispatch: React.Dispatch<LinkFinderAction>;
+  savePreferences: (prefs: LinkFinderPrefs) => Promise<void>;
 } | null>(null);
 
 // Helper functions
@@ -351,7 +353,7 @@ const useLinkFinder = () => {
 
 // Components
 const UnsavedChangesBar: React.FC = () => {
-  const { state, dispatch } = useLinkFinder();
+  const { state, dispatch, savePreferences } = useLinkFinder();
 
   if (!state.hasUnsavedChanges) return null;
 
@@ -362,6 +364,7 @@ const UnsavedChangesBar: React.FC = () => {
 
   const handleSave = () => {
     localStorage.setItem('linkFinderPrefs', JSON.stringify(state.prefs));
+    savePreferences(state.prefs);
     dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false });
     toast.success('Settings saved successfully');
   };
@@ -1049,6 +1052,7 @@ const LinkFinderProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Load remote preferences
   useEffect(() => {
     ;(async () => {
       const {
@@ -1056,8 +1060,9 @@ const LinkFinderProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } = await supabase.auth.getUser()
       if (user) {
         try {
-          const remote = await getOracleSetting<LinkFinderPrefs>(user.id, 'link_finder', defaultPrefs)
+          const remote = await getAISetting<LinkFinderPrefs>(user.id, 'link_finder', defaultPrefs)
           dispatch({ type: 'SET_PREFS', payload: remote })
+          dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false })
         } catch (error) {
           console.error('Failed to load link finder settings:', error)
         }
@@ -1081,7 +1086,7 @@ const LinkFinderProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   return (
-    <LinkFinderContext.Provider value={{ state, dispatch }}>
+    <LinkFinderContext.Provider value={{ state, dispatch, savePreferences }}>
       {children}
     </LinkFinderContext.Provider>
   );
