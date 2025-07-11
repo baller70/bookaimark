@@ -29,9 +29,11 @@ export interface AISettings {
     notify_on_broken: boolean
   }
   browser_launcher: {
-    default_browser: string
-    open_in_new_tab: boolean
-    focus_window: boolean
+    duplicateHandling: 'skip' | 'overwrite' | 'keepBoth';
+    maxTabs: number;
+    autoTag: boolean;
+    autoCategorize: boolean;
+    undoWindowSecs: number;
   }
 }
 
@@ -180,9 +182,11 @@ function getDefaultAISetting<K extends keyof AISettings>(key: K): AISettings[K] 
       notify_on_broken: true,
     },
     browser_launcher: {
-      default_browser: 'default',
-      open_in_new_tab: true,
-      focus_window: true,
+      duplicateHandling: 'skip',
+      maxTabs: 40,
+      autoTag: true,
+      autoCategorize: true,
+      undoWindowSecs: 8,
     },
   }
   return defaults[key]

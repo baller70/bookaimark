@@ -35,10 +35,10 @@ import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 // Types
 interface BrowserLauncherPrefs {
   duplicateHandling: 'skip' | 'overwrite' | 'keepBoth';
-  maxTabs: 40;
-  autoTag: true;
-  autoCategorize: true;
-  undoWindowSecs: 8;
+  maxTabs: number;
+  autoTag: boolean;
+  autoCategorize: boolean;
+  undoWindowSecs: number;
 }
 
 interface CapturedTab {
@@ -94,6 +94,7 @@ type BrowserLauncherAction =
 const BrowserLauncherContext = createContext<{
   state: BrowserLauncherState;
   dispatch: React.Dispatch<BrowserLauncherAction>;
+  savePreferences: (prefs: BrowserLauncherPrefs) => Promise<void>;
 } | null>(null);
 
 // Reducer
@@ -221,7 +222,7 @@ const useProgressDonut = (total: number, done: number) => {
 
 // Components
 const UnsavedChangesBar: React.FC = () => {
-  const { state, dispatch } = useBrowserLauncher();
+  const { state, dispatch, savePreferences } = useBrowserLauncher();
 
   if (!state.hasUnsavedChanges) return null;
 
@@ -230,10 +231,9 @@ const UnsavedChangesBar: React.FC = () => {
     toast.success('Settings reset to defaults');
   };
 
-  const handleSave = () => {
-    localStorage.setItem('browserLauncherPrefs', JSON.stringify(state.prefs));
+  const handleSave = async () => {
+    await savePreferences(state.prefs);
     dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false });
-    toast.success('Settings saved successfully');
   };
 
   return (
@@ -708,25 +708,11 @@ const BrowserLauncherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     isExtensionInstalled: false
   });
 
-  // Load preferences from localStorage on mount
+  // Check if extension is installed
   useEffect(() => {
-    const saved = localStorage.getItem('browserLauncherPrefs');
-    if (saved) {
-      try {
-        const prefs = JSON.parse(saved);
-        dispatch({ type: 'SET_PREFS', payload: prefs });
-        dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false });
-      } catch (error) {
-        console.error('Failed to load browser launcher preferences:', error);
-      }
-    }
-
-    // Check if extension is installed
     const checkExtension = () => {
-      // This would be replaced with actual extension detection
       dispatch({ type: 'SET_EXTENSION_INSTALLED', payload: true });
     };
-
     checkExtension();
   }, []);
 
@@ -785,14 +771,15 @@ const BrowserLauncherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [jobId, dispatch]);
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
         try {
-          const remote = await getOracleSetting<BrowserLauncherPrefs>(user.id, 'browser_launcher', defaultPrefs)
+          const remote = await getAISetting(user.id, 'browser_launcher')
           dispatch({ type: 'SET_PREFS', payload: remote })
+          dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false })
         } catch (error) {
           console.error('Failed to load browser launcher settings:', error)
         }
@@ -806,7 +793,7 @@ const BrowserLauncherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } = await supabase.auth.getUser()
     if (user) {
       try {
-        await saveAISetting<BrowserLauncherPrefs>(user.id, 'browser_launcher', prefs)
+        await saveAISetting(user.id, 'browser_launcher', prefs)
         toast.success('Browser launcher preferences saved')
       } catch (error) {
         console.error('Failed to save browser launcher preferences:', error)
@@ -816,7 +803,7 @@ const BrowserLauncherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }
 
   return (
-    <BrowserLauncherContext.Provider value={{ state, dispatch }}>
+    <BrowserLauncherContext.Provider value={{ state, dispatch, savePreferences }}>
       {children}
     </BrowserLauncherContext.Provider>
   );
