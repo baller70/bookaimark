@@ -18,10 +18,9 @@ const CompassIcon = ({ className }: { className?: string }) => (
 
 const nav = [
   { href: '/settings/ai/auto-processing', label: 'Auto-Processing', icon: CompassIcon },
-  { href: '/settings/ai/recommendations', label: 'Recommendations', icon: Tags },
+  { href: '/settings/ai/recommendations', label: 'Content Discovery', icon: Tags },
   { href: '/settings/ai/bulk-uploader', label: 'Bulk Link Uploader', icon: Upload },
   { href: '/settings/ai/link-validator', label: 'Link Validator', icon: ShieldCheck },
-  { href: '/settings/ai/link-finder', label: 'Link Finder', icon: Search },
   { href: '/settings/ai/browser-launcher', label: 'Browser Launcher', icon: Globe },
 ]
 

@@ -1255,7 +1255,6 @@ export default function LinkValidatorPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             <ChartsSidebar />
-            <ValidationSummary />
           </div>
         </div>
 
