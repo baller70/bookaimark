@@ -10,18 +10,18 @@ const openai = new OpenAI({
 
 // Types
 interface LinkFinderRequest {
-  query: string
-  settings: {
-    maxResults: number
-    searchDepth: 'surface' | 'deep'
-    includeImages: boolean
-    includeVideos: boolean
-    includeDocuments: boolean
+  prefs: {
+    topic: string
+    useProfileInterests: boolean
+    dateRange: 'any' | '24h' | 'week' | 'month' | 'year'
+    linkTypes: string[]
     language: string
-    region: string
-    timeRange: 'any' | 'day' | 'week' | 'month' | 'year'
-    domains: string[]
+    includeDomains: string[]
     excludeDomains: string[]
+    maxLinks: number
+    serendipity: number
+    autoSaveAll: boolean
+    schedule: string
   }
 }
 
@@ -102,7 +102,7 @@ const mockLinkFinderResults: LinkFinderResult[] = [
   }
 ]
 
-const TESTING_MODE = process.env.LINK_FINDER_TESTING === 'true'
+const TESTING_MODE = process.env.LINK_FINDER_TESTING === 'true' || process.env.NODE_ENV === 'development'
 
 export async function GET() {
   try {
@@ -150,28 +150,35 @@ export async function POST(request: NextRequest) {
           console.log('🧪 TESTING MODE: Link Finder Authentication bypassed')
           
           const body = await request.json()
-          const { query, settings } = body as LinkFinderRequest
+          const { prefs } = body as LinkFinderRequest
           
-          // Filter mock results based on query
+          // Filter mock results based on topic (more lenient matching)
+          const topicWords = prefs.topic.toLowerCase().split(' ')
           const filteredResults = mockLinkFinderResults.filter(result =>
-            result.title.toLowerCase().includes(query.toLowerCase()) ||
-            result.description.toLowerCase().includes(query.toLowerCase()) ||
-            result.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))
-          ).slice(0, settings.maxResults || 10)
+            topicWords.some(word => 
+              result.title.toLowerCase().includes(word) ||
+              result.description.toLowerCase().includes(word) ||
+              result.tags.some(tag => tag.toLowerCase().includes(word))
+            )
+          ).slice(0, prefs.maxLinks || 10)
+          
+          // If no matches found, return all mock results
+          const finalResults = filteredResults.length > 0 ? filteredResults : mockLinkFinderResults.slice(0, prefs.maxLinks || 10)
           
           return NextResponse.json({
             success: true,
-            results: filteredResults,
-            query: query,
-            totalFound: filteredResults.length,
-            searchDepth: settings.searchDepth,
+            results: finalResults,
+            query: prefs.topic,
+            totalFound: finalResults.length,
+            searchDepth: 'surface',
             processingTime: Math.random() * 2000 + 500, // Mock processing time
             timestamp: Date.now()
           })
         }
 
         // Production authentication
-        const supabase = createRouteHandlerClient({ cookies: () => cookies() })
+        const cookieStore = cookies()
+        const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
         // Check if authentication bypass is enabled
@@ -211,48 +218,45 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        const { query, settings } = body as LinkFinderRequest
+        const { prefs } = body as LinkFinderRequest
 
-        if (!query || query.trim().length === 0) {
+        if (!prefs.topic || prefs.topic.trim().length === 0) {
           return NextResponse.json(
-            { error: 'Search query is required' },
+            { error: 'Search topic is required' },
             { status: 400 }
           )
         }
 
-        if (!settings) {
+        if (!prefs) {
           return NextResponse.json(
-            { error: 'Search settings are required' },
+            { error: 'Search preferences are required' },
             { status: 400 }
           )
         }
 
         console.log('🔍 Processing link finder request:', {
-          query: query.substring(0, 50),
-          maxResults: settings.maxResults,
-          searchDepth: settings.searchDepth,
+          topic: prefs.topic.substring(0, 50),
+          maxLinks: prefs.maxLinks,
+          dateRange: prefs.dateRange,
           userId: userId
         })
 
-        span.setAttribute("query", query)
-        span.setAttribute("maxResults", settings.maxResults)
-        span.setAttribute("searchDepth", settings.searchDepth)
+        span.setAttribute("topic", prefs.topic)
+        span.setAttribute("maxLinks", prefs.maxLinks)
+        span.setAttribute("dateRange", prefs.dateRange)
         span.setAttribute("userId", userId)
 
-        // Use OpenAI to generate relevant links based on the query
+        // Use OpenAI to generate relevant links based on the topic
         const searchPrompt = `
-You are an expert link finder. Based on the search query "${query}", suggest ${settings.maxResults} highly relevant web resources.
+You are an expert link finder. Based on the search topic "${prefs.topic}", suggest ${prefs.maxLinks} highly relevant web resources.
 
-Search Settings:
-- Search Depth: ${settings.searchDepth}
-- Include Images: ${settings.includeImages}
-- Include Videos: ${settings.includeVideos}
-- Include Documents: ${settings.includeDocuments}
-- Language: ${settings.language}
-- Region: ${settings.region}
-- Time Range: ${settings.timeRange}
-- Domains to include: ${settings.domains.join(', ') || 'Any'}
-- Domains to exclude: ${settings.excludeDomains.join(', ') || 'None'}
+Search Preferences:
+- Date Range: ${prefs.dateRange}
+- Link Types: ${prefs.linkTypes.join(', ')}
+- Language: ${prefs.language}
+- Include Domains: ${prefs.includeDomains.join(', ') || 'Any'}
+- Exclude Domains: ${prefs.excludeDomains.join(', ') || 'None'}
+- Serendipity Level: ${prefs.serendipity}/10
 
 For each suggested link, provide:
 1. A realistic URL (use real domains when possible)
@@ -302,7 +306,7 @@ Make the suggestions diverse, high-quality, and truly relevant to the search que
         } catch (parseError) {
           console.error('❌ Failed to parse AI response:', parseError)
           // Fall back to mock results
-          aiResults = mockLinkFinderResults.slice(0, settings.maxResults)
+          aiResults = mockLinkFinderResults.slice(0, prefs.maxLinks)
         }
 
         // Transform AI results to our format
@@ -320,7 +324,7 @@ Make the suggestions diverse, high-quality, and truly relevant to the search que
           snippet: result.snippet || result.description || 'AI-generated content snippet',
           readTime: `${Math.ceil(Math.random() * 10) + 2} min read`,
           confidence: result.relevanceScore || 0.8,
-          why: result.why || ['AI-generated match', 'Relevant to query']
+          why: result.why || ['AI-generated match', 'Relevant to topic']
         }))
 
         console.log(`✅ Link Finder: ${results.length} results generated`)
@@ -328,9 +332,9 @@ Make the suggestions diverse, high-quality, and truly relevant to the search que
         return NextResponse.json({
           success: true,
           results: results,
-          query: query,
+          query: prefs.topic,
           totalFound: results.length,
-          searchDepth: settings.searchDepth,
+          searchDepth: 'surface',
           processingTime: Date.now(),
           timestamp: Date.now(),
           usage: completion.usage
