@@ -1,0 +1,269 @@
+---
+description: BookAIMark tech stack, dependency versions, and best practices guide
+globs: **/*
+alwaysApply: true
+---
+
+# BookAIMark Tech Stack & Dependencies
+
+This rule documents the complete technology stack, dependency versions, and best practices for the BookAIMark project.
+
+## 🏗️ **Project Architecture**
+
+### **Monorepo Structure**
+- **Package Manager:** `pnpm@8.15.0` (workspace-based monorepo)
+- **Workspace Configuration:** `pnpm-workspace.yaml`
+- **Node Version:** `>=18.0.0`
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"      # Main applications
+  - "packages/*"  # Shared packages
+  - "features/*"  # Feature modules
+```
+
+## 🚀 **Core Framework & Runtime**
+
+### **Next.js 15.1.0** - Full-Stack React Framework
+- **Version:** `15.1.0` (Latest stable)
+- **Router:** App Router (modern approach)
+- **Features Used:**
+  - Server Components
+  - API Routes
+  - Image Optimization
+  - Internationalization (12 locales)
+  - Server Actions
+
+**Best Practices:**
+- ✅ Using App Router for modern React patterns
+- ✅ Server Components for performance
+- ✅ Image optimization with WebP/AVIF formats
+- ⚠️ Consider upgrading to Next.js 15.2+ when stable
+
+### **React 18.2.0** - UI Library
+- **Version:** `18.2.0` (Stable)
+- **Features Used:**
+  - Concurrent Features
+  - Suspense
+  - Server Components
+  - Hooks
+
+**Best Practices:**
+- ✅ Using React 18 concurrent features
+- ✅ Proper hook usage patterns
+- ⚠️ Consider upgrading to React 18.3+ for latest features
+
+### **TypeScript 5.3.2** - Type Safety
+- **Version:** `5.3.2` (Modern)
+- **Configuration:** Strict mode enabled
+- **Features Used:**
+  - Strict type checking
+  - Path mapping
+  - Incremental compilation
+
+**Best Practices:**
+- ✅ Strict mode enabled for better type safety
+- ✅ Path mapping for clean imports
+- ✅ Incremental compilation for faster builds
+
+## 🎨 **UI & Styling Stack**
+
+### **Tailwind CSS 3.4.0** - Utility-First CSS
+- **Version:** `3.4.0` (Latest)
+- **Plugins:** `tailwindcss-animate`
+- **Features Used:**
+  - Dark mode support
+  - Custom animations
+  - Responsive design
+  - CSS Variables integration
+
+**Best Practices:**
+- ✅ Using CSS variables for theming
+- ✅ Custom animations for enhanced UX
+- ✅ Responsive-first design approach
+
+### **Radix UI** - Headless Component Library
+- **Version Range:** `1.0.x - 2.0.x` (Latest stable)
+- **Components Used:**
+  - Accordion, Alert Dialog, Avatar
+  - Checkbox, Dialog, Dropdown Menu
+  - Label, Popover, Select, Switch
+  - Tabs, Toast, Tooltip
+
+**Best Practices:**
+- ✅ Using headless components for accessibility
+- ✅ Consistent component API patterns
+- ✅ Full keyboard navigation support
+
+### **Lucide React 0.294.0** - Icon Library
+- **Version:** `0.294.0` (Latest)
+- **Features:** Tree-shakeable, consistent design
+
+**Best Practices:**
+- ✅ Tree-shakeable imports
+- ✅ Consistent icon sizing
+- ✅ Semantic icon usage
+
+## 🔧 **Development Tools**
+
+### **Animation & Interactions**
+- **Framer Motion:** `12.23.3` (Latest)
+- **Class Variance Authority:** `0.7.0` (Component variants)
+- **Tailwind Merge:** `2.1.0` (Class merging)
+
+### **Form Handling**
+- **React Hook Form:** `7.60.0` (Latest)
+- **Zod:** `3.22.4` (Schema validation)
+
+### **Drag & Drop**
+- **DND Kit:** `6.1.0` (Core), `8.0.0` (Sortable)
+
+## 🗄️ **Backend & Database**
+
+### **Supabase** - Backend as a Service
+- **Client:** `@supabase/supabase-js@2.47.2`
+- **Auth Helpers:** `@supabase/auth-helpers-nextjs@0.10.0`
+- **Features Used:**
+  - Authentication
+  - Real-time subscriptions
+  - File storage
+  - Edge functions
+
+**Best Practices:**
+- ✅ Using auth helpers for Next.js integration
+- ✅ Row Level Security (RLS) for data protection
+- ⚠️ Consider upgrading to latest Supabase client
+
+### **Prisma** - Database ORM
+- **Database:** PostgreSQL
+- **Schema:** Comprehensive marketplace model
+- **Features Used:**
+  - Type-safe database queries
+  - Migrations
+  - Schema introspection
+
+**Best Practices:**
+- ✅ Using UUID primary keys
+- ✅ Proper indexing strategy
+- ✅ Cascade delete relationships
+
+## 🤖 **AI & External Services**
+
+### **OpenAI 4.76.1** - AI Integration
+- **Version:** `4.76.1` (Latest)
+- **Features Used:**
+  - Chat completions
+  - Function calling
+  - Embeddings
+
+### **Stripe** - Payment Processing
+- **Server:** `stripe@18.3.0`
+- **Client:** `@stripe/stripe-js@7.4.0`
+- **Features Used:**
+  - Payment intents
+  - Subscriptions
+  - Webhooks
+
+### **Resend 4.6.0** - Email Service
+- **Version:** `4.6.0` (Latest)
+- **Features Used:**
+  - Transactional emails
+  - React email templates
+
+## 📊 **Monitoring & Analytics**
+
+### **Sentry 9.33.0** - Error Tracking
+- **Version:** `9.33.0` (Latest)
+- **Features Used:**
+  - Error monitoring
+  - Performance tracking
+  - Source maps
+
+**Best Practices:**
+- ✅ Automatic error capture
+- ✅ Performance monitoring
+- ✅ User feedback integration
+
+## 🔧 **Build & Development**
+
+### **Development Tools**
+- **Concurrently:** `8.2.2` (Parallel scripts)
+- **Autoprefixer:** `10.4.16` (CSS prefixing)
+- **PostCSS:** `4.0.0` (CSS processing)
+
+### **Performance Optimization**
+- **Node Options:** `--max-old-space-size=4096`
+- **Next.js Turbo:** Available for faster builds
+- **Server Minification:** Enabled
+
+**Best Practices:**
+- ✅ Memory optimization for large builds
+- ✅ Incremental compilation
+- ✅ Bundle analysis available
+
+## 📱 **Feature-Specific Dependencies**
+
+### **Data Visualization**
+- **Recharts:** `3.1.0` (Charts)
+- **React Flow:** `11.11.4` (Node-based UIs)
+
+### **Media & Content**
+- **React Email:** `0.2.0` (Email templates)
+- **React Speech Kit:** `3.0.1` (Voice features)
+- **TinyColor2:** `1.6.0` (Color manipulation)
+
+### **UI Enhancements**
+- **Sonner:** `2.0.6` (Toast notifications)
+- **Vaul:** `1.1.2` (Drawer component)
+- **React Day Picker:** `9.8.0` (Date selection)
+
+## 🎯 **Version Management Best Practices**
+
+### **Dependency Update Strategy**
+1. **Major Updates:** Test thoroughly, update documentation
+2. **Minor Updates:** Review changelog, update regularly
+3. **Patch Updates:** Apply promptly for security fixes
+
+### **Version Pinning**
+- **Exact versions** for critical dependencies (React, Next.js)
+- **Caret ranges** for UI libraries and tools
+- **Workspace references** for internal packages
+
+### **Security Considerations**
+- Regular dependency audits with `pnpm audit`
+- Automated security updates for patch versions
+- Monitor for known vulnerabilities
+
+## 🚨 **Known Issues & Recommendations**
+
+### **Current Recommendations**
+1. **Supabase Auth Helpers:** Consider upgrading to `@supabase/ssr` for better Next.js 15 support
+2. **React Icons:** Version `5.5.0` is latest, consider consistency with Lucide
+3. **Tailwind PostCSS:** Version `4.0.0` is experimental, monitor for stability
+
+### **Performance Optimizations**
+- Enable Next.js Turbo for faster development
+- Use dynamic imports for heavy components
+- Implement proper caching strategies
+
+### **Accessibility**
+- Radix UI provides excellent accessibility foundation
+- Ensure proper ARIA labels and keyboard navigation
+- Test with screen readers
+
+## 📚 **Documentation & Resources**
+
+### **Key Documentation Links**
+- [Next.js 15 Documentation](https://nextjs.org/docs)
+- [Radix UI Components](https://www.radix-ui.com/)
+- [Tailwind CSS](https://tailwindcss.com/docs)
+- [Supabase Documentation](https://supabase.com/docs)
+
+### **Internal Guidelines**
+- Follow the directory structure rule
+- Use TypeScript for all new code
+- Implement proper error boundaries
+- Write tests for critical functionality
+
+This stack provides a modern, scalable foundation for the BookAIMark application with excellent developer experience and performance characteristics.
