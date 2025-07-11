@@ -303,45 +303,8 @@ export default function Dashboard() {
   const [activeBookmarkTab, setActiveBookmarkTab] = useState('overview');
   const [hasVisitedMediaTab, setHasVisitedMediaTab] = useState(false);
 
-  // State for mock folders used in Folder 2.0 and Goal 2.0 views
-  const [mockFolders, setMockFolders] = useState([
-    {
-      id: '1',
-      name: 'Development',
-      description: 'All development related bookmarks and resources',
-      color: '#3b82f6'
-    },
-    {
-      id: '2', 
-      name: 'Design',
-      description: 'Design tools, inspiration, and creative resources',
-      color: '#ef4444'
-    },
-    {
-      id: '3',
-      name: 'Productivity',
-      description: 'Tools and apps to boost productivity',
-      color: '#10b981'
-    },
-    {
-      id: '4',
-      name: 'Entertainment',
-      description: 'Fun and entertainment websites',
-      color: '#8b5cf6'
-    },
-    {
-      id: '5',
-      name: 'Social',
-      description: 'Social media and networking platforms',
-      color: '#f59e0b'
-    },
-    {
-      id: '6',
-      name: 'Education',
-      description: 'Learning resources and educational content',
-      color: '#06b6d4'
-    }
-  ]);
+  // Dynamic folders based on real bookmark categories
+  const [dynamicFolders, setDynamicFolders] = useState<any[]>([]);
 
   const [mockGoalFolders, setMockGoalFolders] = useState([
     {
@@ -441,6 +404,21 @@ export default function Dashboard() {
       if (missing.length === 0) return prev;
       return [...prev, ...missing];
     });
+  }, [bookmarks]);
+
+  // Generate dynamic folders from real bookmark categories
+  useEffect(() => {
+    const colorOptions = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#f97316', '#ec4899'];
+    
+    const categories = Array.from(new Set(bookmarks.map((b) => b.category)));
+    const folders = categories.map((category, index) => ({
+      id: category.toLowerCase().replace(/\s+/g, '-'),
+      name: category,
+      description: `${category} related bookmarks and resources`,
+      color: colorOptions[index % colorOptions.length]
+    }));
+    
+    setDynamicFolders(folders);
   }, [bookmarks]);
 
   // Reset compact view mode when switching away from compact/list view
@@ -1142,14 +1120,14 @@ export default function Dashboard() {
         }
       }
 
-      // Handle mockFolders reordering (Folder 2.0)
-      const activeFolderIndex = mockFolders.findIndex((item) => item.id === active.id)
-      const overFolderIndex = mockFolders.findIndex((item) => item.id === over.id)
-      
-      if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
-        setMockFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
-        return
-      }
+          // Handle dynamicFolders reordering (Folder 2.0)
+    const activeFolderIndex = dynamicFolders.findIndex((item) => item.id === active.id)
+    const overFolderIndex = dynamicFolders.findIndex((item) => item.id === over.id)
+    
+    if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
+      setDynamicFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
+      return
+    }
 
       // Handle category folder reordering for Compact & List folder views
       if ((viewMode === 'compact' || viewMode === 'list') && compactViewMode === 'folders') {
@@ -2666,9 +2644,9 @@ export default function Dashboard() {
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <SortableContext items={mockFolders.map(f => f.id)} strategy={rectSortingStrategy}>
+                <SortableContext items={dynamicFolders.map(f => f.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 density-gap">
-                    {mockFolders.map((folder) => {
+                    {dynamicFolders.map((folder) => {
                       const folderBookmarks = bookmarks.filter(bookmark => 
                         bookmark.category.toLowerCase() === folder.name.toLowerCase()
                       );

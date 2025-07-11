@@ -281,6 +281,45 @@ export default function Dashboard() {
   const [activeBookmarkTab, setActiveBookmarkTab] = useState('overview')
   const [isSharing, setIsSharing] = useState<Record<number, boolean>>({})
 
+  // Dynamic folders based on real bookmark categories
+  const [dynamicFolders, setDynamicFolders] = useState<any[]>([]);
+
+  const [mockGoalFolders, setMockGoalFolders] = useState([
+    {
+      id: '1',
+      name: 'Project Management',
+      description: 'Tools and resources for project management',
+      color: '#ff7b7b',
+      goal_progress: 75,
+      goal_priority: 'high',
+      goal_status: 'in_progress',
+      deadline_date: '2026-06-30',
+      goal_notes: 'Complete project management tools and resources'
+    },
+    {
+      id: '2',
+      name: 'Learning Development',
+      description: 'Resources for learning new skills',
+      color: '#7bff7b',
+      goal_progress: 60,
+      goal_priority: 'medium',
+      goal_status: 'completed',
+      deadline_date: '2026-05-31',
+      goal_notes: 'Complete learning resources'
+    },
+    {
+      id: '3',
+      name: 'Entertainment',
+      description: 'Entertainment resources and tools',
+      color: '#7b7bff',
+      goal_progress: 80,
+      goal_priority: 'high',
+      goal_status: 'overdue',
+      deadline_date: '2026-06-15',
+      goal_notes: 'Complete entertainment resources and tools'
+    }
+  ]);
+
   // Load user profile picture from Supabase
   useEffect(() => {
     const loadProfileAvatar = async () => {
