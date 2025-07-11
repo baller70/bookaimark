@@ -44,10 +44,10 @@ import {
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
 // Removed Supabase import - now using API route approach
-import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
+
 import { useTranslation } from '@/hooks/use-translation'
 import { LanguageSelector } from '@/components/ui/language-selector'
-import SaveButton from '@/components/SaveButton'
+
 
 // TypeScript Interfaces
 interface Rule {
@@ -191,10 +191,24 @@ const AutoProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [settings, persistedSettings])
 
   const saveSettings = useCallback(async () => {
-    // Settings are now saved via SaveButton component using API route
-    console.log('Settings will be saved via SaveButton component:', settings)
-    setPersistedSettings(settings)
-    toast.success('Settings saved successfully')
+    try {
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'bookmarks',
+          title: 'Auto-Processing Settings',
+          data: settings,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to save settings')
+      setPersistedSettings(settings)
+      toast.success('Auto-processing settings saved successfully')
+    } catch (error) {
+      console.error('Failed to save auto-processing settings:', error)
+      toast.error('Failed to save auto-processing settings')
+    }
   }, [settings])
 
   const resetSettings = useCallback(() => {
@@ -237,13 +251,34 @@ function AutoProcessingContent() {
   const [filteringCollapsed, setFilteringCollapsed] = useState(false)
   const [rulesCollapsed, setRulesCollapsed] = useState(false)
 
-  // Mock data for tag cloud
-  const tagCloudData = [
-    { name: 'Technology', value: 35, color: '#8884d8' },
-    { name: 'Design', value: 28, color: '#82ca9d' },
-    { name: 'Business', value: 22, color: '#ffc658' },
-    { name: 'Marketing', value: 15, color: '#ff7c7c' }
-  ]
+  // Tag cloud data (updated live from bookmarks)
+  const [tagCloudData, setTagCloudData] = useState<{ name: string; value: number; color: string }[]>([]);
+
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const res = await fetch('/api/bookmarks?user_id=dev-user-123');
+        const json = await res.json();
+        if (json.data) {
+          const counts: Record<string, number> = {};
+          json.data.forEach((bm: any) => {
+            (bm.tags || []).forEach((t: string) => {
+              counts[t] = (counts[t] || 0) + 1;
+            });
+          });
+          const palette = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#a4de6c', '#d0ed57'];
+          const cloud = Object.entries(counts)
+            .sort((a, b) => (b[1] as number) - (a[1] as number))
+            .slice(0, 50)
+            .map(([name, value], idx) => ({ name, value: value as number, color: palette[idx % palette.length] }));
+          setTagCloudData(cloud);
+        }
+      } catch (err) {
+        console.error('Failed to load tag cloud data', err);
+      }
+    };
+    fetchTags();
+  }, []);
 
   // Mock history data
   const historyItems: HistoryItem[] = [
@@ -287,7 +322,7 @@ function AutoProcessingContent() {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{t('autoProcessing.title')}</h1>
+            <h1 className="text-2xl font-bold">Auto-Processing</h1>
             <p className="text-muted-foreground">
               {t('autoProcessing.description')}
             </p>
@@ -316,15 +351,10 @@ function AutoProcessingContent() {
                   <RotateCcw className="h-4 w-4 mr-1" />
                   {t('common.reset')}
                 </Button>
-                <SaveButton
-                  table="bookmarks"
-                  payload={{
-                    url: 'https://settings.example.com/auto-processing',
-                    title: 'Auto-Processing Settings',
-                    description: JSON.stringify(settings),
-                    created_at: new Date().toISOString()
-                  }}
-                />
+                <Button size="sm" onClick={saveSettings}>
+                  <Save className="h-4 w-4 mr-1" />
+                  {t('common.save')}
+                </Button>
               </div>
             </AlertDescription>
           </Alert>

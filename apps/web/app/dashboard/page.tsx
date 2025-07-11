@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars, @typescript-eslint/no-explicit-any */
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -539,6 +539,8 @@ export default function Dashboard() {
 
   // ---- Folder category ordering state (for compact & list views) ----
   const [folderCategories, setFolderCategories] = useState<string[]>([]);
+  const [bulkMode, setBulkMode] = useState(false);
+  const scrollLockRef = useRef(false);
 
   // Initialize / sync folderCategories with current bookmark categories while preserving user-defined order
   useEffect(() => {
@@ -882,6 +884,39 @@ export default function Dashboard() {
     saveHierarchyAssignments(assignments);
   };
 
+  // Preserve scroll position during selectedBookmarks state changes
+  useEffect(() => {
+    // Disable scroll restoration globally to prevent browser interference
+    if (history.scrollRestoration) {
+      history.scrollRestoration = 'manual'
+    }
+    
+    // Add CSS to prevent scroll jumping
+    const style = document.createElement('style')
+    style.textContent = `
+      html {
+        scroll-behavior: auto !important;
+      }
+      body {
+        overflow-anchor: none;
+      }
+    `
+    document.head.appendChild(style)
+    
+    return () => {
+      // Cleanup
+      document.head.removeChild(style)
+      if (history.scrollRestoration) {
+        history.scrollRestoration = 'auto'
+      }
+    }
+  }, [])
+
+  // Monitor selectedBookmarks changes for debugging
+  useEffect(() => {
+    console.log('📋 Selected bookmarks changed:', selectedBookmarks.length)
+  }, [selectedBookmarks]);
+
   // Create folders for hierarchy after bookmarks are loaded
   const foldersForHierarchyV1 = useMemo(() => {
     const categories = [...new Set(bookmarks.map((b) => b.category))];
@@ -1187,11 +1222,42 @@ export default function Dashboard() {
   )
 
   const handleBookmarkSelect = (bookmarkId: number) => {
+    // Capture scroll position before any changes
+    const scrollY = window.scrollY
+    const scrollX = window.scrollX
+    
+    // Disable browser scroll restoration
+    const originalScrollRestoration = history.scrollRestoration
+    if (history.scrollRestoration) {
+      history.scrollRestoration = 'manual'
+    }
+    
+    // Update state
     setSelectedBookmarks(prev => 
       prev.includes(bookmarkId) 
         ? prev.filter(id => id !== bookmarkId)
         : [...prev, bookmarkId]
     )
+    
+    // Aggressive scroll position restoration
+    const restoreScroll = () => {
+      window.scrollTo(scrollX, scrollY)
+    }
+    
+    // Multiple restoration strategies to handle React re-render timing
+    restoreScroll() // Immediate
+    requestAnimationFrame(restoreScroll) // Next frame
+    setTimeout(restoreScroll, 0) // Next tick
+    setTimeout(restoreScroll, 1) // Micro delay
+    setTimeout(restoreScroll, 10) // Small delay
+    setTimeout(restoreScroll, 50) // Medium delay
+    
+    // Restore browser scroll restoration after everything settles
+    setTimeout(() => {
+      if (originalScrollRestoration) {
+        history.scrollRestoration = originalScrollRestoration
+      }
+    }, 100)
   }
 
   const handleBookmarkClick = (bookmark: any) => {
@@ -2243,6 +2309,13 @@ export default function Dashboard() {
         e.currentTarget.style.boxShadow = '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)';
       }}
       onClick={(e) => {
+        // Handle bulk selection mode
+        if (bulkMode) {
+          e.preventDefault()
+          e.stopPropagation()
+          handleBookmarkSelect(bookmark.id)
+          return
+        }
         // Don't open modal if we're currently editing this bookmark
         if (editingField && selectedBookmark?.id === bookmark.id) {
           e.preventDefault()
@@ -2252,6 +2325,35 @@ export default function Dashboard() {
         handleBookmarkClick(bookmark)
       }}
     >
+      {/* Bulk Selection Checkbox - Simplified Direct Approach */}
+      {bulkMode && (
+        <div 
+          className="absolute top-3 left-3 z-[9999] cursor-pointer"
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log('Checkbox clicked for bookmark:', bookmark.id)
+            handleBookmarkSelect(bookmark.id)
+          }}
+        >
+          <div 
+            className={`w-6 h-6 border-2 rounded-md flex items-center justify-center shadow-lg ${
+              selectedBookmarks.includes(bookmark.id) 
+                ? 'bg-blue-600 border-blue-600' 
+                : 'bg-white border-gray-400 hover:border-blue-500'
+            }`}
+          >
+            {selectedBookmarks.includes(bookmark.id) && (
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Background Website Logo with 5% opacity - Custom background takes priority */}
       {(() => {
         if (bookmark.customBackground) {
@@ -2517,10 +2619,48 @@ export default function Dashboard() {
   const CompactBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <div 
       className="group cursor-pointer"
-      onClick={() => handleBookmarkClick(bookmark)}
+      onClick={(e) => {
+        // Handle bulk selection mode
+        if (bulkMode) {
+          e.preventDefault()
+          e.stopPropagation()
+          handleBookmarkSelect(bookmark.id)
+          return
+        }
+        handleBookmarkClick(bookmark)
+      }}
     >
       {/* Square Box Design matching folder cards - SAME SIZE */}
       <div className="aspect-square w-full bg-white border border-black relative overflow-hidden rounded-lg">
+        
+                 {/* Bulk Selection Checkbox for Compact View */}
+         {bulkMode && (
+           <div 
+             className="absolute top-2 left-2 z-[9999] cursor-pointer"
+             onMouseDown={(e) => e.stopPropagation()}
+             onMouseUp={(e) => e.stopPropagation()}
+             onClick={(e) => {
+               e.preventDefault()
+               e.stopPropagation()
+               console.log('Compact checkbox clicked for bookmark:', bookmark.id)
+               handleBookmarkSelect(bookmark.id)
+             }}
+           >
+             <div 
+               className={`w-5 h-5 border-2 rounded-md flex items-center justify-center shadow-lg ${
+                 selectedBookmarks.includes(bookmark.id) 
+                   ? 'bg-blue-600 border-blue-600' 
+                   : 'bg-white border-gray-400 hover:border-blue-500'
+               }`}
+             >
+               {selectedBookmarks.includes(bookmark.id) && (
+                 <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                 </svg>
+               )}
+             </div>
+           </div>
+         )}
         {/* Background Website Logo with 5% opacity - Custom background takes priority */}
         {(() => {
           if (bookmark.customBackground) {
@@ -2867,8 +3007,46 @@ export default function Dashboard() {
         e.currentTarget.style.borderColor = 'rgb(0 0 0)';
         e.currentTarget.style.boxShadow = '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)';
       }}
-      onClick={() => handleBookmarkClick(bookmark)}
+      onClick={(e) => {
+        // Handle bulk selection mode
+        if (bulkMode) {
+          e.preventDefault()
+          e.stopPropagation()
+          handleBookmarkSelect(bookmark.id)
+          return
+        }
+        handleBookmarkClick(bookmark)
+      }}
     >
+             {/* Bulk Selection Checkbox for List View */}
+       {bulkMode && (
+         <div 
+           className="absolute top-3 left-3 z-[9999] cursor-pointer"
+           onMouseDown={(e) => e.stopPropagation()}
+           onMouseUp={(e) => e.stopPropagation()}
+           onClick={(e) => {
+             e.preventDefault()
+             e.stopPropagation()
+             console.log('List checkbox clicked for bookmark:', bookmark.id)
+             handleBookmarkSelect(bookmark.id)
+           }}
+         >
+           <div 
+             className={`w-6 h-6 border-2 rounded-md flex items-center justify-center shadow-lg ${
+               selectedBookmarks.includes(bookmark.id) 
+                 ? 'bg-blue-600 border-blue-600' 
+                 : 'bg-white border-gray-400 hover:border-blue-500'
+             }`}
+           >
+             {selectedBookmarks.includes(bookmark.id) && (
+               <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+               </svg>
+             )}
+           </div>
+         </div>
+       )}
+
       {/* Background Website Logo with 5% opacity - Custom background takes priority */}
       {(() => {
         if (bookmark.customBackground) {
@@ -3931,9 +4109,101 @@ export default function Dashboard() {
 
   const currentChartData = chartData[chartTimePeriod as keyof typeof chartData]
 
+  // Add bulk delete function
+  const handleBulkDelete = async () => {
+    if (selectedBookmarks.length === 0) {
+      showNotification('No bookmarks selected for deletion')
+      return
+    }
 
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selectedBookmarks.length} bookmark(s)? This action cannot be undone.`
+    )
 
+    if (!confirmDelete) return
 
+    try {
+      const response = await fetch('/api/bookmarks/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'delete',
+          bookmarkIds: selectedBookmarks,
+          userId: 'dev-user-123'
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Remove deleted bookmarks from local state
+        setBookmarks(prev => prev.filter(b => !selectedBookmarks.includes(b.id)))
+        setSelectedBookmarks([])
+        setBulkMode(false)
+        showNotification(`Successfully deleted ${data.deletedCount} bookmark(s)`)
+      } else {
+        showNotification('Failed to delete bookmarks: ' + data.error)
+      }
+    } catch (error) {
+      showNotification('Error deleting bookmarks')
+      console.error('Bulk delete error:', error)
+    }
+  }
+
+  // Add bulk move function
+  const handleBulkMove = async (newCategory: string) => {
+    if (selectedBookmarks.length === 0) {
+      showNotification('No bookmarks selected for moving')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/bookmarks/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'move',
+          bookmarkIds: selectedBookmarks,
+          userId: 'dev-user-123',
+          category: newCategory
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update bookmarks in local state
+        setBookmarks(prev => prev.map(bookmark => 
+          selectedBookmarks.includes(bookmark.id) 
+            ? { ...bookmark, category: newCategory }
+            : bookmark
+        ))
+        setSelectedBookmarks([])
+        setBulkMode(false)
+        showNotification(`Successfully moved ${data.updatedCount} bookmark(s) to "${newCategory}"`)
+      } else {
+        showNotification('Failed to move bookmarks: ' + data.error)
+      }
+    } catch (error) {
+      showNotification('Error moving bookmarks')
+      console.error('Bulk move error:', error)
+    }
+  }
+
+  // Toggle all bookmarks selection
+  const handleSelectAll = () => {
+    if (selectedBookmarks.length === filteredBookmarks.length) {
+      // Deselect all
+      setSelectedBookmarks([])
+    } else {
+      // Select all visible bookmarks
+      setSelectedBookmarks(filteredBookmarks.map(b => b.id))
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -3944,8 +4214,29 @@ export default function Dashboard() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">BOOKMARKHUB</h1>
               <p className="text-gray-600 mt-1">Your Digital Workspace</p>
+              {selectedBookmarks.length > 0 && (
+                <div className="mt-2">
+                  <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                    {selectedBookmarks.length} SELECTED
+                  </Badge>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-4">
+              {/* Bulk Mode Toggle - Enhanced visibility */}
+              <Button
+                variant={bulkMode ? 'default' : 'outline'}
+                onClick={() => {
+                  setBulkMode(!bulkMode)
+                  if (!bulkMode) {
+                    setSelectedBookmarks([])
+                  }
+                }}
+                className={`flex items-center space-x-2 ${bulkMode ? 'bg-blue-600 hover:bg-blue-700' : 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50'} font-semibold transition-all duration-200`}
+              >
+                {bulkMode ? <CheckCircle className="h-4 w-4 text-white" /> : <Check className="h-4 w-4" />}
+                <span className={bulkMode ? 'text-white' : ''}>🗂️ BULK SELECT</span>
+              </Button>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-40 border-gray-200">
                   <SelectValue placeholder="Category" />
@@ -3990,6 +4281,53 @@ export default function Dashboard() {
               </Button>
             </div>
           </div>
+
+          {/* Bulk Actions Toolbar - Enhanced visibility */}
+          {selectedBookmarks.length > 0 && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Button
+                    onClick={handleSelectAll}
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                  >
+                    {selectedBookmarks.length === filteredBookmarks.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <span className="text-sm text-blue-800 font-semibold">
+                    ✅ {selectedBookmarks.length} of {filteredBookmarks.length} bookmarks selected
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Select onValueChange={handleBulkMove}>
+                    <SelectTrigger className="w-40 border-blue-300">
+                      <SelectValue placeholder="📁 Move to..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Development">Development</SelectItem>
+                      <SelectItem value="Design">Design</SelectItem>
+                      <SelectItem value="Productivity">Productivity</SelectItem>
+                      <SelectItem value="Learning">Learning</SelectItem>
+                      <SelectItem value="Entertainment">Entertainment</SelectItem>
+                      <SelectItem value="Research">Research</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
+                      <SelectItem value="Technology">Technology</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={handleBulkDelete}
+                    variant="destructive"
+                    size="sm"
+                    className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 font-semibold"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>🗑️ DELETE SELECTED</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Oracle Component */}
           <Oracle />

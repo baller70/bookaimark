@@ -114,16 +114,16 @@ export async function GET(request: NextRequest) {
       tags: bookmark.tags || [],
       priority: 'medium',
       isFavorite: false,
-      visits: bookmark.visits || Math.floor(Math.random() * 50) + 1,
-      lastVisited: new Date(bookmark.created_at).toLocaleDateString(),
+      visits: bookmark.visits || 0, // Start at 0 for new bookmarks
+      lastVisited: bookmark.visits > 0 ? new Date(bookmark.created_at).toLocaleDateString() : 'Never',
       dateAdded: new Date(bookmark.created_at).toLocaleDateString(),
       favicon: bookmark.title?.charAt(0)?.toUpperCase() || 'B',
       screenshot: "/placeholder.svg",
       circularImage: "/placeholder.svg",
       logo: "",
       notes: bookmark.notes || 'No notes',
-      timeSpent: '0m',
-      weeklyVisits: Math.floor(Math.random() * 20) + 1,
+      timeSpent: bookmark.time_spent ? `${bookmark.time_spent}m` : '0m', // Use actual time spent or 0
+      weeklyVisits: 0, // Start at 0 for new bookmarks
       siteHealth: bookmark.site_health || 'unknown',
       site_health: bookmark.site_health || 'unknown',
       healthCheckCount: bookmark.healthCheckCount || 0,
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
       customBackground: bookmark.customBackground,
       project: {
         name: bookmark.ai_category || "GENERAL",
-        progress: Math.floor(Math.random() * 100),
+        progress: 0, // Start at 0 for new bookmarks
         status: "Active"
       },
       relatedBookmarks: bookmark.relatedBookmarks || []
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       // Generate new ID
       const newId = Math.max(0, ...allBookmarks.map(b => b.id)) + 1;
       
-      // Create new bookmark
+      // Create new bookmark with zero analytics
       const newBookmark: Bookmark = {
         id: newId,
         user_id: userId,
@@ -236,7 +236,13 @@ export async function POST(request: NextRequest) {
         notes: notes || '',
         relatedBookmarks: relatedBookmarks || [],
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        // Initialize all analytics fields to zero for new bookmarks
+        visits: 0,
+        time_spent: 0,
+        site_health: 'working' as const,
+        healthCheckCount: 0,
+        last_health_check: null
       };
       
       // Add to bookmarks array

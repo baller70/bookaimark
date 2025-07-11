@@ -131,6 +131,33 @@ const validateUrl = (url: string): boolean => {
   }
 };
 
+// Helper function to safely parse AI JSON responses
+const parseAIResponse = (content: string): any => {
+  try {
+    // First try direct JSON parsing
+    return JSON.parse(content);
+  } catch (error) {
+    try {
+      // Try to extract JSON from markdown code blocks
+      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[1]);
+      }
+      
+      // Try to find JSON object in the content
+      const objectMatch = content.match(/\{[\s\S]*\}/);
+      if (objectMatch) {
+        return JSON.parse(objectMatch[0]);
+      }
+      
+      throw new Error('No valid JSON found in response');
+    } catch (parseError) {
+      console.warn('Failed to parse AI response:', content.substring(0, 200));
+      return {};
+    }
+  }
+};
+
 const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings): Promise<{ tags: string[]; folder: string; priority: 'low' | 'medium' | 'high' }> => {
   const hostname = new URL(url).hostname.toLowerCase();
   
@@ -217,7 +244,7 @@ const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings)
         temperature: 0.3,
       });
 
-      const aiResult = JSON.parse(aiResponse.choices[0].message.content || '{}');
+      const aiResult = parseAIResponse(aiResponse.choices[0].message.content || '{}');
       if (aiResult.tags && Array.isArray(aiResult.tags)) {
         tags = [...new Set([...tags, ...aiResult.tags])];
       }
@@ -322,7 +349,7 @@ Guidelines:
 - Consider the user's likely intent for bookmarking this content
 - Language preference: ${settings.language || 'english'}
 
-Respond in JSON format:
+Respond ONLY with valid JSON:
 {
   "summary": "Brief description of the content",
   "tags": ["tag1", "tag2", "tag3"],
@@ -344,7 +371,7 @@ ${textContent.substring(0, 3000)}...`
       temperature: 0.3,
     });
 
-    const aiResult = JSON.parse(aiResponse.choices[0].message.content || '{}');
+    const aiResult = parseAIResponse(aiResponse.choices[0].message.content || '{}');
     
     return {
       title,
@@ -529,7 +556,7 @@ export async function POST(request: NextRequest) {
 
         // Use file-based storage with user ID from query parameters or default
         const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('user_id') || '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f';
+        const userId = searchParams.get('user_id') || 'dev-user-123';
         
         console.log('🚀 FILE STORAGE MODE: Using file-based storage for user:', userId);
         
@@ -652,20 +679,37 @@ export async function POST(request: NextRequest) {
               // Use AI-generated tags and folder if available, or fall back to basic prediction
               const prediction = await predictTagsAndFolder(cleanedUrl, processingSettings);
               
-              if (enhancedMetadata.aiTags && enhancedMetadata.aiTags.length > 0) {
+              // Apply tags based on settings
+              if (processingSettings.autoCategorize && enhancedMetadata.aiTags && enhancedMetadata.aiTags.length > 0) {
                 bulkLink.predictedTags = enhancedMetadata.aiTags;
               } else {
                 bulkLink.predictedTags = prediction.tags;
               }
               
-              if (enhancedMetadata.aiCategory) {
+              // Add extra tag if specified (avoid duplicates)
+              if (processingSettings.extraTag && processingSettings.extraTag.trim()) {
+                const extraTag = processingSettings.extraTag.trim();
+                if (!bulkLink.predictedTags.includes(extraTag)) {
+                  bulkLink.predictedTags.push(extraTag);
+                }
+              }
+              
+              // Apply folder based on settings
+              if (processingSettings.forceFolderId) {
+                // Force into specified folder
+                bulkLink.predictedFolder = processingSettings.forceFolderId;
+              } else if (processingSettings.autoCategorize && enhancedMetadata.aiCategory) {
                 bulkLink.predictedFolder = enhancedMetadata.aiCategory;
               } else {
                 bulkLink.predictedFolder = prediction.folder;
               }
               
-              // Set priority from prediction (AI or basic)
-              bulkLink.predictedPriority = prediction.priority;
+              // Set priority based on settings
+              if (processingSettings.autoPriority) {
+                bulkLink.predictedPriority = prediction.priority;
+              } else {
+                bulkLink.predictedPriority = 'medium'; // Default when auto-priority is disabled
+              }
 
               // Store AI-generated notes for later use
               if (enhancedMetadata.aiNotes) {

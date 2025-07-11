@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,23 +24,27 @@ import {
   Play, 
   Pause, 
   AlertCircle,
+  AlertTriangle,
   FileText,
   Video,
   Github,
   Globe,
   FolderOpen,
+  Folder,
   Tag,
   Eye,
   EyeOff,
   RotateCcw,
-  Save
+  Save,
+  BarChart3,
+  PlusCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase'
 import { getAISetting } from '@/lib/user-settings-service'
 import SaveButton from '../../../../components/SaveButton'
 
 // Types
-type BulkLinkStatus = 'queued' | 'validating' | 'processing' | 'saved' | 'duplicate' | 'failed';
+type BulkLinkStatus = 'queued' | 'validating' | 'processing' | 'processed' | 'saved' | 'duplicate' | 'failed';
 
 interface BulkLink {
   id: string;
@@ -49,6 +54,7 @@ interface BulkLink {
   linkType?: 'video' | 'doc' | 'pdf' | 'repo' | 'web';
   predictedTags: string[];
   predictedFolder: string;
+  priority: 'Low' | 'Medium' | 'High';
   status: BulkLinkStatus;
   error?: string;
   selected: boolean;
@@ -84,7 +90,7 @@ interface JobState {
   logs: string[];
 }
 
-// Default preferences
+// Default preferences with useful presets
 const defaultPrefs: BulkUploaderPrefs = {
   defaultBatchSize: 20,
   privacyDefault: 'private',
@@ -92,7 +98,48 @@ const defaultPrefs: BulkUploaderPrefs = {
   autoPriorityDefault: true,
   duplicateHandling: 'autoMerge',
   backgroundModeDefault: true,
-  presets: {}
+  presets: {
+    'Quick Import': {
+      name: 'Quick Import',
+      batchSize: 40,
+      extraTag: 'quick-import',
+      forceFolderId: null,
+      privacy: 'private',
+      autoCategorize: true,
+      autoPriority: true,
+      duplicateHandling: 'skip'
+    },
+    'Development Resources': {
+      name: 'Development Resources',
+      batchSize: 20,
+      extraTag: 'dev-resource',
+      forceFolderId: 'development',
+      privacy: 'private',
+      autoCategorize: false,
+      autoPriority: true,
+      duplicateHandling: 'autoMerge'
+    },
+    'Research Collection': {
+      name: 'Research Collection',
+      batchSize: 30,
+      extraTag: 'research',
+      forceFolderId: 'research',
+      privacy: 'private',
+      autoCategorize: true,
+      autoPriority: false,
+      duplicateHandling: 'keepBoth'
+    },
+    'Public Sharing': {
+      name: 'Public Sharing',
+      batchSize: 10,
+      extraTag: 'shared',
+      forceFolderId: null,
+      privacy: 'public',
+      autoCategorize: true,
+      autoPriority: true,
+      duplicateHandling: 'overwrite'
+    }
+  }
 };
 
 // Context
@@ -112,6 +159,7 @@ interface BulkUploaderState {
   selectedLinks: Set<string>;
   jobState: JobState;
   hasUnsavedChanges: boolean;
+  history: { timestamp: string; links: BulkLink[] }[];
 }
 
 type BulkUploaderAction = 
@@ -123,6 +171,8 @@ type BulkUploaderAction =
   | { type: 'SELECT_ALL_LINKS'; payload: boolean }
   | { type: 'SET_JOB_STATE'; payload: Partial<JobState> }
   | { type: 'SET_UNSAVED_CHANGES'; payload: boolean }
+  | { type: 'ADD_HISTORY'; payload: { timestamp: string; links: BulkLink[] } }
+  
   | { type: 'RESET_TO_DEFAULTS' };
 
 const BulkUploaderContext = createContext<{
@@ -201,6 +251,7 @@ const parseCsv = (csvText: string): BulkLink[] => {
       linkType,
       predictedTags: tags,
       predictedFolder: folder,
+      priority: 'Medium' as 'Medium',
       status: 'queued' as BulkLinkStatus,
       selected: true
     };
@@ -221,6 +272,7 @@ const parseTextLinks = (text: string): BulkLink[] => {
       linkType,
       predictedTags: tags,
       predictedFolder: folder,
+      priority: 'Medium' as 'Medium',
       status: 'queued' as BulkLinkStatus,
       selected: true
     };
@@ -313,19 +365,16 @@ const bulkUploaderReducer = (state: BulkUploaderState, action: BulkUploaderActio
         hasUnsavedChanges: action.payload
       };
     
+    case 'ADD_HISTORY':
+      return {
+        ...state,
+        history: [...state.history, action.payload]
+      };
+    
     case 'RESET_TO_DEFAULTS':
       return {
         ...state,
-        currentSettings: {
-          batchSize: state.prefs.defaultBatchSize,
-          extraTag: '',
-          forceFolderId: null,
-          privacy: state.prefs.privacyDefault,
-          autoCategorize: state.prefs.autoCategorizeDefault,
-          autoPriority: state.prefs.autoPriorityDefault,
-          duplicateHandling: state.prefs.duplicateHandling,
-          backgroundMode: state.prefs.backgroundModeDefault
-        },
+        currentSettings: { ...state.currentSettings },
         hasUnsavedChanges: false
       };
     
@@ -489,12 +538,13 @@ const InputTabs: React.FC = () => {
       const newLink: BulkLink = {
         id: generateId(),
         url: singleUrl.trim(),
+        priority: 'Medium' as 'Medium',
         title: singleTitle.trim() || undefined,
         notes: singleNotes.trim() || undefined,
-        linkType: detectLinkType(singleUrl),
-        predictedTags: predictTagsAndFolder(singleUrl).tags,
-        predictedFolder: predictTagsAndFolder(singleUrl).folder,
-        status: 'queued',
+        linkType: detectLinkType(singleUrl.trim()),
+        predictedTags: predictTagsAndFolder(singleUrl.trim()).tags,
+        predictedFolder: predictTagsAndFolder(singleUrl.trim()).folder,
+        status: 'queued' as BulkLinkStatus,
         selected: true
       };
 
@@ -848,6 +898,7 @@ const StatusBadge: React.FC<{ status: BulkLinkStatus }> = ({ status }) => {
     queued: 'secondary',
     validating: 'outline',
     processing: 'outline',
+    processed: 'outline',
     saved: 'default',
     duplicate: 'secondary',
     failed: 'destructive'
@@ -994,6 +1045,33 @@ const SidebarControls: React.FC = () => {
   const [newPresetName, setNewPresetName] = useState('');
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  // Modal state for creating new folder/category
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  const handleCreateFolder = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName.trim(), user_id: 'dev-user-123' }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setAvailableCategories(prev => [...prev, json.category.name]);
+        handleSettingChange('forceFolderId', json.category.name.toLowerCase());
+        toast.success(`Created folder "${json.category.name}"`);
+        setShowCategoryModal(false);
+        setNewCategoryName('');
+      } else {
+        throw new Error(json.error || 'Failed to create folder');
+      }
+    } catch (err) {
+      console.error('Error creating folder:', err);
+      toast.error('Failed to create folder');
+    }
+  };
 
   // Load available categories from the dedicated categories API
   useEffect(() => {
@@ -1095,16 +1173,42 @@ const SidebarControls: React.FC = () => {
         <div>
           <Label>Import Preset</Label>
           <div className="flex space-x-2 mt-2">
-            <Select>
+            <Select onValueChange={(presetName) => {
+              const preset = state.prefs.presets[presetName];
+              if (preset) {
+                dispatch({ 
+                  type: 'SET_CURRENT_SETTINGS', 
+                  payload: {
+                    batchSize: preset.batchSize,
+                    extraTag: preset.extraTag || '',
+                    forceFolderId: preset.forceFolderId,
+                    privacy: preset.privacy,
+                    autoCategorize: preset.autoCategorize,
+                    autoPriority: preset.autoPriority,
+                    duplicateHandling: preset.duplicateHandling
+                  }
+                });
+                toast.success(`Applied preset "${presetName}"`);
+              }
+            }}>
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder="Select preset..." />
               </SelectTrigger>
               <SelectContent>
-                {Object.keys(state.prefs.presets).map(presetName => (
-                  <SelectItem key={presetName} value={presetName}>
-                    {presetName}
-                  </SelectItem>
-                ))}
+                {(() => {
+                  const presetKeys = Object.keys(state.prefs.presets);
+                  console.log('🎯 Available presets in dropdown:', presetKeys);
+                  
+                  if (presetKeys.length === 0) {
+                    return <SelectItem value="none" disabled>No presets available</SelectItem>;
+                  }
+                  
+                  return presetKeys.map(presetName => (
+                    <SelectItem key={presetName} value={presetName}>
+                      {presetName}
+                    </SelectItem>
+                  ));
+                })()}
               </SelectContent>
             </Select>
             
@@ -1162,7 +1266,13 @@ const SidebarControls: React.FC = () => {
               <Label>Force into folder</Label>
                              <Select 
                  value={state.currentSettings.forceFolderId || 'auto'} 
-                 onValueChange={(value) => handleSettingChange('forceFolderId', value === 'auto' ? null : value)}
+                 onValueChange={(value) => {
+                   if (value === 'create_new') {
+                     setShowCategoryModal(true);
+                   } else {
+                     handleSettingChange('forceFolderId', value === 'auto' ? null : value);
+                   }
+                 }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Auto-categorize"} />
@@ -1178,8 +1288,39 @@ const SidebarControls: React.FC = () => {
                        </SelectItem>
                      ))
                    )}
+                   <SelectItem value="create_new">
+                     <PlusCircle className="h-4 w-4 mr-1 inline" />
+                     Create new folder...
+                   </SelectItem>}
                  </SelectContent>
               </Select>
+
+            <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Folder</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="new-category">Folder Name</Label>
+                    <Input
+                      id="new-category"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="e.g., Inspirations"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateFolder} disabled={!newCategoryName.trim()}>
+                      Create
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
             </div>
           </div>
         </div>
@@ -1219,6 +1360,15 @@ const SidebarControls: React.FC = () => {
               id="auto-categorize"
               checked={state.currentSettings.autoCategorize}
               onCheckedChange={(checked) => handleSettingChange('autoCategorize', checked)}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <Label htmlFor="auto-priority">Auto-priority</Label>
+            <Switch
+              id="auto-priority"
+              checked={state.currentSettings.autoPriority}
+              onCheckedChange={(checked) => handleSettingChange('autoPriority', checked)}
             />
           </div>
           
@@ -1319,14 +1469,39 @@ const ProgressDonut: React.FC = () => {
 
 // Upload Summary Component
 const UploadSummary: React.FC = () => {
+  const getFixSuggestion = (errorMsg: string | undefined) => {
+    if (!errorMsg) return 'Unknown error. Try again later.';
+    const lower = errorMsg.toLowerCase();
+    if (lower.includes('metadata')) return 'Site blocked metadata scraping. Add details manually or retry later.';
+    if (lower.includes('duplicate')) return 'Link already exists in your bookmarks. Choose a different duplicate strategy.';
+    if (lower.includes('timeout')) return 'Network timeout. Check your connection and retry.';
+    if (lower.includes('invalid url')) return 'The URL seems invalid. Verify and correct it.';
+    return 'Review the error message and retry the upload.';
+  };
   const { state } = useBulkUploaderPrefs();
   const { links, jobState } = state;
 
   const stats = useMemo(() => {
     const total = links.length;
-    const saved = links.filter(link => link.status === 'saved').length;
+    
+    // If job is completed and not running, treat all non-failed links as saved
+    const isJobCompleted = !jobState.isRunning && jobState.completed > 0;
+    
+    let saved, processing;
+    if (isJobCompleted) {
+      // When job is completed, count all non-failed/non-duplicate links as saved
+      saved = links.filter(link => 
+        link.status === 'saved' || 
+        link.status === 'processed' || 
+        (link.status === 'processing' && link.selected)
+      ).length;
+      processing = 0; // No links should be processing when job is completed
+    } else {
+      saved = links.filter(link => link.status === 'saved' || link.status === 'processed').length;
+      processing = links.filter(link => link.status === 'processing').length;
+    }
+    
     const failed = links.filter(link => link.status === 'failed').length;
-    const processing = links.filter(link => link.status === 'processing').length;
     const queued = links.filter(link => link.status === 'queued').length;
     const duplicates = links.filter(link => link.status === 'duplicate').length;
 
@@ -1335,10 +1510,24 @@ const UploadSummary: React.FC = () => {
       return acc;
     }, {} as Record<string, number>);
 
-    const recentUploads = links
-      .filter(link => link.status === 'saved')
-      .slice(-5)
-      .reverse();
+    // Categorize links by their processing results
+    const savedLinks = links.filter(link => 
+      link.status === 'saved' || 
+      link.status === 'processed' || 
+      (isJobCompleted && link.status === 'processing' && link.selected)
+    );
+    
+    const savedWithWarnings = savedLinks.filter(link => 
+      !link.title || link.title === 'undefined' || link.error
+    );
+    
+    const savedSuccessfully = savedLinks.filter(link => 
+      link.title && link.title !== 'undefined' && !link.error
+    );
+
+    const failedLinks = links.filter(link => link.status === 'failed');
+
+    const recentUploads = savedLinks.slice(-8).reverse(); // Show more recent uploads
 
     return {
       total,
@@ -1349,9 +1538,13 @@ const UploadSummary: React.FC = () => {
       duplicates,
       byType,
       recentUploads,
-      successRate: total > 0 ? Math.round((saved / total) * 100) : 0
+      savedWithWarnings,
+      savedSuccessfully,
+      failedLinks,
+      successRate: total > 0 ? Math.round((saved / total) * 100) : 0,
+      warningRate: total > 0 ? Math.round((savedWithWarnings.length / total) * 100) : 0
     };
-  }, [links]);
+  }, [links, jobState]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -1411,11 +1604,18 @@ const UploadSummary: React.FC = () => {
       
       <CardContent className="space-y-6">
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <div className="bg-white/80 rounded-lg p-4 text-center border border-green-200">
-            <div className="text-2xl font-bold text-green-600">{stats.saved}</div>
-            <div className="text-xs text-green-700 font-medium">Saved</div>
+            <div className="text-2xl font-bold text-green-600">{stats.savedSuccessfully.length}</div>
+            <div className="text-xs text-green-700 font-medium">Perfect</div>
           </div>
+          
+          {stats.savedWithWarnings.length > 0 && (
+            <div className="bg-white/80 rounded-lg p-4 text-center border border-yellow-200">
+              <div className="text-2xl font-bold text-yellow-600">{stats.savedWithWarnings.length}</div>
+              <div className="text-xs text-yellow-700 font-medium">Saved w/ Warnings</div>
+            </div>
+          )}
           
           {stats.processing > 0 && (
             <div className="bg-white/80 rounded-lg p-4 text-center border border-blue-200">
@@ -1425,9 +1625,9 @@ const UploadSummary: React.FC = () => {
           )}
           
           {stats.queued > 0 && (
-            <div className="bg-white/80 rounded-lg p-4 text-center border border-yellow-200">
-              <div className="text-2xl font-bold text-yellow-600">{stats.queued}</div>
-              <div className="text-xs text-yellow-700 font-medium">Queued</div>
+            <div className="bg-white/80 rounded-lg p-4 text-center border border-purple-200">
+              <div className="text-2xl font-bold text-purple-600">{stats.queued}</div>
+              <div className="text-xs text-purple-700 font-medium">Queued</div>
             </div>
           )}
           
@@ -1439,12 +1639,60 @@ const UploadSummary: React.FC = () => {
           )}
           
           {stats.failed > 0 && (
-            <div className="bg-white/80 rounded-lg p-4 text-center border border-red-200">
-              <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-              <div className="text-xs text-red-700 font-medium">Failed</div>
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="bg-white/80 rounded-lg p-4 text-center border border-red-200 cursor-help">
+                    <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
+                    <div className="text-xs text-red-700 font-medium">Failed</div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm font-semibold text-white">{stats.failed} failed uploads</p>
+                  <p className="text-xs mt-1 text-white">Hover each failed item below for details & fix tips.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
+
+        {/* Detailed Results Summary */}
+        {stats.total > 0 && (
+          <div className="bg-white/60 rounded-lg p-4 border border-white/50">
+            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Processing Results Summary
+            </h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Total Links Processed:</span>
+                <span className="font-semibold text-gray-800">{stats.total}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-green-600">✅ Successfully Saved (Complete):</span>
+                <span className="font-semibold text-green-700">{stats.savedSuccessfully.length}</span>
+              </div>
+              {stats.savedWithWarnings.length > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-yellow-600">⚠️ Saved with Warnings (Partial Data):</span>
+                  <span className="font-semibold text-yellow-700">{stats.savedWithWarnings.length}</span>
+                </div>
+              )}
+              {stats.failed > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-red-600">❌ Failed to Process:</span>
+                  <span className="font-semibold text-red-700">{stats.failed}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center border-t pt-2">
+                <span className="text-gray-600">Overall Success Rate:</span>
+                <span className={`font-semibold ${stats.successRate >= 80 ? 'text-green-600' : stats.successRate >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {stats.successRate}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content Types Breakdown */}
         {Object.keys(stats.byType).length > 0 && (
@@ -1469,40 +1717,122 @@ const UploadSummary: React.FC = () => {
           </div>
         )}
 
-        {/* Recent Successful Uploads */}
+        {/* Recent Uploads with Details */}
         {stats.recentUploads.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
               <Eye className="h-4 w-4 mr-2" />
-              Recent Uploads
+              Recent Uploads ({stats.recentUploads.length})
             </h4>
             <div className="space-y-2">
-              {stats.recentUploads.map((link) => (
-                <div key={link.id} className="bg-white/60 rounded-lg p-3 border border-white/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3 flex-1 min-w-0">
-                      <div className={`p-1.5 rounded ${getTypeColor(link.linkType || 'web')}`}>
-                        {getTypeIcon(link.linkType || 'web')}
+              {stats.recentUploads.map((link) => {
+                const hasWarning = !link.title || link.title === 'undefined' || link.error;
+                const isComplete = link.title && link.title !== 'undefined' && !link.error;
+                
+                return (
+                  <div key={link.id} className={`bg-white/60 rounded-lg p-3 border ${hasWarning ? 'border-yellow-200' : 'border-white/50'}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-3 flex-1 min-w-0">
+                        <div className={`p-1.5 rounded ${getTypeColor(link.linkType || 'web')}`}>
+                          {getTypeIcon(link.linkType || 'web')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-800 truncate">
+                            {link.title && link.title !== 'undefined' ? link.title : new URL(link.url).hostname}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate mb-1 flex items-center">
+                            <span className="truncate">{link.url}</span>
+                            {hasWarning && (
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertCircle className="h-3 w-3 ml-1 text-yellow-600 cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-sm font-semibold text-red-700">{link.error || 'Metadata fetch failed'}</p>
+                                    <p className="text-xs mt-1 text-white">{getFixSuggestion(link.error)}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                          {hasWarning && (
+                            <div className="text-xs text-yellow-600 flex items-center">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              {!link.title || link.title === 'undefined' ? 'Metadata fetch failed' : link.error}
+                            </div>
+                          )}
+                          {link.predictedFolder && (
+                            <div className="text-xs text-gray-500 flex items-center mt-1">
+                              <Folder className="h-3 w-3 mr-1" />
+                              Saved to: {link.predictedFolder}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      <div className="flex flex-col items-end space-y-1">
+                        <div className="flex items-center space-x-1">
+                          {link.predictedTags.slice(0, 2).map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-xs bg-white/80">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <Badge className={`text-xs ${isComplete ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>
+                          {isComplete ? '✓ Complete' : '⚠️ Partial'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Failed Uploads Details */}
+        {stats.failedLinks.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-red-700 mb-3 flex items-center">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Failed Uploads ({stats.failedLinks.length})
+            </h4>
+            <div className="space-y-2">
+              {stats.failedLinks.map((link) => (
+                <div key={link.id} className="bg-red-50 rounded-lg p-3 border border-red-200">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3 flex-1 min-w-0">
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="p-1.5 rounded bg-red-100 text-red-700 cursor-help">
+                              <AlertCircle className="h-4 w-4" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm font-semibold text-red-700">{link.error || 'Unknown error'}</p>
+                            <p className="text-xs mt-1 text-white">{getFixSuggestion(link.error)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate">
+                        <div className="text-sm font-medium text-red-800 truncate">
                           {link.title || new URL(link.url).hostname}
                         </div>
-                        <div className="text-xs text-gray-500 truncate">
+                        <div className="text-xs text-red-600 truncate mb-1">
                           {link.url}
                         </div>
+                        {link.error && (
+                          <div className="text-xs text-red-700 flex items-center">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            {link.error}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      {link.predictedTags.slice(0, 2).map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs bg-white/80">
-                          {tag}
-                        </Badge>
-                      ))}
-                      <Badge className="bg-green-100 text-green-700 border-green-200">
-                        ✓ Saved
-                      </Badge>
-                    </div>
+                    <Badge className="bg-red-100 text-red-700 border-red-200 text-xs">
+                      ❌ Failed
+                    </Badge>
                   </div>
                 </div>
               ))}
@@ -1598,6 +1928,21 @@ const ImportButton: React.FC = () => {
     });
 
     try {
+      // Fetch Auto-Processing settings to coordinate behaviour
+      let autoProcessingEnabled = true;
+      try {
+        const autoRes = await fetch('/api/save?table=bookmarks&title=Auto-Processing Settings');
+        const autoJson = await autoRes.json();
+        if (autoJson.success && autoJson.data.found) {
+          const auto = autoJson.data.settings;
+          if (auto.paused || !auto.processBulk) {
+            autoProcessingEnabled = false;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load auto-processing settings, defaulting to enabled', err);
+      }
+
       // Prepare API request
       const apiRequest = {
         links: selectedLinks.map(link => ({
@@ -1614,7 +1959,8 @@ const ImportButton: React.FC = () => {
           autoPriority: state.currentSettings.autoPriority,
           duplicateHandling: state.currentSettings.duplicateHandling,
           backgroundMode: state.currentSettings.backgroundMode,
-          language: 'english' // TODO: Get from user settings
+          language: 'english', // TODO: Get from user settings
+          autoProcessingEnabled
         }
       };
 
@@ -1629,10 +1975,14 @@ const ImportButton: React.FC = () => {
         });
       });
 
+      if (!autoProcessingEnabled) {
+        toast.warning('Auto-processing is disabled for bulk uploads. Links will be imported without processing.');
+      }
+
       dispatch({ 
         type: 'SET_JOB_STATE', 
         payload: { 
-          logs: [...state.jobState.logs, '🔗 Sending links to AI processing...']
+          logs: [...state.jobState.logs, `🔗 Sending links to AI processing... (autoProcessingEnabled: ${autoProcessingEnabled})`]
         } 
       });
 
@@ -1693,6 +2043,23 @@ const ImportButton: React.FC = () => {
         } 
       });
 
+      // SHOW SUCCESS TOAST
+      // Record upload history
+      const historyTimestamp = new Date().toISOString();
+      const historyLinks = selectedLinks.map(orig => {
+        const proc = result.processedLinks.find((pl: BulkLink) => pl.url === orig.url) || {} as Partial<BulkLink>;
+        return {
+          ...orig,
+          title: proc.title || orig.title,
+          notes: proc.notes || orig.notes,
+          predictedTags: proc.predictedTags || orig.predictedTags,
+          predictedFolder: proc.predictedFolder || orig.predictedFolder,
+          status: proc.status || orig.status,
+          error: proc.error
+        };
+      });
+      dispatch({ type: 'ADD_HISTORY', payload: { timestamp: historyTimestamp, links: historyLinks } });
+
       // Show success toast
       const successMessage = `✅ ${result.totalSuccessful} links processed successfully`;
       const failureMessage = result.totalFailed > 0 ? ` · ${result.totalFailed} failed` : '';
@@ -1701,11 +2068,11 @@ const ImportButton: React.FC = () => {
         action: {
           label: 'View Details',
           onClick: () => {
-            // Could open a detailed report modal
             console.log('Full processing result:', result);
           }
         }
       });
+      
 
     } catch (error) {
       console.error('Bulk import error:', error);
@@ -1739,6 +2106,8 @@ const ImportButton: React.FC = () => {
       });
 
       toast.error(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Clear links after failed import to reset state
+      dispatch({ type: 'SET_LINKS', payload: [] });
     }
   };
 
@@ -1789,37 +2158,93 @@ const BulkUploaderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       logs: [],
     },
     hasUnsavedChanges: false,
+    history: [],
   });
 
-  // Load preferences from localStorage
+  // Load preferences from Supabase MCP API
   useEffect(() => {
-    const savedPrefs = localStorage.getItem('bulkUploaderPrefs');
-    if (savedPrefs) {
+    const loadPreferences = async () => {
       try {
-        const parsed = JSON.parse(savedPrefs);
-        dispatch({ type: 'SET_PREFS', payload: parsed });
+        console.log('🔍 Loading bulk uploader preferences from Supabase MCP...');
+        const response = await fetch('/api/save?table=bookmarks&title=Bulk Uploader Preferences');
+        const result = await response.json();
         
-        // Apply defaults from preferences
-        dispatch({
-          type: 'SET_CURRENT_SETTINGS',
-          payload: {
-            batchSize: parsed.defaultBatchSize || 20,
-            privacy: parsed.privacyDefault || 'private',
-            autoCategorize: parsed.autoCategorizeDefault ?? true,
-            autoPriority: parsed.autoPriorityDefault ?? true,
-            duplicateHandling: parsed.duplicateHandling || 'autoMerge',
-            backgroundMode: parsed.backgroundModeDefault ?? true,
-          },
-        });
+        if (result.success && result.data.found) {
+          console.log('✅ Loaded saved preferences:', result.data.settings);
+          const parsed = result.data.settings;
+          // Merge saved prefs with default presets to ensure presets are always available
+          const mergedPrefs = {
+            ...defaultPrefs,
+            ...parsed,
+            presets: {
+              ...defaultPrefs.presets, // Always include default presets
+              ...parsed.presets // Add any custom presets
+            }
+          };
+          dispatch({ type: 'SET_PREFS', payload: mergedPrefs });
+          console.log('🎯 Loaded presets:', Object.keys(mergedPrefs.presets));
+          
+          // Apply defaults from preferences
+          dispatch({
+            type: 'SET_CURRENT_SETTINGS',
+            payload: {
+              batchSize: parsed.defaultBatchSize || 20,
+              privacy: parsed.privacyDefault || 'private',
+              autoCategorize: parsed.autoCategorizeDefault ?? true,
+              autoPriority: parsed.autoPriorityDefault ?? true,
+              duplicateHandling: parsed.duplicateHandling || 'autoMerge',
+              backgroundMode: parsed.backgroundModeDefault ?? true,
+            },
+          });
+        } else {
+          console.log('📭 No saved preferences found, using defaults with presets');
+          // No saved preferences, ensure we have default presets
+          dispatch({ type: 'SET_PREFS', payload: defaultPrefs });
+          console.log('🎯 Default presets available:', Object.keys(defaultPrefs.presets));
+        }
       } catch (error) {
-        console.error('Failed to load preferences:', error);
+        console.error('❌ Failed to load preferences from Supabase MCP:', error);
+        // If loading fails, ensure we have default presets
+        dispatch({ type: 'SET_PREFS', payload: defaultPrefs });
+        console.log('🎯 Fallback to default presets:', Object.keys(defaultPrefs.presets));
       }
-    }
+    };
+    
+    loadPreferences();
   }, []);
 
-  // Save preferences to localStorage when they change
+  // Save preferences to Supabase MCP when they change
   useEffect(() => {
-    localStorage.setItem('bulkUploaderPrefs', JSON.stringify(state.prefs));
+    const savePreferences = async () => {
+      try {
+        console.log('💾 Saving bulk uploader preferences to Supabase MCP...');
+        const response = await fetch('/api/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            table: 'bookmarks',
+            title: 'Bulk Uploader Preferences',
+            data: state.prefs
+          })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ Preferences saved to Supabase MCP successfully');
+        } else {
+          console.error('❌ Failed to save preferences:', result.error);
+        }
+      } catch (error) {
+        console.error('❌ Error saving preferences to Supabase MCP:', error);
+      }
+    };
+    
+    // Only save if we have actual preferences (not initial empty state)
+    if (Object.keys(state.prefs.presets).length > 0) {
+      savePreferences();
+    }
   }, [state.prefs]);
 
   return (
@@ -1874,8 +2299,36 @@ export default function BulkUploaderPage() {
         </div>
 
         <UploadSummary />
+        
+        {/* Upload History Panel */}
+        <UploadHistory />
         <ProgressDonut />
       </div>
     </BulkUploaderProvider>
   );
 } 
+
+// Add UploadHistory component
+const UploadHistory: React.FC = () => {
+  const { state } = useBulkUploaderPrefs();
+  if (state.history.length === 0) return null;
+  return (
+    <Card className="mt-8">
+      <CardHeader>
+        <CardTitle>Upload History</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {state.history.map(entry => (
+          <div key={entry.timestamp} className="mb-4">
+            <h4 className="text-sm font-medium">{new Date(entry.timestamp).toLocaleString()}</h4>
+            <ul className="list-disc list-inside text-xs">
+              {entry.links.map(link => (
+                <li key={link.id}>{link.url} - {link.priority}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+};

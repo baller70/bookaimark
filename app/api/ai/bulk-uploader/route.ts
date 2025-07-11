@@ -126,6 +126,33 @@ const validateUrl = (url: string): boolean => {
   }
 };
 
+// Helper function to safely parse AI JSON responses
+const parseAIResponse = (content: string): any => {
+  try {
+    // First try direct JSON parsing
+    return JSON.parse(content);
+  } catch (error) {
+    try {
+      // Try to extract JSON from markdown code blocks
+      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[1]);
+      }
+      
+      // Try to find JSON object in the content
+      const objectMatch = content.match(/\{[\s\S]*\}/);
+      if (objectMatch) {
+        return JSON.parse(objectMatch[0]);
+      }
+      
+      throw new Error('No valid JSON found in response');
+    } catch (parseError) {
+      console.warn('Failed to parse AI response:', content.substring(0, 200));
+      return {};
+    }
+  }
+};
+
 const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings): Promise<{ tags: string[]; folder: string }> => {
   const hostname = new URL(url).hostname.toLowerCase();
   
@@ -173,7 +200,7 @@ const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings)
             - Consider the domain, path, and URL structure
             - Tags should be lowercase, single words or short phrases
             - Folder should be a clear category name
-            - Respond in JSON format: {"tags": ["tag1", "tag2"], "folder": "FolderName"}
+            - Respond ONLY with valid JSON: {"tags": ["tag1", "tag2"], "folder": "FolderName"}
             
             Language preference: ${settings.language || 'english'}`
           },
@@ -186,7 +213,7 @@ const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings)
         temperature: 0.3,
       });
 
-      const aiResult = JSON.parse(aiResponse.choices[0].message.content || '{}');
+      const aiResult = parseAIResponse(aiResponse.choices[0].message.content || '{}');
       if (aiResult.tags && Array.isArray(aiResult.tags)) {
         tags = [...new Set([...tags, ...aiResult.tags])];
       }
@@ -366,7 +393,7 @@ export async function POST(request: NextRequest) {
 
         // Use file-based storage with user ID from query parameters or default
         const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('user_id') || '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f';
+        const userId = searchParams.get('user_id') || 'dev-user-123';
         
         console.log('🚀 FILE STORAGE MODE: Using file-based storage for user:', userId);
         
