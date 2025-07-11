@@ -95,6 +95,18 @@ interface HistoryEntry {
   results: { [key in HealthStatus]: number };
 }
 
+interface ValidationSummary {
+  totalLinks: number;
+  checkedLinks: number;
+  okLinks: number;
+  brokenLinks: number;
+  redirectLinks: number;
+  timeoutLinks: number;
+  phishingLinks: number;
+  lastRunAt?: string;
+  nextRunAt?: string;
+}
+
 // Default preferences
 const defaultPrefs: LinkValidatorPrefs = {
   scope: 'all',
@@ -428,7 +440,36 @@ const ScopePanel: React.FC = () => {
         console.log('📁 Categories fetch status:', resCats.status, resCats.statusText);
         const catsData = await resCats.json();
         console.log('📁 Categories response:', catsData);
-        setCategories(catsData.categories || []);
+        
+        // If no categories exist, create some sample ones for testing
+        if (catsData.categories && catsData.categories.length === 0) {
+          console.log('📝 No categories found, creating sample categories...');
+          const sampleCategories = [
+            { name: 'Work', description: 'Work-related bookmarks', color: '#3B82F6' },
+            { name: 'Personal', description: 'Personal bookmarks', color: '#10B981' },
+            { name: 'Research', description: 'Research and learning', color: '#8B5CF6' },
+          ];
+          
+          for (const cat of sampleCategories) {
+            try {
+              await fetch('/api/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...cat, user_id: userId })
+              });
+            } catch (error) {
+              console.log('Failed to create sample category:', cat.name, error);
+            }
+          }
+          
+          // Refetch categories after creating samples
+          const resCatsRefresh = await fetch(`/api/categories?user_id=${userId}`);
+          const catsDataRefresh = await resCatsRefresh.json();
+          setCategories(catsDataRefresh.categories || []);
+        } else {
+          setCategories(catsData.categories || []);
+        }
+        
         const resBms = await fetch(`/api/bookmarks?user_id=${userId}`);
         console.log('📚 Bookmarks fetch status:', resBms.status, resBms.statusText);
         const bmsData = await resBms.json();
@@ -950,6 +991,94 @@ const ChartsSidebar: React.FC = () => {
   );
 };
 
+const ValidationSummary: React.FC = () => {
+  const { state } = useLinkValidator();
+
+  const summary: ValidationSummary = useMemo(() => {
+    const results = state.results;
+    const counts = {
+      ok: results.filter(r => r.status === 'ok').length,
+      broken: results.filter(r => r.status === 'broken').length,
+      redirect: results.filter(r => r.status === 'redirect').length,
+      timeout: results.filter(r => r.status === 'timeout').length,
+      phishing: results.filter(r => r.status === 'phishing').length,
+    };
+    
+    return {
+      totalLinks: results.length,
+      checkedLinks: results.length,
+      okLinks: counts.ok,
+      brokenLinks: counts.broken,
+      redirectLinks: counts.redirect,
+      timeoutLinks: counts.timeout,
+      phishingLinks: counts.phishing,
+      lastRunAt: state.prefs.lastRunAt,
+    };
+  }, [state.results, state.prefs.lastRunAt]);
+
+  const stats = [
+    { label: 'Total Links', value: summary.totalLinks, icon: Globe, color: 'text-blue-600' },
+    { label: 'Healthy', value: summary.okLinks, icon: CheckCircle, color: 'text-green-600' },
+    { label: 'Broken', value: summary.brokenLinks, icon: XCircle, color: 'text-red-600' },
+    { label: 'Redirects', value: summary.redirectLinks, icon: ArrowRight, color: 'text-yellow-600' },
+    { label: 'Timeouts', value: summary.timeoutLinks, icon: Clock, color: 'text-orange-600' },
+    { label: 'Phishing', value: summary.phishingLinks, icon: AlertCircle, color: 'text-red-800' },
+  ];
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <ShieldCheck className="h-5 w-5 mr-2" />
+          Validation Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+          {stats.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <div key={index} className="text-center p-3 bg-gray-50 rounded-lg">
+                <Icon className={`h-6 w-6 mx-auto mb-1 ${stat.color}`} />
+                <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                <div className="text-sm text-gray-600">{stat.label}</div>
+              </div>
+            );
+          })}
+        </div>
+        
+        {summary.lastRunAt && (
+          <div className="text-sm text-gray-600">
+            Last validation: {formatTimeAgo(summary.lastRunAt)}
+          </div>
+        )}
+        
+        {state.history.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Recent Validations</h4>
+            <div className="space-y-2">
+              {state.history.slice(0, 3).map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <div className="flex items-center space-x-2">
+                    <History className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm">{formatTimeAgo(entry.runAt)}</span>
+                    <span className="text-xs text-gray-500">({entry.scope})</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <span className="text-green-600">{entry.results.ok || 0} OK</span>
+                    <span className="text-red-600">{entry.results.broken || 0} broken</span>
+                    <span className="text-yellow-600">{entry.results.redirect || 0} redirects</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const ScanButton: React.FC = () => {
   const { state, dispatch } = useLinkValidator();
 
@@ -994,6 +1123,7 @@ const ScanButton: React.FC = () => {
     // Record history
     const historyEntry: HistoryEntry = { id: generateId(), runAt: new Date().toISOString(), scope: state.prefs.scope, totalChecked: totalLinks, results: results.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<HealthStatus, number>) };
     dispatch({ type: 'ADD_HISTORY_ENTRY', payload: historyEntry });
+    // Update last run time in preferences
     dispatch({ type: 'SET_PREFS', payload: { lastRunAt: new Date().toISOString() } });
     // Notify user
     const brokenCount = results.filter(r => r.status === 'broken').length;
@@ -1105,6 +1235,7 @@ export default function LinkValidatorPage() {
         </div>
 
         <UnsavedChangesBar />
+        <ValidationSummary />
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Main Content */}
@@ -1124,6 +1255,7 @@ export default function LinkValidatorPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             <ChartsSidebar />
+            <ValidationSummary />
           </div>
         </div>
 
