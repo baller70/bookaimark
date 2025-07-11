@@ -53,7 +53,6 @@ import {
   Filter
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis } from 'recharts';
-import { supabase } from '@/lib/supabase'
 import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
 
 // Types
@@ -419,24 +418,25 @@ const ScopePanel: React.FC = () => {
 
   useEffect(() => {
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        try {
-          console.log('🔍 Fetching categories and bookmarks for user:', user.id);
-          const resCats = await fetch(`/api/categories?user_id=${user.id}`);
-          const catsData = await resCats.json();
-          console.log('📁 Categories response:', catsData);
-          setCategories(catsData.categories || []);
-          const resBms = await fetch(`/api/bookmarks?user_id=${user.id}`);
-          const bmsData = await resBms.json();
-          console.log('📚 Bookmarks response:', bmsData);
-          setBookmarks(bmsData.bookmarks || []);
-          console.log('✅ Final state - categories:', catsData.categories?.length || 0, 'bookmarks:', bmsData.bookmarks?.length || 0);
-        } catch (error) {
-          console.error('Failed to load categories or bookmarks:', error);
-        }
+      console.log('🚀 ScopePanel useEffect starting...');
+      // Temporary: hardcode user ID for testing
+      const userId = 'dev-user-123';
+      console.log('👤 Using hardcoded user ID:', userId);
+      try {
+        console.log('🔍 Fetching categories and bookmarks for user:', userId);
+        const resCats = await fetch(`/api/categories?user_id=${userId}`);
+        console.log('📁 Categories fetch status:', resCats.status, resCats.statusText);
+        const catsData = await resCats.json();
+        console.log('📁 Categories response:', catsData);
+        setCategories(catsData.categories || []);
+        const resBms = await fetch(`/api/bookmarks?user_id=${userId}`);
+        console.log('📚 Bookmarks fetch status:', resBms.status, resBms.statusText);
+        const bmsData = await resBms.json();
+        console.log('📚 Bookmarks response:', bmsData);
+        setBookmarks(bmsData.bookmarks || []);
+        console.log('✅ Final state - categories:', catsData.categories?.length || 0, 'bookmarks:', bmsData.bookmarks?.length || 0);
+      } catch (error) {
+        console.error('Failed to load categories or bookmarks:', error);
       }
     })();
   }, []);
@@ -444,6 +444,9 @@ const ScopePanel: React.FC = () => {
   const handleScopeChange = (scope: 'all' | 'selected') => {
     dispatch({ type: 'SET_PREFS', payload: { scope } });
   };
+
+  // Debug logging
+  console.log('🎯 ScopePanel render - categories:', categories.length, 'bookmarks:', bookmarks.length);
 
   return (
     <Card>
@@ -485,7 +488,6 @@ const ScopePanel: React.FC = () => {
                 <SelectValue placeholder="Choose folders and bookmarks..." />
               </SelectTrigger>
               <SelectContent>
-                {console.log('🎯 Rendering dropdown with categories:', categories.length, 'bookmarks:', bookmarks.length)}
                 {categories.map(cat => (
                   <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                 ))}
@@ -953,13 +955,13 @@ const ScanButton: React.FC = () => {
 
   const handleScan = async () => {
     // Load user information
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error('Please sign in to validate links');
-      return;
-    }
+    // const { data: { user } } = await supabase.auth.getUser(); // Removed Supabase dependency
+    // if (!user) {
+    //   toast.error('Please sign in to validate links');
+    //   return;
+    // }
     // Fetch user bookmarks
-    const response = await fetch(`/api/bookmarks?user_id=${user.id}`);
+    const response = await fetch(`/api/bookmarks?user_id=${'dev-user-123'}`); // Hardcoded user ID
     const json = await response.json();
     const savedBookmarks = Array.isArray(json.data) ? json.data : [];
     const bookmarksList = savedBookmarks.map((b: any) => ({ id: b.id, url: b.url, title: b.title || b.url }));
@@ -1046,46 +1048,40 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Load preferences from localStorage on mount
   useEffect(() => {
     ;(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        try {
-          const remoteRaw = await getAISetting(user.id, 'link_validator')
-          // Map remote settings to local preferences
-          dispatch({
-            type: 'SET_PREFS',
-            payload: {
-              schedule: remoteRaw.check_frequency,
-              autoMoveBroken: remoteRaw.auto_remove_broken,
-              emailSummary: remoteRaw.notify_on_broken,
-            },
-          })
-          dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false })
-        } catch (error) {
-          console.error('Failed to load link validator settings:', error)
-        }
+      // Temporary: hardcode user ID for testing
+      const userId = 'dev-user-123';
+      try {
+        const remoteRaw = await getAISetting(userId, 'link_validator')
+        // Map remote settings to local preferences
+        dispatch({
+          type: 'SET_PREFS',
+          payload: {
+            schedule: remoteRaw.check_frequency,
+            autoMoveBroken: remoteRaw.auto_remove_broken,
+            emailSummary: remoteRaw.notify_on_broken,
+          },
+        })
+        dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false })
+      } catch (error) {
+        console.error('Failed to load link validator settings:', error)
       }
     })()
   }, [])
 
   const savePreferences = async (prefs: LinkValidatorPrefs) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (user) {
-      try {
-        // Map local preferences to remote settings structure
-        await saveAISetting(user.id, 'link_validator', {
-          check_frequency: prefs.schedule,
-          auto_remove_broken: prefs.autoMoveBroken,
-          notify_on_broken: prefs.emailSummary,
-        })
-        toast.success('Link validator preferences saved')
-      } catch (error) {
-        console.error('Failed to save link validator preferences:', error)
-        toast.error('Failed to save preferences')
-      }
+    // Temporary: hardcode user ID for testing
+    const userId = 'dev-user-123';
+    try {
+      // Map local preferences to remote settings structure
+      await saveAISetting(userId, 'link_validator', {
+        check_frequency: prefs.schedule,
+        auto_remove_broken: prefs.autoMoveBroken,
+        notify_on_broken: prefs.emailSummary,
+      })
+      toast.success('Settings saved successfully!')
+    } catch (error) {
+      console.error('Failed to save link validator settings:', error)
+      toast.error('Failed to save settings')
     }
   }
 
