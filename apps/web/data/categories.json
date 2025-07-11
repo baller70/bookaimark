@@ -1,0 +1,22 @@
+[
+  {
+    "id": "1752190975977",
+    "name": "Test Category",
+    "description": "A test category",
+    "color": "#3B82F6",
+    "user_id": "dev-user-123",
+    "bookmarkCount": 0,
+    "createdAt": "2025-07-10T23:42:55.977Z",
+    "updatedAt": "2025-07-10T23:42:55.977Z"
+  },
+  {
+    "id": "1752191186306",
+    "name": "LLM Models",
+    "description": "AI and Machine Learning Models",
+    "color": "#8B5CF6",
+    "user_id": "dev-user-123",
+    "bookmarkCount": 0,
+    "createdAt": "2025-07-10T23:46:26.306Z",
+    "updatedAt": "2025-07-10T23:46:26.306Z"
+  }
+]

@@ -132,86 +132,122 @@ export function useAnalytics(bookmarks: any[]) {
     topPerformer: null
   })
   const [isLoading, setIsLoading] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  
+  // Circuit breaker state to prevent infinite loops
+  const [failureCount, setFailureCount] = useState(0)
+  const [lastFailureTime, setLastFailureTime] = useState<number | null>(null)
+  const MAX_FAILURES = 3
+  const FAILURE_RESET_TIME = 60000 // 1 minute
 
-  // Calculate usage percentage based on visits
+  // Helper function to calculate usage percentage
   const calculateUsagePercentage = useCallback((visits: number, totalVisits: number) => {
     if (totalVisits === 0) return 0
-    return Math.min(Math.round((visits / totalVisits) * 100), 100)
+    return Math.round((visits / totalVisits) * 100)
   }, [])
 
-  // Calculate trend direction
-  const calculateTrend = useCallback((current: number, previous: number) => {
-    if (current > previous) return 'up'
-    if (current < previous) return 'down'
+  // Helper function to calculate trend direction
+  const calculateTrend = useCallback((currentVisits: number, weeklyVisits: number) => {
+    if (weeklyVisits === 0) return 'stable'
+    if (currentVisits > weeklyVisits * 1.2) return 'up'
+    if (currentVisits < weeklyVisits * 0.8) return 'down'
     return 'stable'
   }, [])
 
+  // Check if circuit breaker should prevent API calls
+  const shouldSkipApiCall = useCallback(() => {
+    if (failureCount < MAX_FAILURES) return false
+    
+    const now = Date.now()
+    if (lastFailureTime && (now - lastFailureTime) > FAILURE_RESET_TIME) {
+      // Reset failure count after timeout
+      setFailureCount(0)
+      setLastFailureTime(null)
+      return false
+    }
+    
+    return failureCount >= MAX_FAILURES
+  }, [failureCount, lastFailureTime])
+
   // Load initial analytics data
   const loadAnalytics = useCallback(async () => {
+    if (shouldSkipApiCall()) {
+      console.log('⚠️ Analytics API calls temporarily disabled due to repeated failures')
+      return
+    }
+
     setIsLoading(true)
     try {
       const response = await fetch('/api/analytics')
-      if (response.ok) {
-        const data = await response.json()
-        const analyticsMap = new Map<number, BookmarkAnalytics>()
-        
-        // Process analytics data
-        let totalVisits = 0
-        let maxVisits = 0
-        let topBookmarkId = null
-        
-        bookmarks.forEach(bookmark => {
-          const analytics = data.bookmarks?.[bookmark.id] || {
-            visits: bookmark.visits || 0,
-            timeSpent: 0,
-            sessionCount: 0,
-            weeklyVisits: 0,
-            monthlyVisits: 0
-          }
-          
-          totalVisits += analytics.visits
-          
-          if (analytics.visits > maxVisits) {
-            maxVisits = analytics.visits
-            topBookmarkId = bookmark.id
-          }
-          
-          analyticsMap.set(bookmark.id, {
-            id: bookmark.id,
-            visits: analytics.visits,
-            timeSpent: analytics.timeSpent,
-            sessionCount: analytics.sessionCount,
-            weeklyVisits: analytics.weeklyVisits,
-            monthlyVisits: analytics.monthlyVisits,
-            usagePercentage: calculateUsagePercentage(analytics.visits, totalVisits || 1),
-            lastVisited: analytics.lastVisited || new Date().toISOString(),
-            isActive: analytics.visits > 0,
-            trendDirection: calculateTrend(analytics.visits, analytics.weeklyVisits)
-          })
-        })
-        
-        // Update usage percentages after calculating total visits
-        analyticsMap.forEach((analytics, id) => {
-          analytics.usagePercentage = calculateUsagePercentage(analytics.visits, totalVisits || 1)
-        })
-        
-        setAnalyticsData(analyticsMap)
-        setGlobalStats({
-          totalVisits,
-          totalBookmarks: bookmarks.length,
-          avgUsage: totalVisits / (bookmarks.length || 1),
-          activeBookmarks: Array.from(analyticsMap.values()).filter(a => a.isActive).length,
-          topPerformer: topBookmarkId
-        })
-        setLastUpdated(new Date())
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
+      const data = await response.json()
+      const analyticsMap = new Map<number, BookmarkAnalytics>()
+      
+      // Process analytics data
+      let totalVisits = 0
+      let maxVisits = 0
+      let topBookmarkId = null
+      
+      bookmarks.forEach(bookmark => {
+        const analytics = data.bookmarks?.[bookmark.id] || {
+          visits: bookmark.visits || 0,
+          timeSpent: 0,
+          sessionCount: 0,
+          weeklyVisits: 0,
+          monthlyVisits: 0
+        }
+        
+        totalVisits += analytics.visits
+        
+        if (analytics.visits > maxVisits) {
+          maxVisits = analytics.visits
+          topBookmarkId = bookmark.id
+        }
+        
+        analyticsMap.set(bookmark.id, {
+          id: bookmark.id,
+          visits: analytics.visits,
+          timeSpent: analytics.timeSpent,
+          sessionCount: analytics.sessionCount,
+          weeklyVisits: analytics.weeklyVisits,
+          monthlyVisits: analytics.monthlyVisits,
+          usagePercentage: calculateUsagePercentage(analytics.visits, totalVisits || 1),
+          lastVisited: analytics.lastVisited || new Date().toISOString(),
+          isActive: analytics.visits > 0,
+          trendDirection: calculateTrend(analytics.visits, analytics.weeklyVisits)
+        })
+      })
+      
+      // Update usage percentages after calculating total visits
+      analyticsMap.forEach((analytics, id) => {
+        analytics.usagePercentage = calculateUsagePercentage(analytics.visits, totalVisits || 1)
+      })
+      
+      setAnalyticsData(analyticsMap)
+      setGlobalStats({
+        totalVisits,
+        totalBookmarks: bookmarks.length,
+        avgUsage: totalVisits / (bookmarks.length || 1),
+        activeBookmarks: Array.from(analyticsMap.values()).filter(a => a.isActive).length,
+        topPerformer: topBookmarkId
+      })
+      setLastUpdated(new Date())
+      
+      // Reset failure count on success
+      setFailureCount(0)
+      setLastFailureTime(null)
     } catch (error) {
       console.error('Failed to load analytics:', error)
+      
+      // Increment failure count and record failure time
+      setFailureCount(prev => prev + 1)
+      setLastFailureTime(Date.now())
     } finally {
       setIsLoading(false)
     }
-  }, [bookmarks, calculateUsagePercentage, calculateTrend])
+  }, [bookmarks, calculateUsagePercentage, calculateTrend, shouldSkipApiCall])
 
   // Track a visit and update analytics in real-time
   const trackVisit = useCallback(async (bookmarkId: number) => {
@@ -277,13 +313,20 @@ export function useAnalytics(bookmarks: any[]) {
 
   // Setup real-time updates
   useEffect(() => {
-    loadAnalytics()
+    // Only load analytics if we have bookmarks
+    if (bookmarks.length > 0) {
+      loadAnalytics()
+    }
     
     // Set up polling for real-time updates every 30 seconds
-    const interval = setInterval(loadAnalytics, 30000)
+    const interval = setInterval(() => {
+      if (bookmarks.length > 0) {
+        loadAnalytics()
+      }
+    }, 30000)
     
     return () => clearInterval(interval)
-  }, [loadAnalytics])
+  }, [bookmarks.length]) // Only depend on bookmarks.length, not the entire bookmarks array or loadAnalytics function
 
   return {
     analyticsData,

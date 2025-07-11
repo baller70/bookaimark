@@ -155,9 +155,7 @@ const InfinityBoardBackground = ({ isActive }: { isActive: boolean }) => {
   const [nodes] = useNodesState([]);
   const [edges] = useEdgesState([]);
 
-  if (!isActive) return null;
-
-  return (
+  return isActive ? (
     <ReactFlowProvider>
       <ReactFlow
         nodes={nodes}
@@ -181,23 +179,23 @@ const InfinityBoardBackground = ({ isActive }: { isActive: boolean }) => {
         <Controls position="bottom-right" />
       </ReactFlow>
     </ReactFlowProvider>
-  );
+  ) : null;
 };
 
 // HIERARCHY Infinity Board with Full Editing Capabilities - DEFINITIVE SOLUTION
-const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, onOpenDetail, isActive }: {
+const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, onOpenDetail, isActive, folderAssignments, onHierarchyAssignmentsChange }: {
   folders: any[];
   bookmarks: any[];
   onCreateFolder: () => void;
   onAddBookmark: () => void;
   onOpenDetail: (bookmark: any) => void;
   isActive: boolean;
+  folderAssignments: FolderHierarchyAssignment[];
+  onHierarchyAssignmentsChange: (assignments: FolderHierarchyAssignment[]) => void;
 }) => {
   const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 });
   
-  if (!isActive) return null;
-  
-  return (
+  return isActive ? (
     <div className="relative w-full min-h-screen overflow-auto">
       {/* Background Layer: React Flow for infinity board only */}
       <div className="absolute inset-0 w-full h-full pointer-events-none">
@@ -266,12 +264,14 @@ const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, 
               onFolderNavigate={() => {}}
               selectedFolder={null}
               onAddBookmark={onAddBookmark}
+              hierarchyAssignments={folderAssignments}
+              onHierarchyAssignmentsChange={onHierarchyAssignmentsChange}
             />
           </div>
         </div>
       </div>
     </div>
-  );
+  ) : null;
 };
 
 // Client-only wrapper to prevent hydration mismatches
@@ -351,45 +351,11 @@ export default function Dashboard() {
   const [arpCurrentStep, setArpCurrentStep] = useState(0);
   const [arpShowAllSteps, setArpShowAllSteps] = useState(false);
 
-  // State for mock folders used in Folder 2.0 and Goal 2.0 views
-  const [mockFolders, setMockFolders] = useState([
-    {
-      id: '1',
-      name: 'Development',
-      description: 'All development related bookmarks and resources',
-      color: '#3b82f6'
-    },
-    {
-      id: '2', 
-      name: 'Design',
-      description: 'Design tools, inspiration, and creative resources',
-      color: '#ef4444'
-    },
-    {
-      id: '3',
-      name: 'Productivity',
-      description: 'Tools and apps to boost productivity',
-      color: '#10b981'
-    },
-    {
-      id: '4',
-      name: 'Entertainment',
-      description: 'Fun and entertainment websites',
-      color: '#8b5cf6'
-    },
-    {
-      id: '5',
-      name: 'Social',
-      description: 'Social media and networking platforms',
-      color: '#f59e0b'
-    },
-    {
-      id: '6',
-      name: 'Education',
-      description: 'Learning resources and educational content',
-      color: '#06b6d4'
-    }
-  ]);
+  // Dynamic folders based on real bookmark categories
+  const [dynamicFolders, setDynamicFolders] = useState<any[]>([]);
+  
+  // State for opened folder in Folder 2.0
+  const [openedFolder, setOpenedFolder] = useState<any>(null);
 
   const [mockGoalFolders, setMockGoalFolders] = useState([
     {
@@ -587,6 +553,40 @@ export default function Dashboard() {
       return [...prev, ...missing];
     });
   }, [bookmarks]);
+
+  // Generate dynamic folders from dedicated categories API
+  useEffect(() => {
+    const loadDynamicFolders = async () => {
+      try {
+        // Fetch categories from the dedicated categories API
+        const response = await fetch('/api/categories?user_id=dev-user-123');
+        const data = await response.json();
+        
+        if (data.success && data.categories) {
+          // Convert categories to folder format
+          const folders = data.categories.map((category: any) => ({
+            id: `folder-${category.id}`,
+            name: category.name,
+            description: category.description,
+            color: category.color,
+            bookmarkCount: category.bookmarkCount
+          }));
+          
+          setDynamicFolders(folders);
+          console.log('📁 Loaded dynamic folders from categories API:', folders);
+        } else {
+          console.log('⚠️ No categories found, using empty folders');
+          setDynamicFolders([]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading dynamic folders:', error);
+        // Fallback to empty folders
+        setDynamicFolders([]);
+      }
+    };
+
+    loadDynamicFolders();
+  }, []); // Load once on component mount
 
   // Reset compact view mode when switching away from compact/list view
   useEffect(() => {
@@ -823,6 +823,64 @@ export default function Dashboard() {
   useEffect(() => {
     setBookmarks(prev => prev.map(b => ({ ...b, tags: Array.isArray(b.tags) ? b.tags : [] })))
   }, [])
+
+  // Load hierarchy assignments from API - MOVED TO TOP TO FIX HOOKS ORDER
+  useEffect(() => {
+    const loadHierarchyAssignments = async () => {
+      try {
+        const response = await fetch(`/api/hierarchy?user_id=${userId}`);
+        const data = await response.json();
+        
+        if (data.success && data.assignments) {
+          setFolderAssignments(data.assignments);
+          console.log('✅ Loaded hierarchy assignments:', data.assignments);
+        } else {
+          console.log('📁 No hierarchy assignments found, using empty array');
+          setFolderAssignments([]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading hierarchy assignments:', error);
+        setFolderAssignments([]);
+      }
+    };
+
+    loadHierarchyAssignments();
+  }, [userId]);
+
+  // Save hierarchy assignments to API - MOVED UP TO FIX HOOKS ORDER
+  const saveHierarchyAssignments = async (assignments: FolderHierarchyAssignment[]) => {
+    try {
+      const response = await fetch('/api/hierarchy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignments,
+          user_id: userId
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ Hierarchy assignments saved successfully');
+        showNotification('Hierarchy assignments saved!');
+      } else {
+        console.error('❌ Failed to save hierarchy assignments:', data.error);
+        showNotification('Failed to save hierarchy assignments');
+      }
+    } catch (error) {
+      console.error('❌ Error saving hierarchy assignments:', error);
+      showNotification('Error saving hierarchy assignments');
+    }
+  };
+
+  // Handle hierarchy assignments change with persistence - MOVED UP TO FIX HOOKS ORDER
+  const handleHierarchyAssignmentsChange = (assignments: FolderHierarchyAssignment[]) => {
+    setFolderAssignments(assignments);
+    saveHierarchyAssignments(assignments);
+  };
 
   // Create folders for hierarchy after bookmarks are loaded
   const foldersForHierarchyV1 = useMemo(() => {
@@ -1525,14 +1583,14 @@ export default function Dashboard() {
         }
       }
 
-      // Handle mockFolders reordering (Folder 2.0)
-      const activeFolderIndex = mockFolders.findIndex((item) => item.id === active.id)
-      const overFolderIndex = mockFolders.findIndex((item) => item.id === over.id)
-      
-      if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
-        setMockFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
-        return
-      }
+          // Handle dynamicFolders reordering (Folder 2.0)
+    const activeFolderIndex = dynamicFolders.findIndex((item) => item.id === active.id)
+    const overFolderIndex = dynamicFolders.findIndex((item) => item.id === over.id)
+    
+    if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
+      setDynamicFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
+      return
+    }
 
       // Handle category folder reordering for Compact & List folder views
       if ((viewMode === 'compact' || viewMode === 'list') && compactViewMode === 'folders') {
@@ -3577,6 +3635,8 @@ export default function Dashboard() {
                   onAddBookmark={() => setShowAddBookmark(true)}
                   onOpenDetail={handleBookmarkClick}
                   isActive={true}
+                  folderAssignments={folderAssignments}
+                  onHierarchyAssignmentsChange={handleHierarchyAssignmentsChange}
                 />
               </div>
             </DndContext>
@@ -3609,45 +3669,103 @@ export default function Dashboard() {
 
         return (
           <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Folder 2.0</h2>
-              <p className="text-gray-600">Advanced folder management with drag-and-drop functionality</p>
-            </div>
-            
-            <ClientOnlyDndProvider>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext items={mockFolders.map(f => f.id)} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 density-gap">
-                    {mockFolders.map((folder) => {
-                      const folderBookmarks = bookmarks.filter(bookmark => 
-                        bookmark.category.toLowerCase() === folder.name.toLowerCase()
-                      );
-                      
-                      return (
-                        <SortableFolderCard2
-                          key={folder.id}
-                          folder={folder}
-                          bookmarkCount={folderBookmarks.length}
-                          onEdit={handleFolderEdit}
-                          onDelete={handleFolderDelete}
-                          onAddBookmark={handleFolderAddBookmark}
-                          onDrop={handleFolderDrop}
-                          onDragOver={handleFolderDragOver}
-                          onClick={() => {
-                            console.log('Folder clicked:', folder);
-                            showNotification(`Opened folder: ${folder.name}`);
-                          }}
-                        />
-                      );
-                    })}
+            {!openedFolder ? (
+              <>
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Folder 2.0</h2>
+                  <p className="text-gray-600">Advanced folder management with drag-and-drop functionality</p>
+                </div>
+                
+                <ClientOnlyDndProvider>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext items={dynamicFolders.map(f => f.id)} strategy={rectSortingStrategy}>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 density-gap">
+                        {dynamicFolders.map((folder) => {
+                          const folderBookmarks = bookmarks.filter(bookmark => 
+                            bookmark.category.toLowerCase() === folder.name.toLowerCase()
+                          );
+                          
+                          return (
+                            <SortableFolderCard2
+                              key={folder.id}
+                              folder={folder}
+                              bookmarkCount={folderBookmarks.length}
+                              onEdit={handleFolderEdit}
+                              onDelete={handleFolderDelete}
+                              onAddBookmark={handleFolderAddBookmark}
+                              onDrop={handleFolderDrop}
+                              onDragOver={handleFolderDragOver}
+                              onClick={() => {
+                                console.log('Folder clicked:', folder);
+                                setOpenedFolder(folder);
+                                showNotification(`Opened folder: ${folder.name}`);
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                </ClientOnlyDndProvider>
+              </>
+            ) : (
+              <>
+                {/* Opened folder view */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <Button
+                        onClick={() => setOpenedFolder(null)}
+                        className="flex items-center space-x-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        <span>Back to Folders</span>
+                      </Button>
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: openedFolder.color }}
+                        >
+                          <FolderIcon className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold text-gray-900">{openedFolder.name}</h2>
+                          <p className="text-gray-600 text-sm">{openedFolder.description}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </SortableContext>
-              </DndContext>
-            </ClientOnlyDndProvider>
+                  
+                  {/* Bookmarks in the opened folder */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {bookmarks
+                      .filter(bookmark => bookmark.category.toLowerCase() === openedFolder.name.toLowerCase())
+                      .map((bookmark) => (
+                        <GridBookmarkCard key={bookmark.id} bookmark={bookmark} />
+                      ))}
+                  </div>
+                  
+                  {bookmarks.filter(bookmark => bookmark.category.toLowerCase() === openedFolder.name.toLowerCase()).length === 0 && (
+                    <div className="text-center py-12">
+                      <FolderIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No bookmarks yet</h3>
+                      <p className="text-gray-600 mb-4">This folder is empty. Add some bookmarks to get started!</p>
+                      <Button
+                        onClick={() => handleFolderAddBookmark(openedFolder.id)}
+                        className="flex items-center space-x-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Add Bookmark</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )
       case 'goal2':
@@ -3812,6 +3930,10 @@ export default function Dashboard() {
   }
 
   const currentChartData = chartData[chartTimePeriod as keyof typeof chartData]
+
+
+
+
 
   return (
     <div className="min-h-screen">

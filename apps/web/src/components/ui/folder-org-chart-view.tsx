@@ -64,6 +64,8 @@ interface FolderOrgChartViewProps {
   onFolderNavigate: (folderId: string | null) => void;
   selectedFolder?: SimpleFolder | null;
   onAddBookmark?: () => void;
+  hierarchyAssignments?: FolderHierarchyAssignment[];
+  onHierarchyAssignmentsChange?: (assignments: FolderHierarchyAssignment[]) => void;
 }
 
 interface HierarchySection {
@@ -92,11 +94,17 @@ export function FolderOrgChartView({
   onFolderNavigate,
   selectedFolder,
   onAddBookmark,
+  hierarchyAssignments: propHierarchyAssignments,
+  onHierarchyAssignmentsChange,
 }: FolderOrgChartViewProps) {
   
   // Hierarchy management state
-  const [hierarchyAssignments, setHierarchyAssignments] = useState<FolderHierarchyAssignment[]>([]);
+  const [internalHierarchyAssignments, setInternalHierarchyAssignments] = useState<FolderHierarchyAssignment[]>([]);
   const [isHierarchyManagerOpen, setIsHierarchyManagerOpen] = useState(false);
+  
+  // Use prop assignments if provided, otherwise use internal state
+  const hierarchyAssignments = propHierarchyAssignments || internalHierarchyAssignments;
+  const setHierarchyAssignments = onHierarchyAssignmentsChange || setInternalHierarchyAssignments;
   const [bookmarkPages, setBookmarkPages] = useState<Record<string, number>>({});
   
   const BOOKMARKS_PER_PAGE = 5;

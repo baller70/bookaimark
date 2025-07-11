@@ -34,6 +34,18 @@ interface Category {
   updatedAt: string
 }
 
+// Available color options for categories
+const colorOptions = [
+  '#3B82F6', // Blue
+  '#8B5CF6', // Purple
+  '#10B981', // Green
+  '#F59E0B', // Orange
+  '#EF4444', // Red
+  '#6B7280', // Gray
+  '#EC4899', // Pink
+  '#14B8A6', // Teal
+]
+
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -46,56 +58,24 @@ export default function CategoriesPage() {
     color: '#3B82F6'
   })
 
-  // Sample data - replace with actual API calls
+  // Load categories from dedicated categories API
   useEffect(() => {
-    const sampleCategories: Category[] = [
-      {
-        id: '1',
-        name: 'Development',
-        description: 'Programming and software development resources',
-        color: '#3B82F6',
-        bookmarkCount: 15,
-        createdAt: '2024-01-15',
-        updatedAt: '2024-01-20'
-      },
-      {
-        id: '2',
-        name: 'Design',
-        description: 'UI/UX design inspiration and tools',
-        color: '#8B5CF6',
-        bookmarkCount: 8,
-        createdAt: '2024-01-10',
-        updatedAt: '2024-01-18'
-      },
-      {
-        id: '3',
-        name: 'Learning',
-        description: 'Educational content and tutorials',
-        color: '#10B981',
-        bookmarkCount: 12,
-        createdAt: '2024-01-05',
-        updatedAt: '2024-01-22'
-      },
-      {
-        id: '4',
-        name: 'Productivity',
-        description: 'Tools and resources for productivity',
-        color: '#F59E0B',
-        bookmarkCount: 6,
-        createdAt: '2024-01-12',
-        updatedAt: '2024-01-19'
-      },
-      {
-        id: '5',
-        name: 'Entertainment',
-        description: 'Fun content and entertainment',
-        color: '#EF4444',
-        bookmarkCount: 3,
-        createdAt: '2024-01-08',
-        updatedAt: '2024-01-16'
+    const loadCategories = async () => {
+      try {
+        const response = await fetch('/api/categories?user_id=dev-user-123');
+        const data = await response.json();
+        
+        if (data.success && data.categories) {
+          setCategories(data.categories);
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        // Fallback to empty array if API fails
+        setCategories([]);
       }
-    ]
-    setCategories(sampleCategories)
+    };
+
+    loadCategories();
   }, [])
 
   const filteredCategories = categories.filter(category =>
@@ -103,7 +83,7 @@ export default function CategoriesPage() {
     category.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleCreateCategory = () => {
+  const handleCreateCategory = async () => {
     if (!newCategory.name.trim()) {
       toast({
         title: "Error",
@@ -113,27 +93,50 @@ export default function CategoriesPage() {
       return
     }
 
-    const category: Category = {
-      id: Date.now().toString(),
-      name: newCategory.name,
-      description: newCategory.description,
-      color: newCategory.color,
-      bookmarkCount: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0]
-    }
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newCategory.name,
+          description: newCategory.description,
+          color: newCategory.color,
+          user_id: 'dev-user-123'
+        }),
+      });
 
-    setCategories([...categories, category])
-    setNewCategory({ name: '', description: '', color: '#3B82F6' })
-    setIsCreateDialogOpen(false)
-    
-    toast({
-      title: "Success",
-      description: "Category created successfully"
-    })
+      if (!response.ok) {
+        throw new Error('Failed to create category');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Add the new category to the local state
+        setCategories([...categories, result.category])
+        setNewCategory({ name: '', description: '', color: '#3B82F6' })
+        setIsCreateDialogOpen(false)
+        
+        toast({
+          title: "Success",
+          description: "Category created successfully"
+        })
+      } else {
+        throw new Error(result.error || 'Failed to create category');
+      }
+    } catch (error) {
+      console.error('Error creating category:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create category. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleEditCategory = () => {
+  const handleEditCategory = async () => {
     if (!editingCategory || !editingCategory.name.trim()) {
       toast({
         title: "Error",
@@ -143,21 +146,52 @@ export default function CategoriesPage() {
       return
     }
 
-    setCategories(categories.map(cat => 
-      cat.id === editingCategory.id 
-        ? { ...editingCategory, updatedAt: new Date().toISOString().split('T')[0] }
-        : cat
-    ))
-    setIsEditDialogOpen(false)
-    setEditingCategory(null)
-    
-    toast({
-      title: "Success",
-      description: "Category updated successfully"
-    })
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingCategory.id,
+          name: editingCategory.name,
+          description: editingCategory.description,
+          color: editingCategory.color,
+          user_id: 'dev-user-123'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update category');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setCategories(categories.map(cat => 
+          cat.id === editingCategory.id ? result.category : cat
+        ))
+        setIsEditDialogOpen(false)
+        setEditingCategory(null)
+        
+        toast({
+          title: "Success",
+          description: "Category updated successfully"
+        })
+      } else {
+        throw new Error(result.error || 'Failed to update category');
+      }
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update category. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleDeleteCategory = (categoryId: string) => {
+  const handleDeleteCategory = async (categoryId: string) => {
     const category = categories.find(cat => cat.id === categoryId)
     if (category && category.bookmarkCount > 0) {
       toast({
@@ -168,22 +202,47 @@ export default function CategoriesPage() {
       return
     }
 
-    setCategories(categories.filter(cat => cat.id !== categoryId))
-    toast({
-      title: "Success",
-      description: "Category deleted successfully"
-    })
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: categoryId,
+          user_id: 'dev-user-123'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete category');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setCategories(categories.filter(cat => cat.id !== categoryId))
+        toast({
+          title: "Success",
+          description: "Category deleted successfully"
+        })
+      } else {
+        throw new Error(result.error || 'Failed to delete category');
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete category. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const openEditDialog = (category: Category) => {
     setEditingCategory({ ...category })
     setIsEditDialogOpen(true)
   }
-
-  const colorOptions = [
-    '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444',
-    '#6366F1', '#EC4899', '#14B8A6', '#F97316', '#84CC16'
-  ]
 
   return (
     <div className="min-h-screen bg-background">

@@ -992,6 +992,40 @@ const SidebarControls: React.FC = () => {
   const { state, dispatch } = useBulkUploaderPrefs();
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  // Load available categories from the dedicated categories API
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setIsLoadingCategories(true);
+        
+        // Fetch categories from the dedicated categories API
+        const response = await fetch('/api/categories?user_id=dev-user-123');
+        const data = await response.json();
+        
+        if (data.success && data.categories) {
+          // Extract category names from the API response
+          const categories = data.categories.map((cat: any) => cat.name).sort();
+          setAvailableCategories(categories);
+          console.log('📁 Loaded categories from categories API:', categories);
+        } else {
+          console.error('❌ Failed to load categories:', data);
+          // Fallback to default categories if API fails
+          setAvailableCategories(['General', 'Work', 'Personal', 'Research']);
+        }
+      } catch (error) {
+        console.error('❌ Error loading categories:', error);
+        // Fallback to default categories
+        setAvailableCategories(['General', 'Work', 'Personal', 'Research']);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []); // Empty dependency array - only load once on component mount
 
   const handleSettingChange = <K extends keyof BulkUploaderState['currentSettings']>(
     key: K,
@@ -1131,14 +1165,19 @@ const SidebarControls: React.FC = () => {
                  onValueChange={(value) => handleSettingChange('forceFolderId', value === 'auto' ? null : value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Auto-categorize" />
+                  <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Auto-categorize"} />
                 </SelectTrigger>
                                  <SelectContent>
                    <SelectItem value="auto">Auto-categorize</SelectItem>
-                   <SelectItem value="general">General</SelectItem>
-                   <SelectItem value="development">Development</SelectItem>
-                   <SelectItem value="articles">Articles</SelectItem>
-                   <SelectItem value="videos">Videos</SelectItem>
+                   {isLoadingCategories ? (
+                     <SelectItem value="loading" disabled>Loading categories...</SelectItem>
+                   ) : (
+                     availableCategories.map((category) => (
+                       <SelectItem key={category} value={category.toLowerCase()}>
+                         {category}
+                       </SelectItem>
+                     ))
+                   )}
                  </SelectContent>
               </Select>
             </div>
@@ -1730,56 +1769,58 @@ const BulkUploaderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [state, dispatch] = useReducer(bulkUploaderReducer, {
     prefs: defaultPrefs,
     currentSettings: {
-      batchSize: defaultPrefs.defaultBatchSize,
+      batchSize: 20,
       extraTag: '',
       forceFolderId: null,
-      privacy: defaultPrefs.privacyDefault,
-      autoCategorize: defaultPrefs.autoCategorizeDefault,
-      autoPriority: defaultPrefs.autoPriorityDefault,
-      duplicateHandling: defaultPrefs.duplicateHandling,
-      backgroundMode: defaultPrefs.backgroundModeDefault
+      privacy: 'private',
+      autoCategorize: true,
+      autoPriority: true,
+      duplicateHandling: 'autoMerge',
+      backgroundMode: true,
     },
     links: [],
-    selectedLinks: new Set<string>(),
+    selectedLinks: new Set(),
     jobState: {
       isRunning: false,
       total: 0,
       completed: 0,
       failed: 0,
       eta: 0,
-      logs: []
+      logs: [],
     },
-    hasUnsavedChanges: false
+    hasUnsavedChanges: false,
   });
 
-  // Load preferences from localStorage on mount
+  // Load preferences from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('bulkUploaderPrefs');
-    if (saved) {
+    const savedPrefs = localStorage.getItem('bulkUploaderPrefs');
+    if (savedPrefs) {
       try {
-        const prefs = JSON.parse(saved);
-        dispatch({ type: 'SET_PREFS', payload: prefs });
+        const parsed = JSON.parse(savedPrefs);
+        dispatch({ type: 'SET_PREFS', payload: parsed });
+        
+        // Apply defaults from preferences
+        dispatch({
+          type: 'SET_CURRENT_SETTINGS',
+          payload: {
+            batchSize: parsed.defaultBatchSize || 20,
+            privacy: parsed.privacyDefault || 'private',
+            autoCategorize: parsed.autoCategorizeDefault ?? true,
+            autoPriority: parsed.autoPriorityDefault ?? true,
+            duplicateHandling: parsed.duplicateHandling || 'autoMerge',
+            backgroundMode: parsed.backgroundModeDefault ?? true,
+          },
+        });
       } catch (error) {
-        console.error('Failed to load bulk uploader preferences:', error);
+        console.error('Failed to load preferences:', error);
       }
     }
   }, []);
 
+  // Save preferences to localStorage when they change
   useEffect(() => {
-    ;(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        try {
-          const remote = await getAISetting<BulkUploaderPrefs>(user.id, 'bulk_uploader')
-          dispatch({ type: 'SET_PREFS', payload: remote })
-        } catch (error) {
-          console.error('Failed to load bulk uploader settings:', error)
-        }
-      }
-    })()
-  }, [])
+    localStorage.setItem('bulkUploaderPrefs', JSON.stringify(state.prefs));
+  }, [state.prefs]);
 
   return (
     <BulkUploaderContext.Provider value={{ state, dispatch }}>

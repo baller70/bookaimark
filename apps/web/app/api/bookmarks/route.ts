@@ -74,13 +74,27 @@ export async function GET(request: NextRequest) {
     console.log('📖 Fetching bookmarks from file storage...');
     console.log('📂 Current working directory:', process.cwd());
     
-    // Get user_id from query params
+    // Get query parameters
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('user_id') || 'dev-user-123';
+    const allCategories = searchParams.get('all_categories') === 'true';
     
     // Load bookmarks from file
     const allBookmarks = await loadBookmarks();
     console.log(`📚 Loaded ${allBookmarks.length} total bookmarks from file`);
+    
+    // If requesting all categories, return unique categories from all users
+    if (allCategories) {
+      const uniqueCategories = [...new Set(allBookmarks.map(b => b.category).filter(Boolean))].sort();
+      console.log(`📁 Found ${uniqueCategories.length} unique categories across all users:`, uniqueCategories);
+      
+      return NextResponse.json({
+        success: true,
+        categories: uniqueCategories,
+        total: uniqueCategories.length
+      });
+    }
+    
     console.log('🔍 Looking for user ID:', userId);
     console.log('📝 Available user IDs:', allBookmarks.map(b => b.user_id));
     
