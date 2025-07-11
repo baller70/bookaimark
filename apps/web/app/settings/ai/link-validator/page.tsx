@@ -1034,7 +1034,7 @@ const ValidationSummary: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (

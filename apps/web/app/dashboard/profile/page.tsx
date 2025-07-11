@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars, @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createDemoSupabaseClient, DEMO_USER_ID } from '../../../lib/supabase-demo'
 import { UserCircleIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
