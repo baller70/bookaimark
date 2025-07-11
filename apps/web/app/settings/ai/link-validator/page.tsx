@@ -424,12 +424,16 @@ const ScopePanel: React.FC = () => {
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          console.log('🔍 Fetching categories and bookmarks for user:', user.id);
           const resCats = await fetch(`/api/categories?user_id=${user.id}`);
           const catsData = await resCats.json();
+          console.log('📁 Categories response:', catsData);
           setCategories(catsData.categories || []);
           const resBms = await fetch(`/api/bookmarks?user_id=${user.id}`);
           const bmsData = await resBms.json();
+          console.log('📚 Bookmarks response:', bmsData);
           setBookmarks(bmsData.bookmarks || []);
+          console.log('✅ Final state - categories:', catsData.categories?.length || 0, 'bookmarks:', bmsData.bookmarks?.length || 0);
         } catch (error) {
           console.error('Failed to load categories or bookmarks:', error);
         }
@@ -481,6 +485,7 @@ const ScopePanel: React.FC = () => {
                 <SelectValue placeholder="Choose folders and bookmarks..." />
               </SelectTrigger>
               <SelectContent>
+                {console.log('🎯 Rendering dropdown with categories:', categories.length, 'bookmarks:', bookmarks.length)}
                 {categories.map(cat => (
                   <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                 ))}
