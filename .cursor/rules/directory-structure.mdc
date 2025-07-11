@@ -1,0 +1,241 @@
+---
+description: BookAIMark project directory structure and important files guide
+globs: **/*
+alwaysApply: true
+---
+
+# BookAIMark Project Directory Structure
+
+This rule documents the complete directory structure and important files in the BookAIMark project, a comprehensive bookmark management system with AI features.
+
+## 🏗️ Project Architecture
+
+BookAIMark follows a **monorepo architecture** with multiple applications and shared packages:
+
+### **Root Level Structure**
+```
+bookaimark/
+├── 📁 app/                     # Main Next.js app directory (App Router)
+├── 📁 apps/                    # Monorepo applications
+│   └── 📁 web/                 # Web application (duplicate/alternative structure)
+├── 📁 backend/                 # Backend services and utilities
+├── 📁 components/              # Shared React components
+├── 📁 config/                  # Configuration files
+├── 📁 data/                    # Local data storage (JSON files)
+├── 📁 docs/                    # Documentation files
+├── 📁 features/                # Feature-based modules
+├── 📁 frontend/                # Frontend application files
+├── 📁 hooks/                   # Custom React hooks
+├── 📁 lib/                     # Shared utility libraries
+├── 📁 packages/                # Shared packages (monorepo)
+├── 📁 public/                  # Static assets
+├── 📁 src/                     # Source code (alternative structure)
+└── 📄 Configuration files      # Package.json, tsconfig, etc.
+```
+
+## 📱 Main Applications
+
+### **1. App Directory (`/app/`)**
+Main Next.js application using App Router:
+
+```
+app/
+├── 📁 api/                     # API routes
+│   ├── 📁 ai/                  # AI-related endpoints
+│   ├── 📁 auth/                # Authentication endpoints
+│   ├── 📁 bookmarks/           # Bookmark management API
+│   ├── 📁 marketplace/         # Marketplace API
+│   ├── 📁 oracle/              # Oracle AI features
+│   └── 📁 settings/            # Settings API
+├── 📁 dashboard/               # Main dashboard pages
+├── 📁 settings/                # Settings pages
+│   ├── 📁 ai/                  # AI settings
+│   ├── 📁 dna/                 # DNA profile settings
+│   └── 📁 oracle/              # Oracle settings
+├── 📁 marketplace/             # Marketplace pages
+├── 📁 auth/                    # Authentication pages
+├── 📁 ai-copilot/              # AI Copilot features
+└── 📄 layout.tsx               # Root layout
+```
+
+### **2. Apps Directory (`/apps/web/`)**
+Alternative/duplicate web application structure:
+
+```
+apps/web/
+├── 📁 app/                     # Next.js app directory
+├── 📁 components/              # Web-specific components
+├── 📁 data/                    # Data files (JSON storage)
+├── 📁 lib/                     # Web-specific utilities
+├── 📁 public/                  # Static assets
+└── 📄 package.json             # Web app dependencies
+```
+
+## 🔧 Backend & Services
+
+### **Backend Directory (`/backend/`)**
+```
+backend/
+├── 📁 api/                     # Backend API routes
+├── 📁 chrome-extension/        # Chrome extension files
+├── 📁 data/                    # Backend data storage
+├── 📁 database/                # Database migrations
+├── 📁 prisma/                  # Prisma ORM configuration
+├── 📁 scripts/                 # Utility scripts
+├── 📁 services/                # Backend services
+├── 📁 supabase/                # Supabase configuration
+├── 📁 tests/                   # Backend tests
+├── 📁 types/                   # TypeScript type definitions
+└── 📄 *.sql                    # SQL setup files
+```
+
+### **Data Storage (`/data/`)**
+```
+data/
+└── 📄 bookmarks.json           # Local bookmark storage
+```
+
+## 📦 Shared Packages
+
+### **Packages Directory (`/packages/`)**
+```
+packages/
+├── 📁 ui/                      # Shared UI components (@bookaimark/ui)
+├── 📁 shared/                  # Shared utilities and types
+└── 📁 backend/                 # Backend package
+```
+
+## 🎨 Components & UI
+
+### **Components Directory (`/components/`)**
+```
+components/
+├── 📁 ui/                      # Base UI components
+├── 📁 auth/                    # Authentication components
+├── 📁 dashboard/               # Dashboard-specific components
+├── 📁 oracle/                  # Oracle AI components
+├── 📁 providers/               # React context providers
+└── 📁 Landing Page/            # Landing page components
+```
+
+## 🚀 Features
+
+### **Features Directory (`/features/`)**
+Feature-based modular architecture:
+
+```
+features/
+├── 📁 ai-copilot/              # AI Copilot feature
+├── 📁 analytics/               # Analytics and tracking
+├── 📁 auth/                    # Authentication feature
+├── 📁 dashboard/               # Dashboard feature
+├── 📁 dna-profile/             # DNA profiling feature
+├── 📁 kanban/                  # Kanban board feature
+├── 📁 marketplace/             # Marketplace feature
+├── 📁 media/                   # Media handling
+├── 📁 notifications/           # Notification system
+├── 📁 oracle/                  # Oracle AI feature
+├── 📁 playbooks/               # Playbooks feature
+├── 📁 pomodoro/                # Pomodoro timer
+├── 📁 settings/                # Settings feature
+├── 📁 timeline/                # Timeline feature
+└── 📄 feature.json             # Feature configuration
+```
+
+## 📚 Documentation & Configuration
+
+### **Important Configuration Files**
+```
+📄 package.json                 # Root package configuration
+📄 pnpm-workspace.yaml          # Monorepo workspace config
+📄 tsconfig.json                # TypeScript configuration
+📄 next.config.js               # Next.js configuration
+📄 tailwind.config.js           # Tailwind CSS configuration
+📄 .gitignore                   # Git ignore rules
+📄 middleware.ts                # Next.js middleware
+```
+
+### **Documentation (`/docs/`)**
+```
+docs/
+├── 📄 AI_RECOMMENDATIONS_INTEGRATION.md
+├── 📄 CLAUDE.md
+├── 📄 CLEANUP_SUMMARY.md
+└── 📄 *.md                     # Various documentation files
+```
+
+## 🔍 Key File Patterns
+
+### **API Routes**
+- `app/api/*/route.ts` - API endpoints
+- `backend/api/*/` - Backend API implementations
+
+### **Page Components**
+- `app/*/page.tsx` - Next.js pages (App Router)
+- `src/app/*/page.tsx` - Alternative page structure
+
+### **Layout Components**
+- `app/*/layout.tsx` - Layout components
+- `components/*/Layout.tsx` - Shared layouts
+
+### **Feature Modules**
+- `features/*/` - Self-contained feature modules
+- `features/*/components/` - Feature-specific components
+- `features/*/hooks/` - Feature-specific hooks
+
+## 🎯 Development Guidelines
+
+### **File Organization**
+1. **Feature-First**: Organize by feature when possible
+2. **Shared Components**: Place in `/components/ui/` or `/packages/ui/`
+3. **API Routes**: Follow REST conventions in `/api/` directories
+4. **Types**: Co-locate with features or use `/types/` for shared types
+
+### **Import Patterns**
+```typescript
+// UI Components
+import { Button } from '@bookaimark/ui';
+
+// Shared utilities
+import { cn } from '@/lib/utils';
+
+// Feature components
+import { DashboardLayout } from '@/components/dashboard/Layout';
+```
+
+### **Directory Naming**
+- Use **kebab-case** for directories
+- Use **PascalCase** for component files
+- Use **camelCase** for utility files
+- Use **lowercase** for API routes
+
+## 🔒 Security & Environment
+
+### **Environment Files**
+```
+📄 .env.local                   # Local environment variables
+📄 .env.example                 # Environment template
+📄 misc/env.example.comments    # Environment documentation
+```
+
+### **Authentication**
+- Supabase Auth integration
+- JWT token handling
+- Protected routes via middleware
+
+## 📊 Data Management
+
+### **Storage Solutions**
+1. **Supabase** - Primary database
+2. **JSON Files** - Local development data
+3. **Prisma** - ORM for database operations
+4. **File Storage** - Local file system utilities
+
+### **Data Flow**
+```
+Frontend → API Routes → Services → Database
+         ↓
+    Local Storage (JSON) ← Development Mode
+```
+
+This directory structure supports a scalable, maintainable codebase with clear separation of concerns and feature-based organization.
