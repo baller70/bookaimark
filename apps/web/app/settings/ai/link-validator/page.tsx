@@ -1034,14 +1034,14 @@ const ValidationSummary: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
-              <div key={index} className="text-center p-3 bg-gray-50 rounded-lg">
-                <Icon className={`h-6 w-6 mx-auto mb-1 ${stat.color}`} />
-                <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-                <div className="text-sm text-gray-600">{stat.label}</div>
+              <div key={index} className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg min-h-[100px]">
+                <Icon className={`h-8 w-8 mb-2 ${stat.color}`} />
+                <div className="text-2xl font-bold text-gray-900 mb-1">{stat.value}</div>
+                <div className="text-xs text-gray-600 text-center leading-tight break-words w-full">{stat.label}</div>
               </div>
             );
           })}
