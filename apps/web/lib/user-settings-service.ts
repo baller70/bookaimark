@@ -24,7 +24,7 @@ export interface AISettings {
     includeTrending: boolean
   }
   link_validator: {
-    check_frequency: 'daily' | 'weekly' | 'monthly'
+    check_frequency: 'off' | 'daily' | 'weekly' | 'monthly'
     auto_remove_broken: boolean
     notify_on_broken: boolean
   }

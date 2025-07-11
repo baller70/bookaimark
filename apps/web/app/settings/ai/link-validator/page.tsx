@@ -414,6 +414,28 @@ const UnsavedChangesBar: React.FC = () => {
 
 const ScopePanel: React.FC = () => {
   const { state, dispatch } = useLinkValidator();
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [bookmarks, setBookmarks] = useState<{ id: string; title: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          const resCats = await fetch(`/api/categories?user_id=${user.id}`);
+          const catsData = await resCats.json();
+          setCategories(catsData.categories || []);
+          const resBms = await fetch(`/api/bookmarks?user_id=${user.id}`);
+          const bmsData = await resBms.json();
+          setBookmarks(bmsData.bookmarks || []);
+        } catch (error) {
+          console.error('Failed to load categories or bookmarks:', error);
+        }
+      }
+    })();
+  }, []);
 
   const handleScopeChange = (scope: 'all' | 'selected') => {
     dispatch({ type: 'SET_PREFS', payload: { scope } });
@@ -449,16 +471,22 @@ const ScopePanel: React.FC = () => {
         {state.prefs.scope === 'selected' && (
           <div>
             <Label>Selected Items</Label>
-            <Select>
+            <Select
+              value={state.prefs.selectedIds[0] ?? ''}
+              onValueChange={(val: string) =>
+                dispatch({ type: 'SET_PREFS', payload: { selectedIds: val ? [val] : [] } })
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Choose folders and bookmarks..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="folder-1">📁 Development</SelectItem>
-                <SelectItem value="folder-2">📁 Articles</SelectItem>
-                <SelectItem value="folder-3">📁 Videos</SelectItem>
-                <SelectItem value="bookmark-1">🔗 GitHub Repository</SelectItem>
-                <SelectItem value="bookmark-2">🔗 Documentation Site</SelectItem>
+                {categories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                ))}
+                {bookmarks.map(bm => (
+                  <SelectItem key={bm.id} value={bm.id}>{bm.title}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground mt-1">
@@ -996,7 +1024,7 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [state, dispatch] = useReducer(linkValidatorReducer, {
     prefs: defaultPrefs,
     results: [],
-    linkHealthMap: new Map(),
+    linkHealthMap: new Map<string, { status: HealthStatus; checkedAt: string; error?: string }>(),
     validationJob: {
       isRunning: false,
       total: 0,
@@ -1005,7 +1033,7 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       eta: 0
     },
     history: [],
-    selectedResults: new Set(),
+    selectedResults: new Set<string>(),
     hasUnsavedChanges: false,
     extraLinks: ''
   });
@@ -1018,8 +1046,16 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } = await supabase.auth.getUser()
       if (user) {
         try {
-          const remote = await getAISetting<LinkValidatorPrefs>(user.id, 'link_validator', defaultPrefs)
-          dispatch({ type: 'SET_PREFS', payload: remote })
+          const remoteRaw = await getAISetting(user.id, 'link_validator')
+          // Map remote settings to local preferences
+          dispatch({
+            type: 'SET_PREFS',
+            payload: {
+              schedule: remoteRaw.check_frequency,
+              autoMoveBroken: remoteRaw.auto_remove_broken,
+              emailSummary: remoteRaw.notify_on_broken,
+            },
+          })
           dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false })
         } catch (error) {
           console.error('Failed to load link validator settings:', error)
@@ -1034,7 +1070,12 @@ const LinkValidatorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } = await supabase.auth.getUser()
     if (user) {
       try {
-        await saveAISetting<LinkValidatorPrefs>(user.id, 'link_validator', prefs)
+        // Map local preferences to remote settings structure
+        await saveAISetting(user.id, 'link_validator', {
+          check_frequency: prefs.schedule,
+          auto_remove_broken: prefs.autoMoveBroken,
+          notify_on_broken: prefs.emailSummary,
+        })
         toast.success('Link validator preferences saved')
       } catch (error) {
         console.error('Failed to save link validator preferences:', error)
