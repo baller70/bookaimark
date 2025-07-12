@@ -8,6 +8,10 @@
     "start": "pnpm --filter @bookaimark/web start",
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
     "clean": "pnpm -r clean",
     "install-all": "pnpm install"
   },

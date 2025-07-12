@@ -3,10 +3,13 @@ const nextConfig = {
   reactStrictMode: false, // Disabled for better dev performance
   pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
   
+  // Production output configuration for Docker
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  
   // Development performance optimizations
   experimental: {
-    serverMinification: false,
-    optimizeCss: false,
+    serverMinification: process.env.NODE_ENV === 'production',
+    optimizeCss: process.env.NODE_ENV === 'production',
   },
   
   // Disable problematic features in development
