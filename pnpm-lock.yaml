@@ -20,6 +20,9 @@ importers:
       react-hook-form:
         specifier: ^7.60.0
         version: 7.60.0(react@18.2.0)
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.74
     devDependencies:
       '@types/node':
         specifier: 20.10.0
@@ -215,7 +218,7 @@ importers:
         version: 0.4.6(react-dom@18.2.0)(react@18.2.0)
       openai:
         specifier: ^4.76.1
-        version: 4.104.0(ws@8.18.3)
+        version: 4.104.0(ws@8.18.3)(zod@3.25.74)
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -288,7 +291,7 @@ importers:
         version: link:../../packages/ui
       openai:
         specifier: ^4.76.1
-        version: 4.104.0(ws@8.18.3)
+        version: 4.104.0(ws@8.18.3)(zod@3.25.74)
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -528,7 +531,7 @@ importers:
         version: 10.18.0(react-dom@18.2.0)(react@18.2.0)
       openai:
         specifier: ^4.76.1
-        version: 4.104.0(ws@8.18.3)
+        version: 4.104.0(ws@8.18.3)(zod@3.25.74)
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -6061,7 +6064,7 @@ packages:
     engines: {node: '>= 0.4'}
     dev: false
 
-  /openai@4.104.0(ws@8.18.3):
+  /openai@4.104.0(ws@8.18.3)(zod@3.25.74):
     resolution: {integrity: sha512-p99EFNsA/yX6UhVO93f5kJsDRLAg+CTA2RBqdHK4RtK8u5IJw32Hyb2dTGKbnnFmnuoBv5r7Z2CURI9sGZpSuA==}
     hasBin: true
     peerDependencies:
@@ -6081,6 +6084,7 @@ packages:
       formdata-node: 4.4.1
       node-fetch: 2.7.0
       ws: 8.18.3
+      zod: 3.25.74
     transitivePeerDependencies:
       - encoding
     dev: false
