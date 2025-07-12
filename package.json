@@ -25,6 +25,7 @@
   },
   "packageManager": "pnpm@8.15.0",
   "dependencies": {
+    "@sentry/nextjs": "^9.33.0",
     "@tabler/icons-react": "^3.34.0",
     "framer-motion": "^12.23.2",
     "react-hook-form": "^7.60.0"
