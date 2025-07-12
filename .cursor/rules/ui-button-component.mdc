@@ -1,0 +1,290 @@
+---
+description: React Button component patterns and conventions using Radix UI, CVA, and forwardRef
+globs: components/ui/**/*.tsx
+alwaysApply: true
+---
+
+# Button Component Conventions
+
+This rule defines the patterns and conventions for creating Button components in the BookAIMark project, based on the established UI component architecture.
+
+## 🏗️ **Core Architecture Patterns**
+
+### **1. Import Structure**
+Always follow this import order and pattern:
+
+```typescript
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+```
+
+**Guidelines:**
+- ✅ Use `import * as React` for React imports
+- ✅ Import Radix UI components for composition patterns
+- ✅ Use `class-variance-authority` for variant management
+- ✅ Import `cn` utility from `@/lib/utils` for className merging
+- ✅ Group external library imports before internal imports
+
+### **2. Variant Definition with CVA**
+Use `class-variance-authority` for consistent variant management:
+
+```typescript
+const buttonVariants = cva(
+  // Base classes - always applied
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+```
+
+**CVA Best Practices:**
+- ✅ Define base classes that apply to all variants
+- ✅ Use semantic color tokens (primary, destructive, secondary, etc.)
+- ✅ Include focus states with `focus-visible` for accessibility
+- ✅ Add disabled states with `disabled:` prefixes
+- ✅ Use CSS selector targeting for nested elements `[&_svg]:`
+- ✅ Always provide `defaultVariants` for fallback behavior
+- ✅ Use opacity modifiers for hover states (`/90`, `/80`)
+
+### **3. TypeScript Interface Pattern**
+Extend HTML button attributes and include variant props:
+
+```typescript
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+```
+
+**Interface Guidelines:**
+- ✅ Extend appropriate HTML element attributes
+- ✅ Include `VariantProps<typeof componentVariants>` for type safety
+- ✅ Add `asChild?: boolean` for Radix UI Slot composition
+- ✅ Use descriptive interface names ending with `Props`
+
+### **4. Component Implementation with forwardRef**
+Use React.forwardRef for proper ref forwarding:
+
+```typescript
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
+```
+
+**forwardRef Best Practices:**
+- ✅ Use `React.forwardRef` for ref forwarding
+- ✅ Destructure variant props explicitly
+- ✅ Default `asChild` to `false`
+- ✅ Use conditional component rendering (`asChild ? Slot : "button"`)
+- ✅ Merge classes with `cn(buttonVariants({ variant, size, className }))`
+- ✅ Spread remaining props with `...props`
+- ✅ Set `displayName` for debugging
+
+### **5. Export Pattern**
+Export both component and variants:
+
+```typescript
+export { Button, buttonVariants }
+```
+
+**Export Guidelines:**
+- ✅ Export the main component
+- ✅ Export variant function for external usage
+- ✅ Use named exports for tree-shaking
+
+## 🎨 **Styling Conventions**
+
+### **Base Classes (Always Applied)**
+```typescript
+"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+```
+
+**Required Base Classes:**
+- ✅ `inline-flex items-center justify-center` - Flexbox layout
+- ✅ `gap-2` - Consistent spacing between elements
+- ✅ `whitespace-nowrap` - Prevent text wrapping
+- ✅ `rounded-md` - Consistent border radius
+- ✅ `text-sm font-medium` - Typography consistency
+- ✅ `ring-offset-background` - Focus ring offset
+- ✅ `transition-colors` - Smooth color transitions
+- ✅ `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` - Accessibility focus states
+- ✅ `disabled:pointer-events-none disabled:opacity-50` - Disabled state styling
+- ✅ `[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0` - Icon styling
+
+### **Color Token Usage**
+Always use semantic color tokens:
+
+```typescript
+// ✅ Good - Semantic tokens
+"bg-primary text-primary-foreground hover:bg-primary/90"
+"bg-destructive text-destructive-foreground hover:bg-destructive/90"
+"bg-secondary text-secondary-foreground hover:bg-secondary/80"
+
+// ❌ Bad - Hard-coded colors
+"bg-blue-500 text-white hover:bg-blue-600"
+"bg-red-500 text-white hover:bg-red-600"
+```
+
+### **Size Variants**
+Provide consistent size options:
+
+```typescript
+size: {
+  default: "h-10 px-4 py-2",    // Standard button size
+  sm: "h-9 rounded-md px-3",    // Small button
+  lg: "h-11 rounded-md px-8",   // Large button  
+  icon: "h-10 w-10",            // Square icon button
+}
+```
+
+## 🔧 **Implementation Guidelines**
+
+### **1. Variant Naming**
+- ✅ Use semantic names: `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`
+- ✅ Avoid color-based names: `blue`, `red`, `green`
+- ✅ Use action-based names for destructive actions: `destructive` not `danger`
+
+### **2. Accessibility Requirements**
+- ✅ Include proper focus states with `focus-visible:`
+- ✅ Add disabled states with appropriate visual feedback
+- ✅ Use semantic color tokens for proper contrast
+- ✅ Ensure keyboard navigation works with focus rings
+
+### **3. Composition Pattern**
+- ✅ Support `asChild` prop for Radix UI Slot composition
+- ✅ Allow component to render as different elements when needed
+- ✅ Maintain proper TypeScript types for different render modes
+
+### **4. Class Merging**
+- ✅ Always use `cn()` utility for className merging
+- ✅ Pass variant props to CVA function: `buttonVariants({ variant, size, className })`
+- ✅ Allow className override through props
+
+## 📝 **Usage Examples**
+
+### **Basic Usage**
+```typescript
+<Button>Click me</Button>
+<Button variant="secondary">Secondary</Button>
+<Button size="lg">Large Button</Button>
+```
+
+### **With Icons**
+```typescript
+<Button>
+  <PlusIcon />
+  Add Item
+</Button>
+
+<Button size="icon">
+  <SearchIcon />
+</Button>
+```
+
+### **As Child (Composition)**
+```typescript
+<Button asChild>
+  <Link href="/dashboard">Go to Dashboard</Link>
+</Button>
+```
+
+### **Custom Styling**
+```typescript
+<Button className="w-full">
+  Full Width Button
+</Button>
+```
+
+## 🚫 **Anti-Patterns to Avoid**
+
+### **❌ Don't hardcode colors**
+```typescript
+// Bad
+"bg-blue-500 hover:bg-blue-600"
+
+// Good
+"bg-primary hover:bg-primary/90"
+```
+
+### **❌ Don't skip accessibility**
+```typescript
+// Bad - Missing focus states
+"bg-primary text-white"
+
+// Good - Includes focus states
+"bg-primary text-primary-foreground focus-visible:ring-2"
+```
+
+### **❌ Don't ignore TypeScript**
+```typescript
+// Bad - Any type
+const Button = (props: any) => { ... }
+
+// Good - Proper typing
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>( ... )
+```
+
+### **❌ Don't skip forwardRef**
+```typescript
+// Bad - No ref forwarding
+const Button = (props: ButtonProps) => { ... }
+
+// Good - Proper ref forwarding
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>( ... )
+```
+
+## 🔄 **Migration Guidelines**
+
+When updating existing buttons:
+
+1. **Replace inline styles with variants**
+2. **Add proper TypeScript interfaces**
+3. **Include accessibility states**
+4. **Use semantic color tokens**
+5. **Add forwardRef for ref forwarding**
+6. **Export both component and variants**
+
+## 🧪 **Testing Considerations**
+
+- ✅ Test all variant combinations
+- ✅ Test accessibility with screen readers
+- ✅ Test keyboard navigation
+- ✅ Test disabled states
+- ✅ Test asChild composition
+- ✅ Test custom className merging
+
+This pattern ensures consistent, accessible, and maintainable button components across the BookAIMark application.

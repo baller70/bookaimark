@@ -1,0 +1,504 @@
+# Page Component Conventions
+
+This rule defines the patterns and conventions for creating page components in the BookAIMark project using Next.js App Router.
+
+## 🏗️ **Core Page Architecture**
+
+### **1. Client Component Declaration**
+Always start with client component directive when needed:
+
+```typescript
+'use client'
+
+import React from 'react'
+// ... other imports
+```
+
+**Client Component Guidelines:**
+- ✅ Use `'use client'` directive at the top of file when component needs client-side features
+- ✅ Place directive before any imports
+- ✅ Use for pages with interactivity, state, or browser APIs
+- ✅ Avoid for static content pages that can be server-rendered
+
+### **2. Import Structure**
+Follow consistent import organization:
+
+```typescript
+'use client'
+
+import React from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+
+// UI Components
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+// Icons
+import { Search, Plus, Filter } from 'lucide-react'
+
+// Feature Components
+import Header from '../../components/Landing Page/components/Header'
+import HeroSection from '../../components/Landing Page/components/HeroSection'
+
+// Hooks and Utilities
+import { useState, useEffect } from 'react'
+```
+
+**Import Organization:**
+- ✅ Group imports by category with blank lines
+- ✅ React and Next.js imports first
+- ✅ UI components second
+- ✅ Icons third
+- ✅ Feature/page-specific components fourth
+- ✅ Hooks and utilities last
+
+### **3. Page Component Structure**
+Use default export with descriptive function names:
+
+```typescript
+export default function LandingPage() {
+  return (
+    <>
+      {/* Site header */}
+      <Header />
+
+      {/* Hero */}
+      <HeroSection />
+
+      {/* Video walkthrough */}
+      <VideoSection />
+    </>
+  )
+}
+```
+
+**Component Structure Guidelines:**
+- ✅ Use default export for page components
+- ✅ Use descriptive function names (PascalCase)
+- ✅ Use React.Fragment (`<>`) for multiple root elements
+- ✅ Include descriptive comments for major sections
+- ✅ Keep page components focused on layout and composition
+
+## 🎨 **Layout and Styling Patterns**
+
+### **1. Container and Spacing**
+Use consistent container and spacing patterns:
+
+```typescript
+<section className="bg-white py-16">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="text-center">
+      {/* Content */}
+    </div>
+  </div>
+</section>
+```
+
+**Layout Guidelines:**
+- ✅ Use `max-w-7xl mx-auto` for main content containers
+- ✅ Apply responsive padding: `px-4 sm:px-6 lg:px-8`
+- ✅ Use semantic HTML elements (`section`, `header`, `main`)
+- ✅ Apply consistent vertical spacing with `py-16`, `py-12`, etc.
+- ✅ Use `bg-white` or appropriate background colors
+
+### **2. Responsive Design**
+Implement mobile-first responsive patterns:
+
+```typescript
+<h1 className="text-4xl md:text-6xl font-bold text-black mb-6 leading-tight">
+  Wrestling with projects?
+</h1>
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+  {/* Content */}
+</div>
+```
+
+**Responsive Guidelines:**
+- ✅ Use mobile-first approach (base styles, then `sm:`, `md:`, `lg:`)
+- ✅ Apply responsive typography scaling
+- ✅ Use CSS Grid with responsive columns
+- ✅ Implement responsive spacing and sizing
+- ✅ Test on multiple screen sizes
+
+### **3. Typography Hierarchy**
+Follow consistent typography patterns:
+
+```typescript
+{/* Main headline */}
+<h1 className="text-4xl md:text-6xl font-bold text-black mb-6 leading-tight">
+  Main Page Title
+</h1>
+
+{/* Section headline */}
+<h2 className="text-5xl md:text-6xl font-black tracking-tight text-black mb-2">
+  Section Title
+</h2>
+
+{/* Subheadline */}
+<p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+  Supporting text content
+</p>
+```
+
+**Typography Guidelines:**
+- ✅ Use consistent heading hierarchy (h1, h2, h3)
+- ✅ Apply appropriate font weights (`font-bold`, `font-black`)
+- ✅ Use semantic text colors (`text-black`, `text-gray-600`)
+- ✅ Implement responsive text sizing
+- ✅ Control line height with `leading-tight`, `leading-snug`
+
+## 🔧 **State Management Patterns**
+
+### **1. Local State**
+Use React hooks for component state:
+
+```typescript
+export default function Dashboard() {
+  const [bookmarks, setBookmarks] = useState([])
+  const [selectedBookmark, setSelectedBookmark] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+
+  useEffect(() => {
+    loadBookmarks()
+  }, [])
+
+  const loadBookmarks = async () => {
+    try {
+      setIsLoading(true)
+      // API call logic
+    } catch (error) {
+      console.error('Error loading bookmarks:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    // JSX
+  )
+}
+```
+
+**State Management Guidelines:**
+- ✅ Use descriptive state variable names
+- ✅ Initialize state with appropriate default values
+- ✅ Handle loading states for async operations
+- ✅ Implement error handling for API calls
+- ✅ Use `useEffect` for side effects and data loading
+
+### **2. Form State**
+Handle form state and validation:
+
+```typescript
+const [formData, setFormData] = useState({
+  title: '',
+  url: '',
+  description: '',
+  category: '',
+  tags: []
+})
+
+const [errors, setErrors] = useState({})
+const [isSubmitting, setIsSubmitting] = useState(false)
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setIsSubmitting(true)
+  
+  try {
+    // Form submission logic
+  } catch (error) {
+    setErrors({ submit: 'Failed to submit form' })
+  } finally {
+    setIsSubmitting(false)
+  }
+}
+```
+
+**Form Guidelines:**
+- ✅ Use controlled components for form inputs
+- ✅ Implement form validation with error states
+- ✅ Handle submission states (loading, success, error)
+- ✅ Prevent default form submission behavior
+- ✅ Reset form state after successful submission
+
+## 📱 **Component Composition**
+
+### **1. Section-Based Architecture**
+Organize pages into logical sections:
+
+```typescript
+export default function LandingPage() {
+  return (
+    <>
+      {/* Site header */}
+      <Header />
+
+      {/* Hero */}
+      <HeroSection />
+
+      {/* Video walkthrough */}
+      <VideoSection />
+
+      {/* Answer YES section */}
+      <AnswerYesSection />
+
+      {/* Product features walkthrough */}
+      <ProjectFeatures />
+    </>
+  )
+}
+```
+
+**Section Guidelines:**
+- ✅ Break pages into logical, reusable sections
+- ✅ Use descriptive component names
+- ✅ Keep sections focused on single responsibilities
+- ✅ Add comments to identify major sections
+- ✅ Make sections independently testable
+
+### **2. Conditional Rendering**
+Handle dynamic content and states:
+
+```typescript
+{isLoading ? (
+  <div className="flex justify-center items-center h-64">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+  </div>
+) : (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {bookmarks.map(bookmark => (
+      <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+    ))}
+  </div>
+)}
+```
+
+**Conditional Rendering Guidelines:**
+- ✅ Handle loading states with appropriate UI
+- ✅ Show empty states when no data available
+- ✅ Use ternary operators for simple conditions
+- ✅ Use logical AND (`&&`) for single condition rendering
+- ✅ Provide meaningful fallback content
+
+## 🎯 **Performance Optimization**
+
+### **1. Image Optimization**
+Use Next.js Image component:
+
+```typescript
+import Image from 'next/image'
+
+<Image 
+  src="/images/basecamp-logo.png" 
+  alt="Basecamp logo" 
+  width={32} 
+  height={32} 
+  className="mr-2" 
+/>
+```
+
+**Image Guidelines:**
+- ✅ Use Next.js `Image` component for optimization
+- ✅ Provide explicit width and height
+- ✅ Include descriptive alt text for accessibility
+- ✅ Use appropriate image formats (WebP, AVIF)
+- ✅ Implement lazy loading for below-fold images
+
+### **2. Code Splitting**
+Implement dynamic imports for heavy components:
+
+```typescript
+import dynamic from 'next/dynamic'
+
+const HeavyComponent = dynamic(() => import('./HeavyComponent'), {
+  loading: () => <div>Loading...</div>,
+  ssr: false
+})
+```
+
+**Code Splitting Guidelines:**
+- ✅ Use dynamic imports for large components
+- ✅ Provide loading states for dynamic components
+- ✅ Consider SSR requirements for dynamic imports
+- ✅ Split by route and feature boundaries
+- ✅ Monitor bundle size impact
+
+## 🔍 **SEO and Metadata**
+
+### **1. Page Metadata**
+Include appropriate metadata for SEO:
+
+```typescript
+import { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Dashboard - BookAIMark',
+  description: 'Manage your bookmarks with AI-powered organization',
+  keywords: ['bookmarks', 'AI', 'organization', 'productivity'],
+  openGraph: {
+    title: 'BookAIMark Dashboard',
+    description: 'AI-powered bookmark management',
+    type: 'website'
+  }
+}
+```
+
+**Metadata Guidelines:**
+- ✅ Include descriptive titles and descriptions
+- ✅ Add relevant keywords for search optimization
+- ✅ Implement Open Graph tags for social sharing
+- ✅ Use structured data when appropriate
+- ✅ Ensure unique metadata per page
+
+### **2. Semantic HTML**
+Use semantic HTML elements:
+
+```typescript
+<main className="min-h-screen bg-gray-50">
+  <header className="bg-white border-b border-gray-200">
+    <nav className="max-w-7xl mx-auto">
+      {/* Navigation */}
+    </nav>
+  </header>
+  
+  <section className="py-16">
+    <article className="max-w-4xl mx-auto">
+      {/* Content */}
+    </article>
+  </section>
+</main>
+```
+
+**Semantic HTML Guidelines:**
+- ✅ Use `main`, `header`, `nav`, `section`, `article` appropriately
+- ✅ Structure content with proper heading hierarchy
+- ✅ Use lists for grouped content
+- ✅ Add ARIA labels for accessibility
+- ✅ Ensure keyboard navigation support
+
+## 🚫 **Anti-Patterns to Avoid**
+
+### **❌ Don't mix server and client components incorrectly**
+```typescript
+// Bad - Server component trying to use client features
+export default function ServerPage() {
+  const [state, setState] = useState() // Error!
+  return <div>Content</div>
+}
+
+// Good - Proper client component
+'use client'
+export default function ClientPage() {
+  const [state, setState] = useState()
+  return <div>Content</div>
+}
+```
+
+### **❌ Don't ignore loading states**
+```typescript
+// Bad - No loading state
+const [data, setData] = useState([])
+// Component renders empty immediately
+
+// Good - Proper loading state
+const [data, setData] = useState([])
+const [isLoading, setIsLoading] = useState(true)
+```
+
+### **❌ Don't use inline styles for complex styling**
+```typescript
+// Bad - Complex inline styles
+<div style={{
+  position: 'absolute',
+  top: '8px',
+  left: '24px',
+  transform: 'rotate(-4deg)',
+  zIndex: 2,
+  fontSize: '1.5rem'
+}}>
+
+// Good - Tailwind classes or CSS modules
+<div className="absolute top-2 left-6 -rotate-1 z-10 text-2xl">
+```
+
+### **❌ Don't forget error boundaries**
+```typescript
+// Bad - No error handling
+export default function Page() {
+  return <ComponentThatMightFail />
+}
+
+// Good - Error boundary wrapper
+export default function Page() {
+  return (
+    <ErrorBoundary fallback={<ErrorFallback />}>
+      <ComponentThatMightFail />
+    </ErrorBoundary>
+  )
+}
+```
+
+## 🔄 **Migration Guidelines**
+
+### **1. Converting Class Components**
+Migrate class components to functional components:
+
+```typescript
+// Old - Class component
+class OldPage extends React.Component {
+  render() {
+    return <div>Content</div>
+  }
+}
+
+// New - Functional component
+export default function NewPage() {
+  return <div>Content</div>
+}
+```
+
+### **2. Adding TypeScript**
+Gradually add TypeScript to existing pages:
+
+```typescript
+// Add type annotations
+interface PageProps {
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}
+
+export default function Page({ params, searchParams }: PageProps) {
+  // Implementation
+}
+```
+
+## 🧪 **Testing Considerations**
+
+### **1. Component Testing**
+Test page components thoroughly:
+
+```typescript
+// Test loading states
+expect(screen.getByText('Loading...')).toBeInTheDocument()
+
+// Test error states
+expect(screen.getByText('Error loading data')).toBeInTheDocument()
+
+// Test user interactions
+fireEvent.click(screen.getByRole('button', { name: 'Add Bookmark' }))
+```
+
+### **2. Integration Testing**
+Test page functionality end-to-end:
+
+- ✅ Test navigation between pages
+- ✅ Verify data loading and display
+- ✅ Test form submissions
+- ✅ Validate responsive behavior
+- ✅ Check accessibility compliance
+
+This page component system ensures consistent, performant, and maintainable pages across the BookAIMark application.

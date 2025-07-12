@@ -1,0 +1,468 @@
+# Package.json Management Conventions
+
+This rule defines the patterns and conventions for managing package.json files in the BookAIMark monorepo, ensuring consistency across all packages and applications.
+
+## 🏗️ **Monorepo Architecture**
+
+### **Root Package.json Structure**
+The root package.json serves as the monorepo coordinator:
+
+```json
+{
+  "name": "bookaimark-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @bookaimark/web dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @bookaimark/web start",
+    "lint": "pnpm -r lint",
+    "type-check": "pnpm -r type-check",
+    "clean": "pnpm -r clean"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
+```
+
+**Root Package Guidelines:**
+- ✅ Use `bookaimark-monorepo` as the root package name
+- ✅ Set `private: true` to prevent accidental publishing
+- ✅ Use `pnpm -r` for recursive commands across all packages
+- ✅ Use `pnpm --filter` for targeting specific packages
+- ✅ Define engine requirements for Node.js and pnpm
+- ✅ Pin packageManager version for consistency
+
+### **Workspace Configuration**
+Always maintain `pnpm-workspace.yaml` in the root:
+
+```yaml
+packages:
+  - "apps/*"      # Main applications
+  - "packages/*"  # Shared packages
+  - "features/*"  # Feature modules
+```
+
+## 📦 **Package Naming Conventions**
+
+### **Scoped Package Names**
+All packages must use the `@bookaimark/` scope:
+
+```json
+{
+  "name": "@bookaimark/web",           // Main application
+  "name": "@bookaimark/ui",            // UI components
+  "name": "@bookaimark/shared",        // Shared utilities
+  "name": "@bookaimark/dashboard",     // Feature packages
+  "name": "@bookaimark/marketplace"    // Feature packages
+}
+```
+
+**Naming Guidelines:**
+- ✅ Use kebab-case for package names
+- ✅ Keep names descriptive and concise
+- ✅ Use feature-based names for feature packages
+- ✅ Use functional names for utility packages (`ui`, `shared`)
+
+### **Version Management**
+Maintain consistent versioning across all packages:
+
+```json
+{
+  "version": "0.1.0",
+  "private": true
+}
+```
+
+**Version Guidelines:**
+- ✅ Use semantic versioning (SemVer)
+- ✅ Keep all packages at the same major version
+- ✅ Set `private: true` for internal packages
+- ✅ Only publish packages intended for external use
+
+## 🔧 **Script Conventions**
+
+### **Standard Scripts**
+Every package should include these standard scripts:
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next && rm -rf node_modules/.cache"
+  }
+}
+```
+
+### **Application-Specific Scripts**
+For Next.js applications, include performance and development scripts:
+
+```json
+{
+  "scripts": {
+    "dev:fast": "NODE_OPTIONS=\"--max-old-space-size=4096\" next dev --port 3000",
+    "dev:ultra": "NODE_OPTIONS='--max-old-space-size=16384' next dev --turbo",
+    "build:analyze": "ANALYZE=true next build",
+    "build:fast": "NODE_OPTIONS=\"--max-old-space-size=4096\" next build",
+    "reset": "npm run clean && npm install"
+  }
+}
+```
+
+**Script Guidelines:**
+- ✅ Use consistent script names across packages
+- ✅ Include memory optimization for large builds
+- ✅ Provide both standard and fast development modes
+- ✅ Include analysis and debugging scripts
+- ✅ Use descriptive script names with colons for variants
+
+## 📋 **Dependency Management**
+
+### **Workspace Dependencies**
+Use `workspace:*` for internal package dependencies:
+
+```json
+{
+  "dependencies": {
+    "@bookaimark/ui": "workspace:*",
+    "@bookaimark/shared": "workspace:*",
+    "@bookaimark/dashboard": "workspace:*"
+  }
+}
+```
+
+### **Version Pinning Strategy**
+Follow these version pinning conventions:
+
+```json
+{
+  "dependencies": {
+    // Exact versions for critical frameworks
+    "next": "15.1.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "typescript": "5.3.2",
+    
+    // Caret ranges for libraries
+    "@radix-ui/react-dialog": "^1.0.5",
+    "framer-motion": "^12.23.3",
+    "lucide-react": "^0.294.0",
+    
+    // Tilde ranges for utilities
+    "class-variance-authority": "^0.7.0",
+    "tailwind-merge": "^2.1.0"
+  }
+}
+```
+
+**Dependency Guidelines:**
+- ✅ Pin exact versions for React, Next.js, and TypeScript
+- ✅ Use caret ranges (^) for most libraries
+- ✅ Use workspace references for internal packages
+- ✅ Keep dependency versions consistent across packages
+- ✅ Group related dependencies together
+
+### **Dependency Categories**
+Organize dependencies by category:
+
+```json
+{
+  "dependencies": {
+    // Core Framework
+    "next": "15.1.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    
+    // UI Components
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-select": "^2.0.0",
+    "lucide-react": "^0.294.0",
+    
+    // Styling
+    "tailwindcss": "^3.4.0",
+    "class-variance-authority": "^0.7.0",
+    "tailwind-merge": "^2.1.0",
+    
+    // State Management & Forms
+    "react-hook-form": "^7.60.0",
+    "zod": "^3.22.4",
+    
+    // External Services
+    "@supabase/supabase-js": "^2.47.2",
+    "openai": "^4.76.1",
+    "stripe": "^18.3.0"
+  }
+}
+```
+
+## 🎯 **Package-Specific Patterns**
+
+### **Main Application Package**
+For the main web application:
+
+```json
+{
+  "name": "@bookaimark/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:fast": "NODE_OPTIONS=\"--max-old-space-size=4096\" next dev --port 3000",
+    "dev:ultra": "NODE_OPTIONS='--max-old-space-size=16384' next dev --turbo",
+    "build": "next build",
+    "build:analyze": "ANALYZE=true next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next && rm -rf node_modules/.cache"
+  }
+}
+```
+
+### **UI Package**
+For the shared UI components package:
+
+```json
+{
+  "name": "@bookaimark/ui",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "@bookaimark/shared": "workspace:*",
+    "@radix-ui/react-slot": "^1.0.2",
+    "class-variance-authority": "^0.7.0",
+    "lucide-react": "^0.294.0",
+    "tailwind-merge": "^2.1.0"
+  }
+}
+```
+
+### **Feature Package**
+For feature-specific packages:
+
+```json
+{
+  "name": "@bookaimark/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "@bookaimark/ui": "workspace:*",
+    "@bookaimark/shared": "workspace:*"
+  }
+}
+```
+
+### **Shared Utilities Package**
+For shared utilities and types:
+
+```json
+{
+  "name": "@bookaimark/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.2",
+    "zod": "^3.22.4"
+  }
+}
+```
+
+## 🚀 **Performance Optimization**
+
+### **Memory Management**
+Include memory optimization scripts:
+
+```json
+{
+  "scripts": {
+    "dev:fast": "NODE_OPTIONS=\"--max-old-space-size=4096\" next dev --port 3000",
+    "dev:ultra": "NODE_OPTIONS='--max-old-space-size=16384' next dev --turbo",
+    "build:fast": "NODE_OPTIONS=\"--max-old-space-size=4096\" next build"
+  }
+}
+```
+
+### **Development Tools**
+Include development productivity scripts:
+
+```json
+{
+  "scripts": {
+    "dev:prewarm": "concurrently \"npm run dev:fast\" \"node scripts/prewarm-pages.js\"",
+    "dev:monitor": "concurrently \"npm run dev:fast\" \"sleep 30 && node scripts/performance-monitor.js\"",
+    "setup": "node scripts/setup-dev-environment.js",
+    "summary": "node scripts/optimization-summary.js"
+  }
+}
+```
+
+## 📊 **DevDependencies Management**
+
+### **Standard DevDependencies**
+Include these standard development dependencies:
+
+```json
+{
+  "devDependencies": {
+    "@types/node": "20.10.0",
+    "@types/react": "18.2.39",
+    "@types/react-dom": "18.2.17",
+    "typescript": "5.3.2",
+    "concurrently": "^8.2.2"
+  }
+}
+```
+
+**DevDependencies Guidelines:**
+- ✅ Include TypeScript types for all major dependencies
+- ✅ Pin TypeScript version for consistency
+- ✅ Include build and development tools
+- ✅ Keep devDependencies minimal and focused
+
+## 🔍 **Package.json Validation**
+
+### **Required Fields**
+Every package.json must include:
+
+```json
+{
+  "name": "@bookaimark/package-name",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",           // For packages
+  "types": "index.ts"           // For packages
+}
+```
+
+### **Optional but Recommended Fields**
+```json
+{
+  "description": "Brief package description",
+  "keywords": ["bookaimark", "feature-name"],
+  "author": "BookAIMark Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bookaimark/bookaimark"
+  }
+}
+```
+
+## 🚫 **Anti-Patterns to Avoid**
+
+### **❌ Don't mix package managers**
+```json
+// Bad - Don't include npm or yarn specific files
+"scripts": {
+  "install": "npm install"
+}
+
+// Good - Use pnpm consistently
+"scripts": {
+  "install-all": "pnpm install"
+}
+```
+
+### **❌ Don't use inconsistent versions**
+```json
+// Bad - Different React versions
+"@bookaimark/ui": {
+  "dependencies": {
+    "react": "18.2.0"
+  }
+},
+"@bookaimark/dashboard": {
+  "dependencies": {
+    "react": "18.1.0"  // Different version
+  }
+}
+```
+
+### **❌ Don't forget workspace references**
+```json
+// Bad - External dependency for internal package
+"dependencies": {
+  "@bookaimark/ui": "^0.1.0"
+}
+
+// Good - Workspace reference
+"dependencies": {
+  "@bookaimark/ui": "workspace:*"
+}
+```
+
+### **❌ Don't publish private packages**
+```json
+// Bad - Missing private flag
+{
+  "name": "@bookaimark/internal-package",
+  "version": "0.1.0"
+}
+
+// Good - Mark as private
+{
+  "name": "@bookaimark/internal-package",
+  "version": "0.1.0",
+  "private": true
+}
+```
+
+## 🔄 **Migration Guidelines**
+
+### **Adding New Packages**
+1. **Create package directory** in appropriate workspace
+2. **Initialize package.json** with standard structure
+3. **Add workspace reference** in dependent packages
+4. **Update root scripts** if needed
+5. **Run pnpm install** to update lockfile
+
+### **Updating Dependencies**
+1. **Update root package.json** first
+2. **Update all dependent packages** consistently
+3. **Test build and development** after updates
+4. **Update lockfile** with `pnpm install`
+5. **Document breaking changes** in changelog
+
+### **Package Restructuring**
+1. **Plan dependency changes** before moving files
+2. **Update import paths** in consuming packages
+3. **Verify workspace references** are correct
+4. **Test all affected packages** thoroughly
+5. **Update documentation** for new structure
+
+## 🧪 **Testing Package Configuration**
+
+### **Validation Scripts**
+Include package validation in CI/CD:
+
+```json
+{
+  "scripts": {
+    "validate": "node scripts/validate-packages.js",
+    "check-deps": "node scripts/check-dependencies.js",
+    "audit": "pnpm audit --audit-level moderate"
+  }
+}
+```
+
+### **Common Checks**
+- ✅ Verify all workspace references resolve
+- ✅ Check for duplicate dependencies
+- ✅ Validate version consistency
+- ✅ Ensure required fields are present
+- ✅ Test package builds successfully
+
+This package.json management system ensures consistency, maintainability, and optimal performance across the BookAIMark monorepo.
