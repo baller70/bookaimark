@@ -17,6 +17,27 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   
+  // Webpack configuration to suppress OpenTelemetry warnings
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Suppress OpenTelemetry warnings in development
+    if (dev) {
+      config.ignoreWarnings = [
+        { module: /require-in-the-middle/ },
+        { module: /@opentelemetry\/instrumentation/ },
+        /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
+        /Critical dependency: the request of a dependency is an expression/,
+      ];
+    }
+    
+    // Optimize bundle for monitoring dependencies
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@sentry/nextjs': require.resolve('@sentry/nextjs'),
+    };
+    
+    return config;
+  },
+  
   // Image optimization
   images: {
     formats: ['image/webp', 'image/avif'],
@@ -59,7 +80,8 @@ module.exports = withSentryConfig(
     widenClientFileUpload: true,
 
     // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers (increases server load)
-    tunnelRoute: "/monitoring",
+    // Changed from "/monitoring" to "/sentry-tunnel" to avoid conflict with monitoring dashboard
+    tunnelRoute: "/sentry-tunnel",
 
     // Automatically tree-shake Sentry logger statements to reduce bundle size
     disableLogger: true,

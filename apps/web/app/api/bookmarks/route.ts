@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
+// Note: Monitoring middleware would be imported here in a full implementation
+// For now, we'll use console logging to maintain compatibility
+// import { withMonitoring, measureDatabaseOperation } from '@/lib/middleware/monitoring';
+// import { logger } from '@/lib/logger';
 
 // File-based storage for persistent bookmarks (until Supabase credentials are fixed)
 const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
@@ -39,6 +43,7 @@ async function ensureDataDirectory() {
 
 // Load bookmarks from file
 async function loadBookmarks(): Promise<Bookmark[]> {
+  // TODO: Add measureDatabaseOperation wrapper when monitoring is fully set up
   try {
     console.log('📁 Bookmarks file path:', BOOKMARKS_FILE);
     await ensureDataDirectory();

@@ -7,15 +7,23 @@ export default defineConfig({
     popup: 'popup.tsx'
   },
   format: ['iife'],
-  target: 'es2020',
+  target: 'chrome58',
   outDir: 'dist',
   clean: true,
-  minify: false,
-  sourcemap: true,
+  minify: process.env.NODE_ENV === 'production',
+  sourcemap: process.env.NODE_ENV !== 'production',
   splitting: false,
   treeshake: true,
-  globalName: 'LinkPilot',
-  esbuildOptions: (options) => {
-    options.drop = ['console', 'debugger'];
+  platform: 'browser',
+  globalName: {
+    background: 'BookAIMarkBackground',
+    content: 'BookAIMarkContent',
+    popup: 'BookAIMarkPopup'
+  },
+  banner: {
+    js: '/* BookAIMark AI Extension - Enhanced with AI features */'
+  },
+  esbuildOptions(options) {
+    options.drop = process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [];
   }
 }); 

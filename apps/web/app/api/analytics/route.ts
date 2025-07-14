@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { promises as fs } from 'fs'
-import path from 'path'
+import { NextRequest, NextResponse } from 'next/server';
+import { readFile, writeFile, access } from 'fs/promises';
+import path from 'path';
+// // import { performanceUtils } from '../../../../../lib/monitoring/performance-enhanced'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const ANALYTICS_FILE = path.join(DATA_DIR, 'analytics.json')
@@ -8,26 +9,31 @@ const ANALYTICS_FILE = path.join(DATA_DIR, 'analytics.json')
 // Ensure data directory exists
 async function ensureDataDir() {
   try {
-    await fs.access(DATA_DIR)
+    await access(DATA_DIR)
   } catch {
-    await fs.mkdir(DATA_DIR, { recursive: true })
+    await writeFile(DATA_DIR, '', { recursive: true })
   }
 }
 
 // Load analytics from file
 async function loadAnalytics() {
-  try {
-    await ensureDataDir()
-    console.log('Loading analytics from:', ANALYTICS_FILE)
-    const data = await fs.readFile(ANALYTICS_FILE, 'utf-8')
-    console.log('Analytics data loaded:', data.length, 'characters')
-    const parsed = JSON.parse(data)
-    console.log('Parsed analytics:', Object.keys(parsed).length, 'bookmarks')
-    return parsed
-  } catch (error) {
-    console.log('No analytics file found, returning empty data. Error:', error.message)
-    return { bookmarks: {} }
-  }
+//   return await performanceUtils.trackDatabaseOperation('load_analytics', async () => {
+    try {
+      await ensureDataDir()
+      console.log('Loading analytics from file:', ANALYTICS_FILE)
+      
+      const data = await readFile(ANALYTICS_FILE, 'utf-8')
+      console.log('Analytics data loaded, size:', data.length)
+      
+      const parsed = JSON.parse(data)
+      console.log('Parsed analytics, bookmarkCount:', Object.keys(parsed).length)
+      
+      return parsed
+    } catch (error) {
+      console.log('No analytics file found, returning empty data. Error:', error.message)
+      return { bookmarks: {} }
+    }
+  });
 }
 
 export async function GET(request: NextRequest) {

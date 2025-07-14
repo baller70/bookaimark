@@ -8,9 +8,33 @@ module.exports = {
     './src/**/*.{ts,tsx}',
   ],
   theme: {
+    // Enhanced mobile-first responsive breakpoints
+    screens: {
+      'xs': '475px',      // Extra small devices
+      'sm': '640px',      // Small devices (landscape phones)
+      'md': '768px',      // Medium devices (tablets)
+      'lg': '1024px',     // Large devices (laptops)
+      'xl': '1280px',     // Extra large devices (desktops)
+      '2xl': '1536px',    // 2X Extra large devices
+      // Mobile-specific breakpoints
+      'mobile': {'max': '767px'},     // Mobile only
+      'tablet': {'min': '768px', 'max': '1023px'},  // Tablet only
+      'desktop': {'min': '1024px'},   // Desktop and up
+      // Touch-specific breakpoints
+      'touch': {'raw': '(hover: none) and (pointer: coarse)'},
+      'no-touch': {'raw': '(hover: hover) and (pointer: fine)'},
+    },
     container: {
       center: true,
-      padding: "2rem",
+      padding: {
+        DEFAULT: "1rem",
+        xs: "1rem",
+        sm: "1.5rem", 
+        md: "2rem",
+        lg: "2rem",
+        xl: "2rem",
+        "2xl": "2rem",
+      },
       screens: {
         "2xl": "1400px",
       },
@@ -19,6 +43,17 @@ module.exports = {
       fontFamily: {
         'audiowide': ['var(--font-audiowide)', 'cursive'],
       },
+      // Mobile-optimized spacing
+      spacing: {
+        'safe-top': 'env(safe-area-inset-top)',
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+        'safe-left': 'env(safe-area-inset-left)',
+        'safe-right': 'env(safe-area-inset-right)',
+        'touch': '44px',  // Minimum touch target size
+        'touch-sm': '40px',
+        'touch-lg': '48px',
+      },
+      // Enhanced colors for mobile
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -53,107 +88,135 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Mobile-specific colors
+        'mobile-primary': '#3b82f6',
+        'mobile-secondary': '#64748b',
+        'touch-highlight': 'rgba(59, 130, 246, 0.1)',
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Mobile-friendly border radius
+        'touch': '12px',
+        'mobile': '8px',
+      },
+      // Mobile-optimized animations
+      animation: {
+        'fade-in': 'fadeIn 0.2s ease-in-out',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'slide-down': 'slideDown 0.3s ease-out',
+        'slide-left': 'slideLeft 0.3s ease-out',
+        'slide-right': 'slideRight 0.3s ease-out',
+        'bounce-gentle': 'bounceGentle 0.4s ease-in-out',
+        'pulse-soft': 'pulseSoft 2s infinite',
+        'swipe-indicator': 'swipeIndicator 1.5s ease-in-out infinite',
       },
       keyframes: {
-        "accordion-down": {
-          from: { height: 0 },
-          to: { height: "var(--radix-accordion-content-height)" },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: 0 },
+        slideUp: {
+          '0%': { transform: 'translateY(100%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
         },
-        blobPulse: {
-          '0%, 100%': { transform: 'scale(1)' },
-          '50%': { transform: 'scale(1.05)' },
+        slideDown: {
+          '0%': { transform: 'translateY(-100%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
         },
-        bounce: {
+        slideLeft: {
+          '0%': { transform: 'translateX(100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        slideRight: {
+          '0%': { transform: 'translateX(-100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        bounceGentle: {
           '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-25%)' },
+          '50%': { transform: 'translateY(-4px)' },
         },
-        morphBlob: {
-          '0%': { borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%' },
-          '50%': { borderRadius: '30% 60% 70% 40% / 50% 60% 30% 60%' },
-          '100%': { borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%' },
+        pulseSoft: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
         },
-        float: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-6px)' },
-        },
-        voiceBar1: {
-          '0%': { transform: 'scaleY(0.4)' },
-          '100%': { transform: 'scaleY(1.2)' },
-        },
-        voiceBar2: {
-          '0%': { transform: 'scaleY(0.6)' },
-          '100%': { transform: 'scaleY(1.4)' },
-        },
-        voiceBar3: {
-          '0%': { transform: 'scaleY(0.3)' },
-          '100%': { transform: 'scaleY(1.0)' },
-        },
-        voiceBar4: {
-          '0%': { transform: 'scaleY(0.7)' },
-          '100%': { transform: 'scaleY(1.3)' },
-        },
-        voiceBar5: {
-          '0%': { transform: 'scaleY(0.2)' },
-          '100%': { transform: 'scaleY(1.1)' },
-        },
-        rotate: {
-          '0%': { transform: 'rotate(0deg)' },
-          '100%': { transform: 'rotate(360deg)' },
-        },
-        glowPulse: {
-          '0%, 100%': { boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)' },
-          '50%': { boxShadow: '0 0 40px rgba(59, 130, 246, 0.6)' },
-        },
-        morphBlobAdvanced: {
-          '0%': { 
-            borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%',
-            transform: 'scale(1) rotate(0deg)'
-          },
-          '25%': { 
-            borderRadius: '30% 60% 70% 40% / 50% 60% 30% 60%',
-            transform: 'scale(1.02) rotate(90deg)'
-          },
-          '50%': { 
-            borderRadius: '50% 50% 50% 50% / 50% 50% 50% 50%',
-            transform: 'scale(1.05) rotate(180deg)'
-          },
-          '75%': { 
-            borderRadius: '70% 30% 60% 40% / 40% 70% 50% 60%',
-            transform: 'scale(1.02) rotate(270deg)'
-          },
-          '100%': { 
-            borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%',
-            transform: 'scale(1) rotate(360deg)'
-          },
+        swipeIndicator: {
+          '0%': { transform: 'translateX(-10px)', opacity: '0.5' },
+          '50%': { transform: 'translateX(10px)', opacity: '1' },
+          '100%': { transform: 'translateX(-10px)', opacity: '0.5' },
         },
       },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        blobPulse: 'blobPulse 4s ease-in-out infinite',
-        bounce: 'bounce 1s ease-in-out infinite',
-        morphBlob: 'morphBlob 6s ease-in-out infinite',
-        float: 'float 3s ease-in-out infinite',
-        voiceBar1: 'voiceBar1 0.6s ease-in-out infinite alternate',
-        voiceBar2: 'voiceBar2 0.7s ease-in-out infinite alternate',
-        voiceBar3: 'voiceBar3 0.5s ease-in-out infinite alternate',
-        voiceBar4: 'voiceBar4 0.8s ease-in-out infinite alternate',
-        voiceBar5: 'voiceBar5 0.4s ease-in-out infinite alternate',
-        rotate: 'rotate 20s linear infinite',
-        glowPulse: 'glowPulse 3s ease-in-out infinite',
-        morphBlobAdvanced: 'morphBlobAdvanced 8s ease-in-out infinite',
+      // Mobile-specific utilities
+      transitionProperty: {
+        'touch': 'background-color, transform, box-shadow',
+      },
+      boxShadow: {
+        'touch': '0 2px 8px rgba(0, 0, 0, 0.1)',
+        'touch-active': '0 1px 4px rgba(0, 0, 0, 0.2)',
+        'mobile-card': '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
+        'mobile-modal': '0 10px 25px rgba(0, 0, 0, 0.15)',
+      },
+      // Mobile typography
+      fontSize: {
+        'mobile-xs': ['0.75rem', { lineHeight: '1rem' }],
+        'mobile-sm': ['0.875rem', { lineHeight: '1.25rem' }],
+        'mobile-base': ['1rem', { lineHeight: '1.5rem' }],
+        'mobile-lg': ['1.125rem', { lineHeight: '1.75rem' }],
+        'mobile-xl': ['1.25rem', { lineHeight: '1.75rem' }],
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Custom mobile utilities plugin
+    function({ addUtilities, theme }) {
+      const newUtilities = {
+        // Touch-friendly utilities
+        '.touch-manipulation': {
+          'touch-action': 'manipulation',
+        },
+        '.touch-pan-x': {
+          'touch-action': 'pan-x',
+        },
+        '.touch-pan-y': {
+          'touch-action': 'pan-y',
+        },
+        '.touch-pinch-zoom': {
+          'touch-action': 'pinch-zoom',
+        },
+        // Mobile-specific utilities
+        '.mobile-scroll': {
+          '-webkit-overflow-scrolling': 'touch',
+          'overscroll-behavior': 'contain',
+        },
+        '.mobile-tap-highlight': {
+          '-webkit-tap-highlight-color': 'rgba(59, 130, 246, 0.1)',
+        },
+        '.mobile-user-select': {
+          '-webkit-user-select': 'none',
+          '-moz-user-select': 'none',
+          'user-select': 'none',
+        },
+        // Safe area utilities
+        '.safe-area-top': {
+          'padding-top': 'env(safe-area-inset-top)',
+        },
+        '.safe-area-bottom': {
+          'padding-bottom': 'env(safe-area-inset-bottom)',
+        },
+        '.safe-area-left': {
+          'padding-left': 'env(safe-area-inset-left)',
+        },
+        '.safe-area-right': {
+          'padding-right': 'env(safe-area-inset-right)',
+        },
+        '.safe-area-inset': {
+          'padding': 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)',
+        },
+      }
+      addUtilities(newUtilities)
+    }
+  ],
 }
 
