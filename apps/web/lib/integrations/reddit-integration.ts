@@ -1,4 +1,5 @@
 import { BaseIntegration, IntegrationConfig, ImportResult, BookmarkData } from './integration-manager';
+import { validateUrl } from '../security/url-validator';
 
 export interface RedditCredentials {
   clientId: string;
@@ -359,6 +360,11 @@ export class RedditIntegration extends BaseIntegration {
       throw new Error('No access token available');
     }
 
+    const validation = validateUrl(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.error}`);
+    }
+
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.accessToken}`,
       'User-Agent': this.config.settings?.userAgent || 'BookAIMark/1.0'
@@ -390,4 +396,4 @@ export function createRedditIntegration(): RedditIntegration {
   };
 
   return new RedditIntegration(config);
-} 
+}  

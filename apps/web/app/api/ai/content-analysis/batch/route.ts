@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
         const metadata = await contentAnalysisService.extractContentFromUrl(url);
         return metadata;
       } catch (error) {
-        console.error(`Failed to extract content from ${url}:`, error);
+        console.error('Failed to extract content from URL:', { url: url.substring(0, 100), error });
         return {
           title: 'Content Extraction Failed',
           url,
@@ -136,4 +136,4 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-}  
+}    

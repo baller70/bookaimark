@@ -1,4 +1,5 @@
 import { BaseIntegration, IntegrationConfig, ImportResult, BookmarkData } from './integration-manager';
+import { validateUrl } from '../security/url-validator';
 
 export interface TwitterCredentials {
   consumerKey: string;
@@ -301,6 +302,12 @@ export class TwitterIntegration extends BaseIntegration {
     method: string = 'GET', 
     credentials?: TwitterCredentials
   ): Promise<Response> {
+    // Validate URL to prevent SSRF
+    const validation = validateUrl(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.error}`);
+    }
+
     const creds = credentials || {
       consumerKey: this.config.settings?.consumerKey,
       consumerSecret: this.config.settings?.consumerSecret,
@@ -409,4 +416,4 @@ export function createTwitterIntegration(): TwitterIntegration {
   };
 
   return new TwitterIntegration(config);
-} 
+}  
