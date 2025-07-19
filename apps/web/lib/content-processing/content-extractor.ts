@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import fetch from 'node-fetch';
 import { appLogger } from '../../lib/logger';
 import { performance } from 'perf_hooks';
+import { validateUrl } from '../security/url-validator';
 
 const logger = appLogger;
 
@@ -176,6 +177,12 @@ export class ContentExtractor {
   }
 
   private async fetchWebpage(url: string, options: ExtractionOptions): Promise<string> {
+    // Validate URL to prevent SSRF
+    const validation = validateUrl(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.error}`);
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), options.timeout || 10000);
 
@@ -195,22 +202,21 @@ export class ContentExtractor {
       });
       
       clearTimeout(timeoutId);
-      return response;
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/html')) {
+        throw new Error(`Invalid content type: ${contentType}`);
+      }
+
+      return await response.text();
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
     }
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('text/html')) {
-      throw new Error(`Invalid content type: ${contentType}`);
-    }
-
-    return await response.text();
   }
 
   private extractTitle(document: Document): string {
@@ -595,4 +601,4 @@ export class ContentExtractor {
 }
 
 // Export singleton instance
-export const contentExtractor = new ContentExtractor();    
+export const contentExtractor = new ContentExtractor();          

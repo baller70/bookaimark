@@ -83,10 +83,6 @@ async function setupEnvironment() {
   envContent = envContent.replace('your-nextauth-secret-here', nextAuthSecret);
   console.log('✅ Generated NEXTAUTH_SECRET');
 
-  envContent = envContent.replace('NODE_ENV=development', 'NODE_ENV=development');
-
-  envContent = envContent.replace('ENABLE_FILE_STORAGE_FALLBACK=true', 'ENABLE_FILE_STORAGE_FALLBACK=true');
-
   fs.writeFileSync(ENV_LOCAL_PATH, envContent);
 
   console.log('\n✅ Created .env.local with default values');
@@ -134,7 +130,7 @@ function validateEnvironment() {
 
   if (missingVars.length > 0) {
     console.error('❌ Missing required environment variables:');
-    missingVars.forEach(varName => console.error(`   - ${varName}`));
+    missingVars.forEach(varName => console.error('   -', varName));
     return false;
   }
 

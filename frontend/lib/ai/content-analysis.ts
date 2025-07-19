@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 // // import { performanceUtils } from '../monitoring/performance-enhanced';
 import { logger } from '../logger';
+import { validateUrl } from '../security/url-validator';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -97,19 +98,12 @@ class ContentAnalysisService {
       // Process and validate the result
       const result = this.processAnalysisResult(analysisResult, metadata, finalOptions);
       
-      logger.info('Content analysis completed', {
-        contentLength: metadata.content.length,
-        summary: result.summary.substring(0, 100) + '...',
-        tags: result.tags,
-        category: result.category
-      });
+      logger.info('Content analysis completed');
       
       return result;
       
     } catch (error) {
-      logger.error('Content analysis failed', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      logger.error('Content analysis failed', error instanceof Error ? error : new Error('Unknown error'));
       
       // Return fallback analysis
       return this.getFallbackAnalysis(metadata);
@@ -117,40 +111,26 @@ class ContentAnalysisService {
   }
 
   /**
-   * Analyze multiple pieces of content in batch
+   * Analyze multiple content items in batch
    */
   async analyzeContentBatch(
     contentList: ContentMetadata[],
     options: AnalysisOptions = {}
   ): Promise<ContentAnalysisResult[]> {
+    const batchSize = 5; // Process in batches to avoid rate limits
     const results: ContentAnalysisResult[] = [];
     
-    // Process in batches to avoid rate limits
-    const batchSize = 5;
     for (let i = 0; i < contentList.length; i += batchSize) {
       const batch = contentList.slice(i, i + batchSize);
-      
       const batchPromises = batch.map(content => 
-        this.analyzeContent(content, options)
+        this.analyzeContent(content, options).catch(error => {
+          logger.error('Batch analysis failed for item', error instanceof Error ? error : new Error('Unknown error'));
+          return this.getFallbackAnalysis(content);
+        })
       );
       
-      const batchResults = await Promise.allSettled(batchPromises);
-      
-      batchResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-        } else {
-          logger.error('Batch analysis failed for item', {
-            error: result.reason
-          });
-          results.push(this.getFallbackAnalysis(batch[index]));
-        }
-      });
-      
-      // Add delay between batches to respect rate limits
-      if (i + batchSize < contentList.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
     }
     
     return results;
@@ -161,6 +141,12 @@ class ContentAnalysisService {
    */
   async extractContentFromUrl(url: string): Promise<ContentMetadata> {
     try {
+      // Validate URL to prevent SSRF
+      const validation = validateUrl(url);
+      if (!validation.isValid) {
+        throw new Error(`URL validation failed: ${validation.error}`);
+      }
+
       // Simple content extraction using fetch
       const response = await fetch(url, {
         headers: {
@@ -185,9 +171,7 @@ class ContentAnalysisService {
       };
       
     } catch (error) {
-      logger.error('Content extraction failed', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      logger.error('Content extraction failed', error instanceof Error ? error : new Error('Unknown error'));
       
       return {
         title: 'Content Extraction Failed',
@@ -199,7 +183,7 @@ class ContentAnalysisService {
   }
 
   /**
-   * Generate AI-powered suggestions for similar content
+   * Generate similar content suggestions
    */
   async generateSimilarContentSuggestions(
     analysis: ContentAnalysisResult,
@@ -235,9 +219,7 @@ Generate ${count} specific search queries or topics that would help find similar
       return result.suggestions || [];
       
     } catch (error) {
-      logger.error('Similar content suggestions failed', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      logger.error('Similar content suggestions failed', error instanceof Error ? error : new Error('Unknown error'));
       
       return [];
     }
@@ -247,67 +229,64 @@ Generate ${count} specific search queries or topics that would help find similar
    * Prepare content for analysis by cleaning and truncating
    */
   private prepareContentForAnalysis(metadata: ContentMetadata): string {
-    let content = metadata.content;
+    let content = metadata.content || '';
     
-    // Clean content
     content = content.replace(/\s+/g, ' ').trim();
     
-    // Truncate if too long (GPT-4 token limit consideration)
-    const maxLength = 8000; // Approximately 2000 tokens
+    // Truncate if too long (GPT-4 token limits)
+    const maxLength = 8000; // Conservative limit
     if (content.length > maxLength) {
       content = content.substring(0, maxLength) + '...';
     }
     
-    return `Title: ${metadata.title}\nURL: ${metadata.url}\nContent: ${content}`;
+    return content;
   }
 
   /**
    * Create analysis prompt based on options
    */
   private createAnalysisPrompt(content: string, options: AnalysisOptions): string {
-    const tasks = [];
+    const sections: string[] = [];
     
     if (options.includeSummary) {
-      tasks.push(`- summary: A concise summary in ${options.maxSummaryLength} words or less`);
+      sections.push(`- summary: A concise summary (max ${options.maxSummaryLength || 200} characters)`);
     }
     
     if (options.includeTags) {
-      tasks.push(`- tags: Up to ${options.maxTags} relevant tags as an array`);
+      sections.push(`- tags: Array of relevant tags (max ${options.maxTags || 10})`);
     }
     
     if (options.includeCategory) {
-      tasks.push(`- category: Primary category (technology, business, science, education, entertainment, news, health, finance, lifestyle, other)`);
+      sections.push('- category: Primary category (article, tutorial, news, documentation, blog, research, other)');
     }
     
     if (options.includeSentiment) {
-      tasks.push(`- sentiment: Overall sentiment (positive, negative, neutral)`);
+      sections.push('- sentiment: Overall sentiment (positive, negative, neutral)');
     }
     
     if (options.includeComplexity) {
-      tasks.push(`- complexity: Content complexity level (beginner, intermediate, advanced)`);
+      sections.push('- complexity: Content complexity (beginner, intermediate, advanced)');
     }
     
     if (options.includeTopics) {
-      tasks.push(`- topics: Main topics covered as an array`);
+      sections.push('- topics: Array of main topics discussed');
     }
     
     if (options.includeKeyPoints) {
-      tasks.push(`- keyPoints: Key takeaways as an array`);
+      sections.push('- keyPoints: Array of key points or takeaways');
     }
     
-    tasks.push(`- readingTime: Estimated reading time in minutes`);
-    tasks.push(`- language: Primary language code (en, es, fr, etc.)`);
-    tasks.push(`- qualityScore: Content quality score from 1-10`);
-    tasks.push(`- relatedKeywords: Related keywords as an array`);
-    tasks.push(`- contentType: Type of content (article, tutorial, news, documentation, blog, research, other)`);
+    sections.push('- readingTime: Estimated reading time in minutes');
+    sections.push('- qualityScore: Content quality score (1-10)');
+    sections.push('- relatedKeywords: Array of related keywords');
+    sections.push(`- language: Content language (default: ${options.language || 'en'})`);
+    sections.push('- contentType: Type of content (article, tutorial, news, documentation, blog, research, other)');
     
-    return `Analyze the following content and provide a JSON response with these fields:
-${tasks.join('\n')}
+    return `Analyze the following content and return a JSON object with these fields:
+${sections.join('\n')}
 
 Content to analyze:
-${content}
-
-Return only valid JSON.`;
+${content}`;
   }
 
   /**
@@ -319,21 +298,18 @@ Return only valid JSON.`;
     options: AnalysisOptions
   ): ContentAnalysisResult {
     return {
-      summary: result.summary || 'No summary available',
-      tags: Array.isArray(result.tags) ? result.tags.slice(0, options.maxTags) : [],
+      summary: result.summary || metadata.title || 'No summary available',
+      tags: Array.isArray(result.tags) ? result.tags.slice(0, options.maxTags || 10) : [],
       category: result.category || 'other',
-      sentiment: ['positive', 'negative', 'neutral'].includes(result.sentiment) 
-        ? result.sentiment : 'neutral',
-      readingTime: Math.max(1, Math.ceil((metadata.wordCount || 0) / 200)),
-      complexity: ['beginner', 'intermediate', 'advanced'].includes(result.complexity) 
-        ? result.complexity : 'intermediate',
-      language: result.language || 'en',
+      sentiment: result.sentiment || 'neutral',
+      readingTime: result.readingTime || Math.ceil((metadata.wordCount || 0) / 200),
+      complexity: result.complexity || 'intermediate',
+      language: result.language || options.language || 'en',
       topics: Array.isArray(result.topics) ? result.topics : [],
-      qualityScore: Math.min(10, Math.max(1, result.qualityScore || 5)),
+      qualityScore: result.qualityScore || 5,
       keyPoints: Array.isArray(result.keyPoints) ? result.keyPoints : [],
       relatedKeywords: Array.isArray(result.relatedKeywords) ? result.relatedKeywords : [],
-      contentType: ['article', 'tutorial', 'news', 'documentation', 'blog', 'research', 'other']
-        .includes(result.contentType) ? result.contentType : 'other'
+      contentType: result.contentType || 'other'
     };
   }
 
@@ -341,14 +317,12 @@ Return only valid JSON.`;
    * Get fallback analysis when AI analysis fails
    */
   private getFallbackAnalysis(metadata: ContentMetadata): ContentAnalysisResult {
-    const words = metadata.content.split(/\s+/).length;
-    
     return {
-      summary: `Content from ${metadata.url}. ${metadata.content.substring(0, 100)}...`,
-      tags: this.extractBasicTags(metadata.content),
+      summary: metadata.title || 'Content analysis unavailable',
+      tags: this.extractBasicTags(metadata.content || metadata.title || ''),
       category: 'other',
       sentiment: 'neutral',
-      readingTime: Math.max(1, Math.ceil(words / 200)),
+      readingTime: Math.ceil((metadata.wordCount || 0) / 200) || 1,
       complexity: 'intermediate',
       language: 'en',
       topics: [],
@@ -360,43 +334,26 @@ Return only valid JSON.`;
   }
 
   /**
-   * Extract basic tags from content using simple keyword extraction
+   * Extract basic tags from content
    */
   private extractBasicTags(content: string): string[] {
-    const words = content.toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .split(/\s+/)
-      .filter(word => word.length > 3);
+    const words = content.toLowerCase().split(/\s+/);
+    const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']);
     
-    const wordCount = new Map<string, number>();
-    words.forEach(word => {
-      wordCount.set(word, (wordCount.get(word) || 0) + 1);
-    });
-    
-    return Array.from(wordCount.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([word]) => word);
+    return words
+      .filter(word => word.length > 3 && !commonWords.has(word))
+      .slice(0, 5);
   }
 
   /**
    * Extract content from HTML
    */
-  private extractContentFromHtml(html: string): {
-    title: string;
-    content: string;
-    author?: string;
-    publishDate?: string;
-  } {
-    // Simple HTML parsing - in production, use a proper HTML parser
+  private extractContentFromHtml(html: string): { title: string; content: string; author?: string; publishDate?: string } {
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const title = titleMatch ? titleMatch[1].trim() : '';
     
-    // Remove script and style tags
     let content = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    
-    // Extract text content
     content = content.replace(/<[^>]+>/g, ' ');
     content = content.replace(/\s+/g, ' ').trim();
     
@@ -439,9 +396,7 @@ export const contentAnalysisUtils = {
       return await contentAnalysisService.analyzeContent(metadata);
       
     } catch (error) {
-      logger.error('Bookmark analysis failed', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      logger.error('Bookmark analysis failed', error instanceof Error ? error : new Error('Unknown error'));
       
       // Return basic analysis
       return {
@@ -481,4 +436,4 @@ export const contentAnalysisUtils = {
   getSimilarContentSuggestions: async (analysis: ContentAnalysisResult, count: number = 5): Promise<string[]> => {
     return await contentAnalysisService.generateSimilarContentSuggestions(analysis, count);
   }
-};    
+};        
