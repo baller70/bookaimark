@@ -329,7 +329,7 @@ export class APICacheManager {
           console.log(`🗑️  Invalidated ${keys.length} cache entries for tag: ${tag}`);
         }
       } catch (error) {
-        console.error('Failed to invalidate cache tag:', { tag, error });
+        console.error(`Failed to invalidate cache tag ${tag}:`, error);
       }
     }
 
@@ -494,7 +494,7 @@ export class APICacheManager {
         console.log(`🔥 Warming up: ${endpoint.path}`);
         // Note: In real implementation, you'd make actual API calls here
       } catch (error) {
-        console.error('Failed to warm up endpoint:', { path: endpoint.path, error });
+        console.error(`Failed to warm up ${endpoint.path}:`, error);
       }
     });
 
@@ -574,4 +574,4 @@ export const cacheAIResponse = async (
 ) => {
   const config = APICacheManager.getAIConfig(operation);
   return apiCache.set(key, data, config);
-};                    
+};                  

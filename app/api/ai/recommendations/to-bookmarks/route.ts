@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         currentId++
         
       } catch (error) {
-        console.error('❌ Failed to create bookmark:', { title: bookmark.title, error })
+        console.error(`❌ Failed to create bookmark "${bookmark.title}":`, error)
         results.push({
           url: bookmark.url,
           title: bookmark.title,

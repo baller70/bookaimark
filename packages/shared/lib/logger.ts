@@ -40,7 +40,7 @@ class Logger {
 
   error(message: string, error?: Error | unknown, context?: LogContext) {
     if (this.isDevelopment) {
-      console.error('[ERROR]', message, error, context || '');
+      console.error(`[ERROR] ${message}`, error, context || '');
     }
     
     // Capture exception with Sentry
@@ -53,7 +53,7 @@ class Logger {
 
   fatal(message: string, error?: Error | unknown, context?: LogContext) {
     if (this.isDevelopment) {
-      console.error('[FATAL]', message, error, context || '');
+      console.error(`[FATAL] ${message}`, error, context || '');
     }
     
     // Capture exception with Sentry
@@ -69,4 +69,4 @@ class Logger {
 }
 
 export const appLogger = new Logger();
-export default appLogger;  
+export default appLogger; 

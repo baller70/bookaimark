@@ -16,7 +16,7 @@ const safeLogger = {
     if (logger && logger.error) {
       logger.error(message, error, data);
     } else {
-      console.error('[ERROR]', message, error, data);
+      console.error(`[ERROR] ${message}`, error, data);
     }
   },
   warn: (message: string, data?: any) => {
@@ -392,4 +392,4 @@ export class IntegrationManager {
 }
 
 // Global integration manager instance
-export const integrationManager = new IntegrationManager();    
+export const integrationManager = new IntegrationManager();  

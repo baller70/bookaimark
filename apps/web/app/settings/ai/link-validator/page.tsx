@@ -54,7 +54,6 @@ import {
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis } from 'recharts';
 import { getAISetting, saveAISetting } from '@/lib/user-settings-service'
-import { validateUrl } from '@/lib/security/url-validator';
 
 // Types
 type HealthStatus = 'ok' | 'redirect' | 'broken' | 'timeout' | 'phishing';
@@ -152,11 +151,6 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const validateURL = async (url: string): Promise<{ status: HealthStatus; redirectTo?: string; error?: string }> => {
   try {
-    const validation = validateUrl(url);
-    if (!validation.isValid) {
-      return { status: 'broken', error: `URL validation failed: ${validation.error}` };
-    }
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -1268,4 +1262,4 @@ export default function LinkValidatorPage() {
       </div>
     </LinkValidatorProvider>
   );
-}  
+} 

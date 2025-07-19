@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadBookmarks, saveBookmarks } from '@/lib/file-storage'
-import { validateUrl } from '@/lib/security/url-validator'
 
 export type HealthStatus = 'excellent' | 'working' | 'fair' | 'poor' | 'broken'
 
@@ -17,15 +16,6 @@ const checkUrlHealth = async (url: string): Promise<{ status: HealthStatus; stat
   const startTime = Date.now()
   
   try {
-    const validation = validateUrl(url);
-    if (!validation.isValid) {
-      return {
-        status: 'broken',
-        error: `URL validation failed: ${validation.error}`,
-        responseTime: Date.now() - startTime
-      };
-    }
-
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
@@ -163,4 +153,4 @@ export async function GET() {
       'POST /api/bookmarks/health': 'Check health status of bookmarks'
     }
   })
-}  
+} 

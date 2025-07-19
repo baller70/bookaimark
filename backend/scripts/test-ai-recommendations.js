@@ -89,7 +89,7 @@ async function testRecommendationsAPI() {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('❌ HTTP error:', { status: response.status, error: errorData.error || response.statusText })
+        console.error(`❌ HTTP ${response.status}:`, errorData.error || response.statusText)
         continue
       }
       
@@ -133,4 +133,4 @@ if (require.main === module) {
   testRecommendationsAPI().catch(console.error)
 }
 
-module.exports = { testRecommendationsAPI }  
+module.exports = { testRecommendationsAPI } 

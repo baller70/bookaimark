@@ -50,7 +50,7 @@ function cleanupFile(filePath) {
     }
     return false;
   } catch (error) {
-    console.error('❌ Error processing file:', { filePath, error: error.message });
+    console.error(`❌ Error processing ${filePath}:`, error.message);
     return false;
   }
 }
@@ -77,7 +77,7 @@ function findFiles(dir, extensions = ['.ts', '.tsx', '.js', '.jsx']) {
       }
     }
   } catch (error) {
-    console.error('Error reading directory:', { dir, error: error.message });
+    console.error(`Error reading directory ${dir}:`, error.message);
   }
   
   return files;
@@ -94,4 +94,4 @@ files.forEach(file => {
   }
 });
 
-console.log(`🎉 Cleanup complete! Processed ${cleaned} files.`);  
+console.log(`🎉 Cleanup complete! Processed ${cleaned} files.`); 

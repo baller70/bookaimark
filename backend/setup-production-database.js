@@ -116,7 +116,7 @@ async function setupProductionDatabase() {
           .single();
 
         if (folderError) {
-          console.error('❌ Failed to create folder:', { folderName: folder.name, error: folderError });
+          console.error(`❌ Failed to create folder "${folder.name}":`, folderError);
         } else {
           console.log(`✅ Created folder: ${newFolder.name} (${newFolder.id})`);
         }
@@ -170,4 +170,4 @@ async function setupProductionDatabase() {
   }
 }
 
-setupProductionDatabase();  
+setupProductionDatabase(); 

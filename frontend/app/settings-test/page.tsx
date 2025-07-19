@@ -80,7 +80,7 @@ export default function SettingsTest() {
 
       return response.ok
     } catch (error) {
-      console.error('API test failed for endpoint:', { endpoint, error })
+      console.error(`API test failed for ${endpoint}:`, error)
       return false
     }
   }
@@ -512,4 +512,4 @@ export default function SettingsTest() {
       </Card>
     </div>
   )
-}  
+} 

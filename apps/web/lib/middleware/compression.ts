@@ -186,7 +186,7 @@ export class CompressionManager {
       const compressionTime = Date.now() - startTime;
       return { compressed, time: compressionTime };
     } catch (error) {
-      console.error('Compression failed for algorithm:', { algorithm, error });
+      console.error(`Compression failed for algorithm ${algorithm}:`, error);
       throw error;
     }
   }
@@ -486,7 +486,7 @@ export class CompressionManager {
           time
         };
       } catch (error) {
-        console.error('Failed to test compression algorithm:', { algorithm, error });
+        console.error(`Failed to test ${algorithm}:`, error);
       }
     }
 
@@ -585,4 +585,4 @@ export const CompressionPresets = {
     mimeTypes: ['application/json'],
     measurePerformance: true
   }
-} as const;  
+} as const; 
