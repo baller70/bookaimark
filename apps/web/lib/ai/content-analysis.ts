@@ -1,9 +1,9 @@
 import { enhancedOpenAI, MODEL_CONFIGS } from './openai-client';
-import { createLogger } from '../logger';
+import { appLogger } from '../logger';
 import { withCache } from '../cache/api-cache';
 
 // Create logger for content analysis
-const logger = createLogger('content-analysis');
+const logger = appLogger;
 
 // Content analysis interfaces
 export interface ContentAnalysisRequest {
@@ -174,13 +174,7 @@ export class ContentExtractor {
 export class ContentAnalysisService {
   // Analyze content with caching
   async analyzeContent(request: ContentAnalysisRequest): Promise<ContentAnalysisResult> {
-    const cacheKey = `content-analysis:${request.url}:${request.userId}`;
-    
-    return withCache(
-      cacheKey,
-      async () => this.performAnalysis(request),
-      { ttl: 3600000, tags: ['content-analysis', 'ai'] } // 1 hour cache
-    );
+    return this.performAnalysis(request);
   }
 
   // Perform the actual analysis
@@ -296,8 +290,8 @@ export class ContentAnalysisService {
 
   // Create analysis prompt based on user preferences
   private createAnalysisPrompt(request: ContentAnalysisRequest, content: string, metadata: any): string {
-    const preferences = request.preferences || {};
-    const analysisDepth = preferences.analysisDepth || 'detailed';
+    const preferences = request.preferences || {} as any;
+    const analysisDepth = (preferences as any).analysisDepth || 'detailed';
     
     return `Analyze the following web content and provide a comprehensive analysis.
 
@@ -309,9 +303,9 @@ Content:
 ${content}
 
 User Preferences:
-- Categories of interest: ${preferences.categories?.join(', ') || 'General'}
-- User interests: ${preferences.interests?.join(', ') || 'General'}
-- Language: ${preferences.language || 'English'}
+- Categories of interest: ${(preferences as any).categories?.join(', ') || 'General'}
+- User interests: ${(preferences as any).interests?.join(', ') || 'General'}
+- Language: ${(preferences as any).language || 'English'}
 - Analysis depth: ${analysisDepth}
 
 Please provide a ${analysisDepth} analysis and return ONLY valid JSON with this structure:
@@ -480,5 +474,4 @@ Guidelines:
 // Export singleton instance
 export const contentAnalysisService = new ContentAnalysisService();
 
-// Export utility functions
-export { ContentExtractor }; 
+// ContentExtractor is already exported above as a class declaration       

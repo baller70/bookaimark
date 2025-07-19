@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { trendingDiscovery, TrendingQuery } from '../../../../lib/recommendation/trending-discovery';
-import { createLogger } from '../../../../lib/logger';
+import { appLogger } from '../../../../lib/logger';
 
-const logger = createLogger('trending-api');
+const logger = appLogger;
 
 export async function GET(request: NextRequest) {
   try {
@@ -127,4 +127,4 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 500 });
   }
-} 
+}  

@@ -67,61 +67,53 @@ class ContentAnalysisService {
   ): Promise<ContentAnalysisResult> {
     const finalOptions = { ...this.DEFAULT_OPTIONS, ...options };
     
-//     return await performanceUtils.trackExternalApiCall(
-      'OpenAI',
-      'content-analysis',
-      async () => {
-        try {
-          // Prepare content for analysis
-          const contentToAnalyze = this.prepareContentForAnalysis(metadata);
-          
-          // Create analysis prompt
-          const prompt = this.createAnalysisPrompt(contentToAnalyze, finalOptions);
-          
-          // Call GPT-4 for analysis
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are an expert content analyst. Analyze the provided content and return a structured JSON response with the requested analysis.'
-              },
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            temperature: 0.3,
-            max_tokens: 1500,
-            response_format: { type: 'json_object' }
-          });
+    try {
+      // Prepare content for analysis
+      const contentToAnalyze = this.prepareContentForAnalysis(metadata);
+      
+      // Create analysis prompt
+      const prompt = this.createAnalysisPrompt(contentToAnalyze, finalOptions);
+      
+      // Call GPT-4 for analysis
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert content analyst. Analyze the provided content and return a structured JSON response with the requested analysis.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' }
+      });
 
-          const analysisResult = JSON.parse(response.choices[0].message.content || '{}');
-          
-          // Process and validate the result
-          const result = this.processAnalysisResult(analysisResult, metadata, finalOptions);
-          
-          logger.info('Content analysis completed', {
-            url: metadata.url,
-            contentLength: metadata.content.length,
-            summary: result.summary.substring(0, 100) + '...',
-            tags: result.tags,
-            category: result.category
-          });
-          
-          return result;
-          
-        } catch (error) {
-          logger.error('Content analysis failed', {
-            url: metadata.url,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
-          
-          // Return fallback analysis
-          return this.getFallbackAnalysis(metadata);
-        }
-      }
-    );
+      const analysisResult = JSON.parse(response.choices[0].message.content || '{}');
+      
+      // Process and validate the result
+      const result = this.processAnalysisResult(analysisResult, metadata, finalOptions);
+      
+      logger.info('Content analysis completed', {
+        contentLength: metadata.content.length,
+        summary: result.summary.substring(0, 100) + '...',
+        tags: result.tags,
+        category: result.category
+      });
+      
+      return result;
+      
+    } catch (error) {
+      logger.error('Content analysis failed', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      // Return fallback analysis
+      return this.getFallbackAnalysis(metadata);
+    }
   }
 
   /**
@@ -149,8 +141,6 @@ class ContentAnalysisService {
           results.push(result.value);
         } else {
           logger.error('Batch analysis failed for item', {
-            index: i + index,
-            url: batch[index].url,
             error: result.reason
           });
           results.push(this.getFallbackAnalysis(batch[index]));
@@ -170,49 +160,42 @@ class ContentAnalysisService {
    * Extract content from URL
    */
   async extractContentFromUrl(url: string): Promise<ContentMetadata> {
-//     return await performanceUtils.trackExternalApiCall(
-      'ContentExtraction',
-      url,
-      async () => {
-        try {
-          // Simple content extraction using fetch
-          const response = await fetch(url, {
-            headers: {
-              'User-Agent': 'BookAIMark Content Analyzer 1.0'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          
-          const html = await response.text();
-          const extracted = this.extractContentFromHtml(html);
-          
-          return {
-            title: extracted.title || 'Untitled',
-            url,
-            content: extracted.content,
-            author: extracted.author,
-            publishDate: extracted.publishDate,
-            wordCount: extracted.content.split(/\s+/).length
-          };
-          
-        } catch (error) {
-          logger.error('Content extraction failed', {
-            url,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
-          
-          return {
-            title: 'Content Extraction Failed',
-            url,
-            content: 'Unable to extract content from this URL.',
-            wordCount: 0
-          };
+    try {
+      // Simple content extraction using fetch
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'BookAIMark Content Analyzer 1.0'
         }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-    );
+      
+      const html = await response.text();
+      const extracted = this.extractContentFromHtml(html);
+      
+      return {
+        title: extracted.title || 'Untitled',
+        url,
+        content: extracted.content,
+        author: extracted.author,
+        publishDate: extracted.publishDate,
+        wordCount: extracted.content.split(/\s+/).length
+      };
+      
+    } catch (error) {
+      logger.error('Content extraction failed', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      return {
+        title: 'Content Extraction Failed',
+        url,
+        content: 'Unable to extract content from this URL.',
+        wordCount: 0
+      };
+    }
   }
 
   /**
@@ -222,12 +205,8 @@ class ContentAnalysisService {
     analysis: ContentAnalysisResult,
     count: number = 5
   ): Promise<string[]> {
-//     return await performanceUtils.trackExternalApiCall(
-      'OpenAI',
-      'similar-content-suggestions',
-      async () => {
-        try {
-          const prompt = `Based on this content analysis:
+    try {
+      const prompt = `Based on this content analysis:
 - Summary: ${analysis.summary}
 - Tags: ${analysis.tags.join(', ')}
 - Category: ${analysis.category}
@@ -235,35 +214,33 @@ class ContentAnalysisService {
 
 Generate ${count} specific search queries or topics that would help find similar, related, or complementary content. Return as a JSON array of strings.`;
 
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a content discovery expert. Generate relevant search queries for finding similar content.'
-              },
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            temperature: 0.7,
-            max_tokens: 300,
-            response_format: { type: 'json_object' }
-          });
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a content discovery expert. Generate relevant search queries for finding similar content.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 300,
+        response_format: { type: 'json_object' }
+      });
 
-          const result = JSON.parse(response.choices[0].message.content || '{"suggestions": []}');
-          return result.suggestions || [];
-          
-        } catch (error) {
-          logger.error('Similar content suggestions failed', {
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
-          
-          return [];
-        }
-      }
-    );
+      const result = JSON.parse(response.choices[0].message.content || '{"suggestions": []}');
+      return result.suggestions || [];
+      
+    } catch (error) {
+      logger.error('Similar content suggestions failed', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      return [];
+    }
   }
 
   /**
@@ -463,7 +440,6 @@ export const contentAnalysisUtils = {
       
     } catch (error) {
       logger.error('Bookmark analysis failed', {
-        url,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       
@@ -505,4 +481,4 @@ export const contentAnalysisUtils = {
   getSimilarContentSuggestions: async (analysis: ContentAnalysisResult, count: number = 5): Promise<string[]> => {
     return await contentAnalysisService.generateSimilarContentSuggestions(analysis, count);
   }
-}; 
+};    

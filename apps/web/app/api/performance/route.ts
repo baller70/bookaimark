@@ -178,8 +178,16 @@ export async function POST(request: NextRequest) {
       case 'clear-rate-limits':
         if (params?.userId && params?.endpoint) {
           // Clear rate limit for specific user/endpoint
-          const key = `rate_limit:user:${params.endpoint}:${params.userId}`;
-          await rateLimiter.redis.del(key);
+          const mockRequest = {
+            headers: new Headers(),
+            ip: '127.0.0.1'
+          } as unknown as NextRequest;
+          const config = {
+            maxRequests: 100,
+            windowMs: 60000,
+            keyGenerator: () => `rate_limit:user:${params.endpoint}:${params.userId}`
+          };
+          await rateLimiter.clearLimit(mockRequest, config);
           result.rateLimit = { cleared: true };
         }
         break;
@@ -340,21 +348,21 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// Apply performance middleware to this endpoint
-const performanceHandler = withRateLimit('api-moderate')(
-  withCompression({ threshold: 512, level: 6 })(
-    withCache({ 
-      ttl: 30, // 30 seconds cache for performance metrics
-      tags: ['performance', 'metrics'],
-      vary: ['user-id']
-    })
-  )
-);
-
 // Example of a high-performance API endpoint with all optimizations
 export async function OPTIONS(request: NextRequest) {
   // This endpoint demonstrates all performance features working together
-  return performanceHandler(request, async () => {
+  
+  const rateLimitResponse = await rateLimiter.middleware(request, {
+    maxRequests: 300,
+    windowMs: 60000, // 1 minute
+    keyGenerator: (req: NextRequest) => req.headers.get('x-forwarded-for') || 'default'
+  });
+  
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  const handler = async () => {
     const demoData = {
       message: 'This endpoint demonstrates all performance optimizations',
       features: {
@@ -387,5 +395,12 @@ export async function OPTIONS(request: NextRequest) {
         'X-Optimizations': 'cache,rate-limit,compression,monitoring'
       }
     });
+  };
+
+  const compressionManager = new (await import('@/lib/middleware/compression')).CompressionManager({
+    threshold: 512,
+    level: 6
   });
-} 
+  
+  return compressionManager.middleware(request, handler);
+}         

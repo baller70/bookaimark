@@ -1,4 +1,4 @@
-import { RedisManager } from '../cache/redis-manager';
+import { getCacheManager } from '../cache/redis-manager';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
@@ -39,20 +39,21 @@ export interface RateLimitStats {
 }
 
 export class RateLimiter {
-  private redis: RedisManager;
+  private cacheManager: ReturnType<typeof getCacheManager>;
+  private redis: ReturnType<ReturnType<typeof getCacheManager>['getClient']>;
   private memoryStore: Map<string, any> = new Map();
   private stats: Map<string, { requests: number; blocked: number; responseTimes: number[] }> = new Map();
 
   constructor() {
-    this.redis = new RedisManager();
+    this.cacheManager = getCacheManager();
+    this.redis = this.cacheManager.getClient();
   }
 
   /**
    * Default key generator - uses IP + User-Agent
    */
   private defaultKeyGenerator(request: NextRequest): string {
-    const ip = request.ip || 
-               request.headers.get('x-forwarded-for') || 
+    const ip = request.headers.get('x-forwarded-for') || 
                request.headers.get('x-real-ip') || 
                'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
@@ -147,22 +148,17 @@ export class RateLimiter {
 
     if (store === 'redis') {
       // Use Redis sorted set to track requests with timestamps
-      const pipe = this.redis.pipeline();
-      
       // Remove old requests
-      pipe.zremrangebyscore(key, 0, windowStart);
+      await this.redis.zRemRangeByScore(key, 0, windowStart);
       
       // Add current request
-      pipe.zadd(key, now, `${now}-${Math.random()}`);
+      await this.redis.zAdd(key, { score: now, value: `${now}-${Math.random()}` });
       
       // Count requests in window
-      pipe.zcard(key);
+      const currentCount = await this.redis.zCard(key);
       
       // Set expiration
-      pipe.expire(key, Math.ceil(config.windowMs / 1000));
-      
-      const results = await pipe.exec();
-      const currentCount = results[2][1] as number;
+      await this.redis.expire(key, Math.ceil(config.windowMs / 1000));
 
       const remaining = Math.max(0, config.maxRequests - currentCount);
       const resetTime = now + config.windowMs;
@@ -241,7 +237,7 @@ export class RateLimiter {
         return {allowed and 1 or 0, tokens, capacity}
       `;
 
-      const result = await this.redis.eval(script, [key], [capacity, refillRate, now]) as number[];
+      const result = await this.redis.eval(script, { keys: [key], arguments: [capacity.toString(), refillRate.toString(), now.toString()] }) as number[];
       const [allowed, tokens, maxTokens] = result;
 
       return {
@@ -320,7 +316,7 @@ export class RateLimiter {
         return {allowed and 1 or 0, volume, capacity}
       `;
 
-      const result = await this.redis.eval(script, [key], [capacity, leakRate, now]) as number[];
+      const result = await this.redis.eval(script, { keys: [key], arguments: [capacity.toString(), leakRate.toString(), now.toString()] }) as number[];
       const [allowed, volume, maxVolume] = result;
 
       return {
@@ -628,9 +624,13 @@ export const withRateLimit = (config: RateLimitConfig | string) => {
 
 export const clearUserRateLimit = async (userId: string, endpoint: string) => {
   const key = `rate_limit:user:${endpoint}:${userId}`;
-  return rateLimiter.redis.del(key);
+  const rateLimiterInstance = rateLimiter as any;
+  if (rateLimiterInstance.redis) {
+    return rateLimiterInstance.redis.del(key);
+  }
+  return false;
 };
 
 export const getRateLimitStats = async (endpoint?: string) => {
   return rateLimiter.getStats(endpoint);
-}; 
+};              

@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
-import { createLogger } from '../logger';
+import { appLogger } from '../logger';
 
 // Create logger for OpenAI operations
-const logger = createLogger('openai-client');
+const logger = appLogger;
 
 // Environment validation
 if (!process.env.OPENAI_API_KEY) {
@@ -461,4 +461,4 @@ export class EnhancedOpenAI {
 export const enhancedOpenAI = new EnhancedOpenAI();
 
 // Export original client for backward compatibility
-export { openai as default }; 
+export { openai as default };  

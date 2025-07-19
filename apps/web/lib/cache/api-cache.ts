@@ -1,4 +1,4 @@
-import { RedisManager } from './redis-manager';
+import { getCacheManager } from './redis-manager';
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -34,14 +34,16 @@ export interface CacheStats {
 }
 
 export class APICacheManager {
-  private redis: RedisManager;
+  private cacheManager: ReturnType<typeof getCacheManager>;
+  private redis: ReturnType<ReturnType<typeof getCacheManager>['getClient']>;
   private defaultTTL = 300; // 5 minutes
   private maxCacheSize = 100 * 1024 * 1024; // 100MB
   private compressionThreshold = 1024; // 1KB
   private stats: Map<string, { hits: number; misses: number; responseTime: number[] }> = new Map();
 
   constructor() {
-    this.redis = new RedisManager();
+    this.cacheManager = getCacheManager();
+    this.redis = this.cacheManager.getClient();
   }
 
   /**
@@ -97,7 +99,7 @@ export class APICacheManager {
     }
 
     try {
-      const compressed = await this.redis.compress(jsonStr);
+      const compressed = Buffer.from(jsonStr, 'utf8').toString('base64');
       return { data: compressed, compressed: true };
     } catch (error) {
       console.warn('Failed to compress cache data:', error);
@@ -114,7 +116,7 @@ export class APICacheManager {
     }
 
     try {
-      const decompressed = await this.redis.decompress(data);
+      const decompressed = Buffer.from(data, 'base64').toString('utf8');
       return JSON.parse(decompressed);
     } catch (error) {
       console.error('Failed to decompress cache data:', error);
@@ -163,10 +165,10 @@ export class APICacheManager {
 
       // Store data and metadata
       await Promise.all([
-        this.redis.setex(key, ttl, processedData),
-        this.redis.setex(`${key}:meta`, ttl + 60, JSON.stringify(metadata)),
+        this.redis.setEx(key, ttl, processedData),
+        this.redis.setEx(`${key}:meta`, ttl + 60, JSON.stringify(metadata)),
         // Add to tag sets for invalidation
-        ...tags.map(tag => this.redis.sadd(`cache_tag:${tag}`, key))
+        ...tags.map(tag => this.redis.sAdd(`cache_tag:${tag}`, key))
       ]);
 
       console.log(`✅ Cached API response: ${key} (${size} bytes, TTL: ${ttl}s)`);
@@ -198,7 +200,7 @@ export class APICacheManager {
       // Update access metadata
       metadata.lastAccessed = Date.now();
       metadata.hitCount++;
-      await this.redis.setex(`${key}:meta`, 60, JSON.stringify(metadata));
+      await this.redis.setEx(`${key}:meta`, 60, JSON.stringify(metadata));
 
       this.recordHit(key, Date.now() - startTime);
       console.log(`🎯 Cache hit: ${key} (${metadata.hitCount} hits)`);
@@ -309,7 +311,7 @@ export class APICacheManager {
 
     for (const tag of tags) {
       try {
-        const keys = await this.redis.smembers(`cache_tag:${tag}`);
+        const keys = await this.redis.sMembers(`cache_tag:${tag}`);
         
         if (keys.length > 0) {
           // Delete cache entries and metadata
@@ -366,7 +368,7 @@ export class APICacheManager {
       const allKeys = [...keys, ...tagKeys];
       
       if (allKeys.length > 0) {
-        await this.redis.del(...allKeys);
+        await this.redis.del(allKeys);
         console.log(`🗑️  Cleared ${allKeys.length} cache entries`);
       }
       
@@ -572,4 +574,4 @@ export const cacheAIResponse = async (
 ) => {
   const config = APICacheManager.getAIConfig(operation);
   return apiCache.set(key, data, config);
-}; 
+};                  

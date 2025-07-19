@@ -1,7 +1,7 @@
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('trending-discovery');
+const logger = appLogger;
 
 export interface TrendingItem {
   id: string;
@@ -989,4 +989,4 @@ export class TrendingDiscovery {
 }
 
 // Export singleton instance
-export const trendingDiscovery = new TrendingDiscovery(); 
+export const trendingDiscovery = new TrendingDiscovery();  

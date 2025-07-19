@@ -1,6 +1,6 @@
 // Profile utility functions for consistent profile picture handling across the app
 import * as Sentry from '@sentry/nextjs'
-import { appLogger } from '@/lib/logger'
+import { appLogger } from '@/apps/web/lib/logger'
 
 export const getProfilePicture = (): string => {
   if (typeof window === 'undefined') {
@@ -16,7 +16,7 @@ export const getProfilePicture = (): string => {
         return settings.profile.avatar;
       }
     } catch (error) {
-      appLogger.warn('Error loading profile avatar from settings', error);
+      appLogger.warn('Error loading profile avatar from settings', { error: error as Error });
       Sentry.captureException(error, {
         tags: { component: 'profile-utils', action: 'get_profile_picture' },
         level: 'warning'
@@ -43,7 +43,7 @@ export const getUserName = (): string => {
         return settings.profile.name;
       }
     } catch (error) {
-      appLogger.warn('Error loading user name from settings', error);
+      appLogger.warn('Error loading user name from settings', { error: error as Error });
       Sentry.captureException(error, {
         tags: { component: 'profile-utils', action: 'get_user_name' },
         level: 'warning'
@@ -72,7 +72,7 @@ export const onProfilePictureChange = (callback: (newPicture: string) => void) =
           callback(settings.profile.avatar);
         }
       } catch (error) {
-        appLogger.warn('Error handling profile picture change', error);
+        appLogger.warn('Error handling profile picture change', { error: error as Error });
       }
     } else if (e.key === 'profilePicture' && e.newValue) {
       callback(e.newValue);
@@ -81,4 +81,4 @@ export const onProfilePictureChange = (callback: (newPicture: string) => void) =
 
   window.addEventListener('storage', handleStorageChange);
   return () => window.removeEventListener('storage', handleStorageChange);
-}; 
+};    

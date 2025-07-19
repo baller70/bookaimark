@@ -13,7 +13,9 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "clean": "pnpm -r clean",
-    "install-all": "pnpm install"
+    "install-all": "pnpm install",
+    "setup-env": "node scripts/setup-env.js",
+    "validate-env": "node scripts/setup-env.js validate"
   },
   "devDependencies": {
     "@types/node": "20.10.0",
@@ -25,10 +27,17 @@
   },
   "packageManager": "pnpm@8.15.0",
   "dependencies": {
-    "@sentry/nextjs": "^9.33.0",
+    "@sentry/nextjs": "^9.35.0",
+    "@supabase/supabase-js": "^2.47.2",
     "@tabler/icons-react": "^3.34.0",
+    "@types/react": "18.2.39",
+    "clsx": "^2.0.0",
     "framer-motion": "^12.23.2",
+    "openai": "^4.76.1",
+    "react": "18.2.0",
     "react-hook-form": "^7.60.0",
+    "resend": "^4.6.0",
+    "tailwind-merge": "^2.1.0",
     "zod": "^3.22.4"
   }
 }

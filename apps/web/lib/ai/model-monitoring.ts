@@ -1,8 +1,8 @@
-import { createLogger } from '../logger';
+import { appLogger } from '../logger';
 import { openaiMetrics, OpenAIUsage } from './openai-client';
 
 // Create logger for model monitoring
-const logger = createLogger('model-monitoring');
+const logger = appLogger;
 
 // Model performance interfaces
 export interface ModelPerformanceMetrics {
@@ -631,4 +631,4 @@ export type {
   ModelAccuracyMetrics,
   ModelOptimizationSuggestion,
   ModelUsageAnalytics,
-}; 
+};  

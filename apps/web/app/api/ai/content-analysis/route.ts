@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { contentAnalysisService, ContentAnalysisRequest } from '@/lib/ai/content-analysis';
-import { createLogger } from '@/lib/logger';
+import { appLogger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/middleware/rate-limiter';
 
-const logger = createLogger('content-analysis-api');
+const logger = appLogger;
 
 export async function POST(request: NextRequest) {
   try {
@@ -127,4 +127,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}  

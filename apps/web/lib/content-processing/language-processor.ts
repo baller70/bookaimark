@@ -1,7 +1,7 @@
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('language-processor');
+const logger = appLogger;
 
 export interface LanguageDetectionResult {
   language: string;
@@ -628,4 +628,4 @@ export class LanguageProcessor {
 }
 
 // Export singleton instance
-export const languageProcessor = new LanguageProcessor(); 
+export const languageProcessor = new LanguageProcessor();  

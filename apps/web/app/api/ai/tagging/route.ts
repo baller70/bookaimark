@@ -25,16 +25,13 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
-        // Generate intelligent tags
-//         result = await performanceUtils.trackFunction('tag_generation', async () => {
-          return await intelligentTaggingService.generateTags(
-            title,
-            url,
-            content,
-            description,
-            options
-          );
-        });
+        result = await intelligentTaggingService.generateTags(
+          title,
+          url,
+          content,
+          description,
+          options
+        );
         break;
 
       case 'quick':
@@ -45,10 +42,7 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
-        // Generate quick tags (simplified)
-//         result = await performanceUtils.trackFunction('quick_tag_generation', async () => {
-          return await taggingUtils.generateQuickTags(title, url, description);
-        });
+        result = await taggingUtils.generateQuickTags(title, url, description);
         break;
 
       case 'validate':
@@ -117,22 +111,19 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Generate quick tags with query parameters
-//     const result = await performanceUtils.trackFunction('quick_tag_generation_get', async () => {
-      return await intelligentTaggingService.generateTags(
-        title,
-        url,
-        undefined,
-        description || undefined,
-        {
-          maxTags,
-          minConfidence,
-          includeAiTags: true,
-          includeContentTags: true,
-          includeUrlTags: true
-        }
-      );
-    });
+    const result = await intelligentTaggingService.generateTags(
+      title,
+      url,
+      undefined,
+      description || undefined,
+      {
+        maxTags,
+        minConfidence,
+        includeAiTags: true,
+        includeContentTags: true,
+        includeUrlTags: true
+      }
+    );
 
     return NextResponse.json({
       success: true,
@@ -150,4 +141,4 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}  

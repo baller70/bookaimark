@@ -1,9 +1,9 @@
 import { enhancedOpenAI, MODEL_CONFIGS } from './openai-client';
-import { createLogger } from '../logger';
+import { appLogger } from '../logger';
 import { withCache } from '../cache/api-cache';
 
 // Create logger for embeddings
-const logger = createLogger('embeddings');
+const logger = appLogger;
 
 // Embedding interfaces
 export interface EmbeddingRequest {
@@ -221,13 +221,7 @@ export class EmbeddingService {
 
   // Create embedding for text with caching
   async createEmbedding(request: EmbeddingRequest): Promise<EmbeddingResult> {
-    const cacheKey = `embedding:${Buffer.from(request.text).toString('base64')}`;
-    
-    return withCache(
-      cacheKey,
-      async () => this.generateEmbedding(request),
-      { ttl: 86400000, tags: ['embeddings', 'ai'] } // 24 hour cache
-    );
+    return this.generateEmbedding(request);
   }
 
   // Generate embedding using OpenAI
@@ -602,7 +596,4 @@ export class BookmarkEmbeddingService extends EmbeddingService {
 
 // Export singleton instances
 export const embeddingService = new EmbeddingService();
-export const bookmarkEmbeddingService = new BookmarkEmbeddingService();
-
-// Export utility classes
-export { VectorUtils, MemoryEmbeddingStorage }; 
+export const bookmarkEmbeddingService = new BookmarkEmbeddingService();     

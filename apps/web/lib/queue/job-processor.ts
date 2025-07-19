@@ -1,4 +1,4 @@
-import { RedisManager } from '../cache/redis-manager';
+import { getCacheManager } from '../cache/redis-manager';
 import { EventEmitter } from 'events';
 
 export interface Job {
@@ -36,7 +36,7 @@ export interface QueueConfig {
   concurrency?: number; // Number of concurrent jobs
   maxJobs?: number; // Maximum jobs in queue
   defaultJobOptions?: JobOptions;
-  redis?: RedisManager;
+  redis?: ReturnType<ReturnType<typeof getCacheManager>['getClient']>;
   cleanupInterval?: number; // Cleanup old jobs interval (ms)
   maxJobAge?: number; // Maximum age of completed jobs (ms)
   enableMetrics?: boolean;
@@ -70,7 +70,8 @@ export interface JobEvent {
 
 export class JobQueue extends EventEmitter {
   private config: Required<QueueConfig>;
-  private redis: RedisManager;
+  private cacheManager: ReturnType<typeof getCacheManager>;
+  private redis: ReturnType<ReturnType<typeof getCacheManager>['getClient']>;
   private processors: Map<string, JobProcessor> = new Map();
   private activeJobs: Map<string, Job> = new Map();
   private paused = false;
@@ -98,14 +99,15 @@ export class JobQueue extends EventEmitter {
         retryDelay: 5000, // 5 seconds
         backoffStrategy: 'exponential'
       },
-      redis: config.redis || new RedisManager(),
+      redis: config.redis || getCacheManager().getClient(),
       cleanupInterval: config.cleanupInterval || 60000, // 1 minute
       maxJobAge: config.maxJobAge || 24 * 60 * 60 * 1000, // 24 hours
       enableMetrics: config.enableMetrics !== false,
       enableDeadLetterQueue: config.enableDeadLetterQueue !== false
     };
 
-    this.redis = this.config.redis;
+    this.cacheManager = getCacheManager();
+    this.redis = this.config.redis || this.cacheManager.getClient();
     this.stats = {
       name: config.name,
       waiting: 0,
@@ -159,7 +161,7 @@ export class JobQueue extends EventEmitter {
     if (job.delay && job.delay > 0) {
       // Add to delayed queue
       const delayedUntil = Date.now() + job.delay;
-      await this.redis.zadd(
+      await this.redis.zAdd(
         `${this.config.name}:delayed`,
         delayedUntil,
         JSON.stringify(job)
@@ -167,7 +169,7 @@ export class JobQueue extends EventEmitter {
       this.stats.delayed++;
     } else {
       // Add to waiting queue with priority
-      await this.redis.zadd(
+      await this.redis.zAdd(
         `${this.config.name}:waiting`,
         -job.priority, // Negative for reverse order (higher priority first)
         JSON.stringify(job)
@@ -234,7 +236,7 @@ export class JobQueue extends EventEmitter {
   private async getNextJob(): Promise<Job | null> {
     try {
       // Get highest priority job
-      const result = await this.redis.zpopmin(`${this.config.name}:waiting`);
+      const result = await this.redis.zPopMin(`${this.config.name}:waiting`);
       
       if (!result || result.length === 0) {
         return null;
@@ -264,7 +266,7 @@ export class JobQueue extends EventEmitter {
       job.attempts++;
       this.stats.active++;
 
-      await this.redis.hset(
+      await this.redis.hSet(
         `${this.config.name}:active`,
         job.id,
         JSON.stringify(job)
@@ -312,11 +314,11 @@ export class JobQueue extends EventEmitter {
     
     // Remove from active
     this.activeJobs.delete(job.id);
-    await this.redis.hdel(`${this.config.name}:active`, job.id);
+    await this.redis.hDel(`${this.config.name}:active`, job.id);
     this.stats.active--;
 
     // Add to completed
-    await this.redis.hset(
+    await this.redis.hSet(
       `${this.config.name}:completed`,
       job.id,
       JSON.stringify(job)
@@ -348,7 +350,7 @@ export class JobQueue extends EventEmitter {
 
     // Remove from active
     this.activeJobs.delete(job.id);
-    await this.redis.hdel(`${this.config.name}:active`, job.id);
+    await this.redis.hDel(`${this.config.name}:active`, job.id);
     this.stats.active--;
 
     // Record metrics
@@ -368,7 +370,7 @@ export class JobQueue extends EventEmitter {
       
       // Add back to delayed queue for retry
       const delayedUntil = Date.now() + retryDelay;
-      await this.redis.zadd(
+      await this.redis.zAdd(
         `${this.config.name}:delayed`,
         delayedUntil,
         JSON.stringify(job)
@@ -379,7 +381,7 @@ export class JobQueue extends EventEmitter {
     } else {
       // Job failed permanently
       if (this.config.enableDeadLetterQueue) {
-        await this.redis.hset(
+        await this.redis.hSet(
           `${this.config.name}:failed`,
           job.id,
           JSON.stringify(job)
@@ -419,7 +421,7 @@ export class JobQueue extends EventEmitter {
         const now = Date.now();
         
         // Get jobs that should be processed now
-        const delayedJobs = await this.redis.zrangebyscore(
+        const delayedJobs = await this.redis.zRangeByScore(
           `${this.config.name}:delayed`,
           0,
           now
@@ -434,7 +436,7 @@ export class JobQueue extends EventEmitter {
             this.stats.delayed--;
 
             // Add to waiting queue
-            await this.redis.zadd(
+            await this.redis.zAdd(
               `${this.config.name}:waiting`,
               -job.priority,
               JSON.stringify(job)
@@ -618,7 +620,7 @@ export class JobQueue extends EventEmitter {
           }
         } else {
           // For hashes
-          const result = await this.redis.hdel(`${this.config.name}:${queue}`, jobId);
+          const result = await this.redis.hDel(`${this.config.name}:${queue}`, jobId);
           if (result > 0) {
             removed = true;
           }
@@ -658,12 +660,12 @@ export class JobQueue extends EventEmitter {
         try {
           const job: Job = JSON.parse(jobData);
           if (job.completedAt && job.completedAt < cutoffTime) {
-            await this.redis.hdel(`${this.config.name}:completed`, jobId);
+            await this.redis.hDel(`${this.config.name}:completed`, jobId);
             cleanedCount++;
           }
         } catch (error) {
           // Remove invalid job data
-          await this.redis.hdel(`${this.config.name}:completed`, jobId);
+          await this.redis.hDel(`${this.config.name}:completed`, jobId);
           cleanedCount++;
         }
       }
@@ -674,12 +676,12 @@ export class JobQueue extends EventEmitter {
         try {
           const job: Job = JSON.parse(jobData);
           if (job.failedAt && job.failedAt < cutoffTime) {
-            await this.redis.hdel(`${this.config.name}:failed`, jobId);
+            await this.redis.hDel(`${this.config.name}:failed`, jobId);
             cleanedCount++;
           }
         } catch (error) {
           // Remove invalid job data
-          await this.redis.hdel(`${this.config.name}:failed`, jobId);
+          await this.redis.hDel(`${this.config.name}:failed`, jobId);
           cleanedCount++;
         }
       }
@@ -725,10 +727,12 @@ export class JobQueue extends EventEmitter {
 // Job queue manager for multiple queues
 export class JobQueueManager {
   private queues: Map<string, JobQueue> = new Map();
-  private redis: RedisManager;
+  private cacheManager: ReturnType<typeof getCacheManager>;
+  private redis: ReturnType<ReturnType<typeof getCacheManager>['getClient']>;
 
-  constructor(redis?: RedisManager) {
-    this.redis = redis || new RedisManager();
+  constructor(redis?: ReturnType<ReturnType<typeof getCacheManager>['getClient']>) {
+    this.cacheManager = getCacheManager();
+    this.redis = redis || this.cacheManager.getClient();
   }
 
   /**
@@ -837,4 +841,4 @@ export const addEmailJob = async (
   });
 
   return queue.add(type, data, options);
-}; 
+};                    

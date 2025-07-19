@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { embeddingService, bookmarkEmbeddingService } from '@/lib/ai/embeddings';
-import { createLogger } from '@/lib/logger';
+import { appLogger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/middleware/rate-limiter';
 
-const logger = createLogger('embeddings-api');
+const logger = appLogger;
 
 export async function POST(request: NextRequest) {
   try {
@@ -475,4 +475,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}  

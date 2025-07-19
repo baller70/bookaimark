@@ -11,29 +11,28 @@ async function ensureDataDir() {
   try {
     await access(DATA_DIR)
   } catch {
-    await writeFile(DATA_DIR, '', { recursive: true })
+    const { mkdir } = await import('fs/promises');
+    await mkdir(DATA_DIR, { recursive: true })
   }
 }
 
 // Load analytics from file
 async function loadAnalytics() {
-//   return await performanceUtils.trackDatabaseOperation('load_analytics', async () => {
-    try {
-      await ensureDataDir()
-      console.log('Loading analytics from file:', ANALYTICS_FILE)
-      
-      const data = await readFile(ANALYTICS_FILE, 'utf-8')
-      console.log('Analytics data loaded, size:', data.length)
-      
-      const parsed = JSON.parse(data)
-      console.log('Parsed analytics, bookmarkCount:', Object.keys(parsed).length)
-      
-      return parsed
-    } catch (error) {
-      console.log('No analytics file found, returning empty data. Error:', error.message)
-      return { bookmarks: {} }
-    }
-  });
+  try {
+    await ensureDataDir()
+    console.log('Loading analytics from file:', ANALYTICS_FILE)
+    
+    const data = await readFile(ANALYTICS_FILE, 'utf-8')
+    console.log('Analytics data loaded, size:', data.length)
+    
+    const parsed = JSON.parse(data)
+    console.log('Parsed analytics, bookmarkCount:', Object.keys(parsed).length)
+    
+    return parsed
+  } catch (error) {
+    console.log('No analytics file found, returning empty data. Error:', error.message)
+    return { bookmarks: {} }
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -52,4 +51,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}  

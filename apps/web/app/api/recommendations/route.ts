@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { recommendationEngine, RecommendationRequest } from '../../../lib/recommendation/recommendation-engine';
 import { performanceTracker } from '../../../lib/recommendation/performance-tracker';
-import { createLogger } from '../../../lib/logger';
+import { appLogger } from '../../../lib/logger';
 
-const logger = createLogger('recommendations-api');
+const logger = appLogger;
 
 export async function GET(request: NextRequest) {
   try {
@@ -169,4 +169,4 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 500 });
   }
-} 
+}  

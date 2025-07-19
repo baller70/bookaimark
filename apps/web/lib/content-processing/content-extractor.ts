@@ -1,9 +1,9 @@
 import { JSDOM } from 'jsdom';
 import fetch from 'node-fetch';
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('content-extractor');
+const logger = appLogger;
 
 export interface ExtractedContent {
   url: string;
@@ -176,19 +176,30 @@ export class ContentExtractor {
   }
 
   private async fetchWebpage(url: string, options: ExtractionOptions): Promise<string> {
-    const response = await fetch(url, {
-      timeout: options.timeout,
-      headers: {
-        'User-Agent': options.userAgent || this.defaultOptions.userAgent!,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      },
-      redirect: options.followRedirects ? 'follow' : 'manual',
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), options.timeout || 10000);
+
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': options.userAgent || this.defaultOptions.userAgent!,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        redirect: options.followRedirects ? 'follow' : 'manual',
+      });
+      
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -584,4 +595,4 @@ export class ContentExtractor {
 }
 
 // Export singleton instance
-export const contentExtractor = new ContentExtractor(); 
+export const contentExtractor = new ContentExtractor();    

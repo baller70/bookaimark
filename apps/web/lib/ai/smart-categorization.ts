@@ -1,6 +1,8 @@
 import { openai } from './openai-client';
-import { logger } from '../logger';
+import { appLogger } from '../logger';
 // // import { performanceMonitor } from '../monitoring/performance-enhanced';
+
+const logger = appLogger;
 
 // Category hierarchy types
 export interface CategoryHierarchy {
@@ -703,12 +705,4 @@ Focus on accuracy, provide confidence scores, and suggest new subcategories if t
 }
 
 // Export singleton instance
-export const smartCategorization = new SmartCategorizationEngine();
-
-// Export types
-export type {
-  CategoryHierarchy,
-  CategorySuggestion,
-  CategoryAnalysis,
-  CategoryLearning
-}; 
+export const smartCategorization = new SmartCategorizationEngine();     

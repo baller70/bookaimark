@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { 
   ArrowLeft,
@@ -63,7 +64,7 @@ const mockData = {
   }
 }
 
-export default function PaymentPage() {
+function PaymentPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const productId = searchParams.get('id')
@@ -397,4 +398,12 @@ export default function PaymentPage() {
       </div>
     </div>
   )
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div>Loading payment page...</div>}>
+      <PaymentPageContent />
+    </Suspense>
+  );
 } 

@@ -1,9 +1,9 @@
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { ExtractedContent } from '../content-processing/content-extractor';
 import { EnrichedContent } from '../content-processing/enrichment-processor';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('recommendation-engine');
+const logger = appLogger;
 
 export interface UserProfile {
   userId: string;
@@ -997,4 +997,4 @@ export class RecommendationEngine {
 }
 
 // Export singleton instance
-export const recommendationEngine = new RecommendationEngine(); 
+export const recommendationEngine = new RecommendationEngine();  

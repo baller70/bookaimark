@@ -27,21 +27,12 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'analyze':
-        // Analyze tag usage patterns
-//         result = await performanceUtils.trackFunction('tag_analytics', async () => {
-          return await intelligentTaggingService.analyzeTagUsage(bookmarks);
-        });
+        result = await intelligentTaggingService.analyzeTagUsage(bookmarks);
         break;
 
       case 'cluster':
-        // Create tag clusters
-//         const analytics = await performanceUtils.trackFunction('tag_analytics_for_clustering', async () => {
-          return await intelligentTaggingService.analyzeTagUsage(bookmarks);
-        });
-        
-//         result = await performanceUtils.trackFunction('tag_clustering', async () => {
-          return await intelligentTaggingService.createTagClusters(analytics);
-        });
+        const analytics = await intelligentTaggingService.analyzeTagUsage(bookmarks);
+        result = await intelligentTaggingService.createTagClusters(analytics);
         break;
 
       case 'improve':
@@ -53,9 +44,7 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
-//         result = await performanceUtils.trackFunction('tag_improvement', async () => {
-          return await intelligentTaggingService.suggestTagImprovements(targetBookmark);
-        });
+        result = await intelligentTaggingService.suggestTagImprovements(targetBookmark);
         break;
 
       default:
@@ -136,4 +125,4 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}  
