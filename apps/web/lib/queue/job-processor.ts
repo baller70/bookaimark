@@ -301,7 +301,7 @@ export class JobQueue extends EventEmitter {
       await this.completeJob(job, startTime);
 
     } catch (error) {
-      console.error(`❌ Job ${job.id} failed:`, error);
+      console.error('Job failed:', { jobId: job.id, error: error instanceof Error ? error.message : 'Unknown error' });
       await this.failJob(job, error as Error, startTime);
     }
   }
@@ -591,7 +591,7 @@ export class JobQueue extends EventEmitter {
           }
         }
       } catch (error) {
-        console.error(`Error checking ${queue} queue:`, error);
+        console.error('Error checking queue:', { queue, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
 
@@ -626,7 +626,7 @@ export class JobQueue extends EventEmitter {
           }
         }
       } catch (error) {
-        console.error(`Error removing job from ${queue}:`, error);
+        console.error('Error removing job from queue:', { queue, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
 
@@ -841,4 +841,4 @@ export const addEmailJob = async (
   });
 
   return queue.add(type, data, options);
-};                    
+};                      

@@ -108,7 +108,7 @@ class ReadReplicaManager {
       });
 
       pool.on('error', (err) => {
-        console.error(`🚨 Replica ${config.id} error:`, err);
+        console.error('🚨 Replica error:', { replicaId: config.id, error: err });
         this.markReplicaUnhealthy(config.id, err.message);
       });
 
@@ -197,7 +197,7 @@ class ReadReplicaManager {
       health.consecutiveFailures++;
       health.responseTime = Date.now() - startTime;
 
-      console.error(`❌ Replica ${replicaId} health check failed:`, error);
+      console.error('❌ Replica health check failed:', { replicaId, error });
 
       // Remove from load balancer if too many failures
       if (health.consecutiveFailures >= 3) {
@@ -658,4 +658,4 @@ export function getReplicaManager(): ReadReplicaManager {
   return replicaManager;
 }
 
-export default ReadReplicaManager; 
+export default ReadReplicaManager;  

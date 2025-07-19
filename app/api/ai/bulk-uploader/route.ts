@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import * as Sentry from '@sentry/nextjs';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { validateUrl as validateUrlSecurity } from '../../../apps/web/lib/security/url-validator';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -241,6 +242,12 @@ const predictTagsAndFolder = async (url: string, settings: BulkUploaderSettings)
 
 const fetchMetadata = async (url: string): Promise<{ title?: string; description?: string }> => {
   try {
+    // Validate URL to prevent SSRF
+    const validation = validateUrlSecurity(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.error}`);
+    }
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; LinkBot/1.0)',
@@ -515,7 +522,7 @@ export async function POST(request: NextRequest) {
               return bulkLink;
 
             } catch (error) {
-              console.error(`Failed to process ${cleanedUrl}:`, error);
+              console.error('Failed to process URL:', { url: cleanedUrl.substring(0, 100), error });
               bulkLink.status = 'failed';
               bulkLink.error = error instanceof Error ? error.message : 'Processing error';
               return bulkLink;
@@ -574,4 +581,4 @@ export async function POST(request: NextRequest) {
       }
     }
   );
-} 
+}      

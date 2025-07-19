@@ -63,7 +63,7 @@ function updateFile(filePath) {
       console.log(`ℹ️  No changes needed: ${filePath}`);
     }
   } catch (error) {
-    console.error(`❌ Error updating ${filePath}:`, error.message);
+    console.error('❌ Error updating file:', { filePath, error: error.message });
   }
 }
 
@@ -71,4 +71,4 @@ console.log('🚀 Updating Supabase imports to use demo client...\n');
 
 filesToUpdate.forEach(updateFile);
 
-console.log('\n✨ Supabase import updates completed!'); 
+console.log('\n✨ Supabase import updates completed!');  

@@ -55,7 +55,7 @@ async function testBulkUploader() {
         .select();
 
       if (error) {
-        console.error(`❌ Failed to insert ${link}:`, error);
+        console.error('❌ Failed to insert link:', { url: link, error });
         return false;
       }
 
@@ -87,4 +87,4 @@ async function testBulkUploader() {
   }
 }
 
-testBulkUploader().catch(console.error); 
+testBulkUploader().catch(console.error);  

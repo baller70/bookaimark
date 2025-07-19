@@ -213,9 +213,9 @@ export async function writeTriStore<T = unknown>({
 
   // Log results
   if (successCount === 0) {
-    console.error(`❌ All storage methods failed for ${key}:`, errors)
+    console.error('❌ All storage methods failed:', { key, errors })
     throw new Error(`Failed to save settings: ${errors.join(', ')}`)
   } else {
-    console.log(`✅ Settings saved successfully to ${successCount} storage locations for ${key}`)
+    console.log('✅ Settings saved successfully:', { key, successCount })
   }
-} 
+}  

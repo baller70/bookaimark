@@ -146,7 +146,7 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
         
         toast.success(`${file.name} saved successfully`);
       } catch (error) {
-        console.error(`Failed to upload ${file.name}:`, error);
+        console.error('Failed to upload file:', { fileName: file.name, error });
         toast.error(`Failed to save ${file.name}`);
       }
     }
@@ -742,4 +742,4 @@ function PersistentFileCard({ file, viewMode, onDelete, getFileIcon }: Persisten
       </div>
     </Card>
   );
-} 
+}  

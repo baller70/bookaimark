@@ -259,7 +259,7 @@ export class OracleService {
             await this.saveSettings(type as any, settings)
             console.log(`✅ Migrated ${type} settings to Supabase`)
           } catch (parseError) {
-            console.error(`Failed to parse ${type} settings:`, parseError)
+            console.error('Failed to parse settings:', { type, error: parseError })
           }
         }
       }
@@ -335,4 +335,4 @@ export class OracleService {
 
     return { conversation, messages }
   }
-} 
+}  
