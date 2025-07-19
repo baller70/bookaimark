@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
-import { appLogger } from '@/lib/logger';
+import { appLogger } from '@/apps/web/lib/logger';
+import React from 'react';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 'fake_resend_key_for_build';
 appLogger.debug('RESEND_API_KEY status', { 
@@ -11,7 +12,7 @@ export const resend = new Resend(RESEND_API_KEY);
 export type EmailPayload = {
   to: string;
   subject: string;
-  react: JSX.Element;
+  react: React.ReactElement;
 };
 
 export const sendEmail = async ({ to, subject, react }: EmailPayload) => {
@@ -29,4 +30,4 @@ export const sendEmail = async ({ to, subject, react }: EmailPayload) => {
     appLogger.error('Error sending email', error, { to });
     return { success: false, error };
   }
-}; 
+};    

@@ -1,10 +1,10 @@
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { ExtractedContent } from './content-extractor';
 import { QualityScore } from './quality-filter';
 import { MultiLanguageContent, languageProcessor } from './language-processor';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('enrichment-processor');
+const logger = appLogger;
 
 export interface EnrichedContent extends ExtractedContent {
   enrichment: ContentEnrichment;
@@ -1019,4 +1019,4 @@ export class EnrichmentProcessor {
 }
 
 // Export singleton instance
-export const enrichmentProcessor = new EnrichmentProcessor(); 
+export const enrichmentProcessor = new EnrichmentProcessor();  

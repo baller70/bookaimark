@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/types/supabase'
-import { appLogger } from '@/lib/logger'
+import { appLogger } from '@/apps/web/lib/logger'
 
 // Get environment variables with fallbacks for development
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://localhost-placeholder.supabase.co'
@@ -31,4 +31,4 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: false, // We don't use Supabase auth
     autoRefreshToken: false,
   }
-}) 
+})  

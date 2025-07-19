@@ -1,8 +1,8 @@
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { ExtractedContent } from './content-extractor';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('quality-filter');
+const logger = appLogger;
 
 export interface QualityScore {
   overall: number; // 0-100
@@ -1016,4 +1016,4 @@ export class QualityFilter {
 }
 
 // Export singleton instance
-export const qualityFilter = new QualityFilter(); 
+export const qualityFilter = new QualityFilter();  

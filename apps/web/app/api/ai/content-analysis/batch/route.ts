@@ -29,20 +29,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Track the batch analysis operation
-//     const results = await performanceUtils.trackFunction('batch_content_analysis', async () => {
-      // Convert bookmarks to ContentMetadata format
-      const contentList = bookmarks.map(bookmark => ({
-        title: bookmark.title || 'Untitled',
-        url: bookmark.url || 'direct-content',
-        content: bookmark.content || bookmark.description || bookmark.title || '',
-        author: bookmark.author,
-        publishDate: bookmark.publishDate,
-        wordCount: bookmark.content ? bookmark.content.split(/\s+/).length : 0
-      }));
+    // Convert bookmarks to ContentMetadata format
+    const contentList = bookmarks.map(bookmark => ({
+      title: bookmark.title || 'Untitled',
+      url: bookmark.url || 'direct-content',
+      content: bookmark.content || bookmark.description || bookmark.title || '',
+      author: bookmark.author,
+      publishDate: bookmark.publishDate,
+      wordCount: bookmark.content ? bookmark.content.split(/\s+/).length : 0
+    }));
 
-      return await contentAnalysisService.analyzeContentBatch(contentList, options);
-    });
+    const results = await contentAnalysisService.analyzeContentBatch(contentList, options);
 
     // Combine results with original bookmark data
     const combinedResults = bookmarks.map((bookmark, index) => ({
@@ -98,27 +95,24 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Track the batch analysis operation
-//     const results = await performanceUtils.trackFunction('batch_content_analysis_get', async () => {
-      // Extract content from URLs first
-      const contentExtractionPromises = urlList.map(async (url) => {
-        try {
-          const metadata = await contentAnalysisService.extractContentFromUrl(url);
-          return metadata;
-        } catch (error) {
-          console.error(`Failed to extract content from ${url}:`, error);
-          return {
-            title: 'Content Extraction Failed',
-            url,
-            content: 'Unable to extract content from this URL.',
-            wordCount: 0
-          };
-        }
-      });
-
-      const contentList = await Promise.all(contentExtractionPromises);
-      return await contentAnalysisService.analyzeContentBatch(contentList);
+    // Extract content from URLs first
+    const contentExtractionPromises = urlList.map(async (url) => {
+      try {
+        const metadata = await contentAnalysisService.extractContentFromUrl(url);
+        return metadata;
+      } catch (error) {
+        console.error('Failed to extract content from URL:', { url: url.substring(0, 100), error });
+        return {
+          title: 'Content Extraction Failed',
+          url,
+          content: 'Unable to extract content from this URL.',
+          wordCount: 0
+        };
+      }
     });
+
+    const contentList = await Promise.all(contentExtractionPromises);
+    const results = await contentAnalysisService.analyzeContentBatch(contentList);
 
     // Combine results with URLs
     const combinedResults = urlList.map((url, index) => ({
@@ -142,4 +136,4 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}    

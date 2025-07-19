@@ -157,7 +157,6 @@ class IntelligentTaggingService {
         // Return basic tags as fallback
         return this.generateFallbackTags(title, url, finalOptions);
       }
-    });
   }
 
   /**
@@ -173,49 +172,47 @@ class IntelligentTaggingService {
     }>,
     options: TaggingOptions = {}
   ): Promise<Array<{ bookmarkId: string; tags: TagSuggestion[] }>> {
-//     return await performanceUtils.trackFunction('batch_intelligent_tagging', async () => {
-      const results: Array<{ bookmarkId: string; tags: TagSuggestion[] }> = [];
+    const results: Array<{ bookmarkId: string; tags: TagSuggestion[] }> = [];
+    
+    // Process in batches to avoid overwhelming the system
+    const batchSize = 10;
+    for (let i = 0; i < bookmarks.length; i += batchSize) {
+      const batch = bookmarks.slice(i, i + batchSize);
       
-      // Process in batches to avoid overwhelming the system
-      const batchSize = 10;
-      for (let i = 0; i < bookmarks.length; i += batchSize) {
-        const batch = bookmarks.slice(i, i + batchSize);
-        
-        const batchPromises = batch.map(async (bookmark) => {
-          try {
-            const tags = await this.generateTags(
-              bookmark.title,
-              bookmark.url,
-              bookmark.content,
-              bookmark.description,
-              options
-            );
-            
-            return { bookmarkId: bookmark.id, tags };
-          } catch (error) {
-            logger.error('Batch tag generation failed for bookmark', {
-              bookmarkId: bookmark.id,
-              error: error instanceof Error ? error.message : 'Unknown error'
-            });
-            
-            return {
-              bookmarkId: bookmark.id,
-              tags: this.generateFallbackTags(bookmark.title, bookmark.url, options)
-            };
-          }
-        });
-        
-        const batchResults = await Promise.all(batchPromises);
-        results.push(...batchResults);
-        
-        // Add small delay between batches
-        if (i + batchSize < bookmarks.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+      const batchPromises = batch.map(async (bookmark) => {
+        try {
+          const tags = await this.generateTags(
+            bookmark.title,
+            bookmark.url,
+            bookmark.content,
+            bookmark.description,
+            options
+          );
+          
+          return { bookmarkId: bookmark.id, tags };
+        } catch (error) {
+          logger.error('Batch tag generation failed for bookmark', {
+            bookmarkId: bookmark.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          
+          return {
+            bookmarkId: bookmark.id,
+            tags: this.generateFallbackTags(bookmark.title, bookmark.url, options)
+          };
         }
-      }
+      });
       
-      return results;
-    });
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+      
+      // Add small delay between batches
+      if (i + batchSize < bookmarks.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    
+    return results;
   }
 
   /**
@@ -229,127 +226,123 @@ class IntelligentTaggingService {
       qualityScore?: number;
     }>
   ): Promise<TagAnalytics[]> {
-//     return await performanceUtils.trackFunction('tag_analytics', async () => {
-      const tagMap = new Map<string, {
-        usage: number;
-        categories: Set<string>;
-        qualityScores: number[];
-        bookmarkIds: string[];
-        lastUsed: Date;
-      }>();
-      
-      // Collect tag statistics
-      bookmarks.forEach(bookmark => {
-        bookmark.tags.forEach(tag => {
-          const normalizedTag = tag.toLowerCase().trim();
-          
-          if (!tagMap.has(normalizedTag)) {
-            tagMap.set(normalizedTag, {
-              usage: 0,
-              categories: new Set(),
-              qualityScores: [],
-              bookmarkIds: [],
-              lastUsed: new Date()
-            });
-          }
-          
-          const tagData = tagMap.get(normalizedTag)!;
-          tagData.usage++;
-          tagData.bookmarkIds.push(bookmark.id);
-          
-          if (bookmark.category) {
-            tagData.categories.add(bookmark.category);
-          }
-          
-          if (bookmark.qualityScore) {
-            tagData.qualityScores.push(bookmark.qualityScore);
-          }
-        });
+    const tagMap = new Map<string, {
+      usage: number;
+      categories: Set<string>;
+      qualityScores: number[];
+      bookmarkIds: string[];
+      lastUsed: Date;
+    }>();
+    
+    // Collect tag statistics
+    bookmarks.forEach(bookmark => {
+      bookmark.tags.forEach(tag => {
+        const normalizedTag = tag.toLowerCase().trim();
+        
+        if (!tagMap.has(normalizedTag)) {
+          tagMap.set(normalizedTag, {
+            usage: 0,
+            categories: new Set(),
+            qualityScores: [],
+            bookmarkIds: [],
+            lastUsed: new Date()
+          });
+        }
+        
+        const tagData = tagMap.get(normalizedTag)!;
+        tagData.usage++;
+        tagData.bookmarkIds.push(bookmark.id);
+        
+        if (bookmark.category) {
+          tagData.categories.add(bookmark.category);
+        }
+        
+        if (bookmark.qualityScore) {
+          tagData.qualityScores.push(bookmark.qualityScore);
+        }
       });
-      
-      // Calculate analytics
-      const analytics: TagAnalytics[] = [];
-      const totalBookmarks = bookmarks.length;
-      
-      tagMap.forEach((data, tag) => {
-        const avgQualityScore = data.qualityScores.length > 0
-          ? data.qualityScores.reduce((sum, score) => sum + score, 0) / data.qualityScores.length
-          : 5;
-        
-        // Determine if tag is trending (used in more than 10% of bookmarks)
-        const trending = data.usage / totalBookmarks > 0.1;
-        
-        // Find related tags (tags that appear together frequently)
-        const relatedTags = this.findRelatedTags(tag, bookmarks);
-        
-        analytics.push({
-          tag,
-          usage: data.usage,
-          trending,
-          relatedTags,
-          categories: Array.from(data.categories),
-          avgQualityScore,
-          bookmarkIds: data.bookmarkIds
-        });
-      });
-      
-      // Sort by usage
-      analytics.sort((a, b) => b.usage - a.usage);
-      
-      return analytics;
     });
+    
+    // Calculate analytics
+    const analytics: TagAnalytics[] = [];
+    const totalBookmarks = bookmarks.length;
+    
+    tagMap.forEach((data, tag) => {
+      const avgQualityScore = data.qualityScores.length > 0
+        ? data.qualityScores.reduce((sum, score) => sum + score, 0) / data.qualityScores.length
+        : 5;
+      
+      // Determine if tag is trending (used in more than 10% of bookmarks)
+      const trending = data.usage / totalBookmarks > 0.1;
+      
+      // Find related tags (tags that appear together frequently)
+      const relatedTags = this.findRelatedTags(tag, bookmarks);
+      
+      analytics.push({
+        tag,
+        usage: data.usage,
+        trending,
+        relatedTags,
+        categories: Array.from(data.categories),
+        avgQualityScore,
+        bookmarkIds: data.bookmarkIds
+      });
+    });
+    
+    // Sort by usage
+    analytics.sort((a, b) => b.usage - a.usage);
+    
+    return analytics;
   }
 
   /**
    * Create tag clusters based on similarity and usage patterns
    */
   async createTagClusters(tags: TagAnalytics[]): Promise<TagCluster[]> {
-//     return await performanceUtils.trackFunction('tag_clustering', async () => {
-      const clusters: TagCluster[] = [];
-      const processedTags = new Set<string>();
-      
-      // Group tags by category first
-      const categoryGroups = new Map<string, TagAnalytics[]>();
-      tags.forEach(tag => {
-        tag.categories.forEach(category => {
-          if (!categoryGroups.has(category)) {
-            categoryGroups.set(category, []);
-          }
-          categoryGroups.get(category)!.push(tag);
-        });
-      });
-      
-      // Create clusters for each category
-      categoryGroups.forEach((categoryTags, category) => {
-        if (categoryTags.length >= 3) { // Only create clusters with 3+ tags
-          const clusterTags = categoryTags
-            .filter(t => !processedTags.has(t.tag))
-            .slice(0, 10); // Limit cluster size
-          
-          if (clusterTags.length >= 3) {
-            const cluster: TagCluster = {
-              id: `cluster-${category}-${Date.now()}`,
-              name: this.generateClusterName(category, clusterTags),
-              tags: clusterTags.map(t => t.tag),
-              description: `Tags related to ${category}`,
-              color: this.generateClusterColor(category),
-              bookmarkCount: clusterTags.reduce((sum, t) => sum + t.usage, 0),
-              lastUsed: new Date()
-            };
-            
-            clusters.push(cluster);
-            clusterTags.forEach(t => processedTags.add(t.tag));
-          }
+    const clusters: TagCluster[] = [];
+    const processedTags = new Set<string>();
+    
+    // Group tags by category first
+    const categoryGroups = new Map<string, TagAnalytics[]>();
+    tags.forEach(tag => {
+      tag.categories.forEach(category => {
+        if (!categoryGroups.has(category)) {
+          categoryGroups.set(category, []);
         }
+        categoryGroups.get(category)!.push(tag);
       });
-      
-      // Create similarity-based clusters for remaining tags
-      const remainingTags = tags.filter(t => !processedTags.has(t.tag));
-      const similarityClusters = this.createSimilarityClusters(remainingTags);
-      clusters.push(...similarityClusters);
-      
-      return clusters.sort((a, b) => b.bookmarkCount - a.bookmarkCount);
     });
+    
+    // Create clusters for each category
+    categoryGroups.forEach((categoryTags, category) => {
+      if (categoryTags.length >= 3) { // Only create clusters with 3+ tags
+        const clusterTags = categoryTags
+          .filter(t => !processedTags.has(t.tag))
+          .slice(0, 10); // Limit cluster size
+        
+        if (clusterTags.length >= 3) {
+          const cluster: TagCluster = {
+            id: `cluster-${category}-${Date.now()}`,
+            name: this.generateClusterName(category, clusterTags),
+            tags: clusterTags.map(t => t.tag),
+            description: `Tags related to ${category}`,
+            color: this.generateClusterColor(category),
+            bookmarkCount: clusterTags.reduce((sum, t) => sum + t.usage, 0),
+            lastUsed: new Date()
+          };
+          
+          clusters.push(cluster);
+          clusterTags.forEach(t => processedTags.add(t.tag));
+        }
+      }
+    });
+    
+    // Create similarity-based clusters for remaining tags
+    const remainingTags = tags.filter(t => !processedTags.has(t.tag));
+    const similarityClusters = this.createSimilarityClusters(remainingTags);
+    clusters.push(...similarityClusters);
+    
+    return clusters.sort((a, b) => b.bookmarkCount - a.bookmarkCount);
   }
 
   /**
@@ -371,46 +364,44 @@ class IntelligentTaggingService {
     tagsToAdd: string[];
     confidence: number;
   }> {
-//     return await performanceUtils.trackFunction('tag_improvement_suggestions', async () => {
-      // Generate new tags for the bookmark
-      const newTags = await this.generateTags(
+    // Generate new tags for the bookmark
+    const newTags = await this.generateTags(
+      bookmark.title,
+      bookmark.url,
+      bookmark.content,
+      bookmark.description,
+      options
+    );
+    
+    const existingTags = new Set(bookmark.tags.map(t => t.toLowerCase()));
+    const newTagNames = new Set(newTags.map(t => t.tag.toLowerCase()));
+    
+    // Find tags to add (high confidence new tags not in existing)
+    const tagsToAdd = newTags
+      .filter(t => !existingTags.has(t.tag.toLowerCase()) && t.confidence > 0.7)
+      .map(t => t.tag);
+    
+    // Find tags to remove (existing tags with low relevance)
+    const tagsToRemove = bookmark.tags.filter(existingTag => {
+      const relevanceScore = this.calculateTagRelevance(
+        existingTag,
         bookmark.title,
-        bookmark.url,
-        bookmark.content,
-        bookmark.description,
-        options
+        bookmark.content || bookmark.description || ''
       );
-      
-      const existingTags = new Set(bookmark.tags.map(t => t.toLowerCase()));
-      const newTagNames = new Set(newTags.map(t => t.tag.toLowerCase()));
-      
-      // Find tags to add (high confidence new tags not in existing)
-      const tagsToAdd = newTags
-        .filter(t => !existingTags.has(t.tag.toLowerCase()) && t.confidence > 0.7)
-        .map(t => t.tag);
-      
-      // Find tags to remove (existing tags with low relevance)
-      const tagsToRemove = bookmark.tags.filter(existingTag => {
-        const relevanceScore = this.calculateTagRelevance(
-          existingTag,
-          bookmark.title,
-          bookmark.content || bookmark.description || ''
-        );
-        return relevanceScore < 0.3;
-      });
-      
-      // Calculate overall confidence
-      const avgConfidence = newTags.length > 0
-        ? newTags.reduce((sum, t) => sum + t.confidence, 0) / newTags.length
-        : 0;
-      
-      return {
-        suggestedTags: newTags,
-        tagsToRemove,
-        tagsToAdd,
-        confidence: avgConfidence
-      };
+      return relevanceScore < 0.3;
     });
+    
+    // Calculate overall confidence
+    const avgConfidence = newTags.length > 0
+      ? newTags.reduce((sum, t) => sum + t.confidence, 0) / newTags.length
+      : 0;
+    
+    return {
+      suggestedTags: newTags,
+      tagsToRemove,
+      tagsToAdd,
+      confidence: avgConfidence
+    };
   }
 
   /**
@@ -860,4 +851,4 @@ export const taggingUtils = {
     
     return Array.from(merged.values());
   }
-}; 
+};  

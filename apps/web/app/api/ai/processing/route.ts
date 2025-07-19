@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
+import { validateUrl } from '../../../../lib/security/url-validator';
 
 // File-based storage for persistent data
 const PROCESSING_JOBS_FILE = join(process.cwd(), 'data', 'processing_jobs.json');
@@ -263,6 +264,11 @@ async function saveProcessingFeedback(feedback: ProcessingFeedback[]): Promise<v
 async function extractContentFromUrl(url: string): Promise<any> {
   // Simulate content extraction - in production, use a service like Puppeteer or Mercury
   try {
+    const validation = validateUrl(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.error}`);
+    }
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; BookAIMark/1.0; +https://bookaimark.com)'
@@ -481,7 +487,7 @@ async function processItem(item: ProcessingItem, settings: ProcessingSettings): 
       console.log(`📄 Extracting content from: ${item.url}`);
       result.extracted_content = await extractContentFromUrl(item.url);
       
-      if (result.extracted_content.error) {
+      if ('error' in result.extracted_content && result.extracted_content.error) {
         result.warnings?.push(`Content extraction failed: ${result.extracted_content.error}`);
       }
     }
@@ -508,7 +514,7 @@ async function processItem(item: ProcessingItem, settings: ProcessingSettings): 
     console.log(`✅ Successfully processed item ${item.id} in ${result.processing_time_ms}ms`);
     
   } catch (error) {
-    console.error(`❌ Failed to process item ${item.id}:`, error);
+    console.error('Failed to process item:', { itemId: item.id, error });
     result.status = 'failed';
     result.error = (error as Error).message;
     result.processing_time_ms = Date.now() - startTime;
@@ -836,7 +842,7 @@ async function processJobAsync(jobId: string) {
     const jobIndex = jobs.findIndex(j => j.id === jobId);
     
     if (jobIndex === -1) {
-      console.error(`Job ${jobId} not found`);
+      console.error('Job not found:', { jobId });
       return;
     }
     
@@ -877,7 +883,7 @@ async function processJobAsync(jobId: string) {
         }
         
       } catch (error) {
-        console.error(`Failed to process item ${item.id}:`, error);
+        console.error('Failed to process item:', { itemId: item.id, error });
         results.push({
           item_id: item.id,
           status: 'failed',
@@ -963,7 +969,7 @@ async function processJobAsync(jobId: string) {
     console.log(`✅ Completed processing job ${jobId} in ${job.actual_duration}ms`);
     
   } catch (error) {
-    console.error(`❌ Job ${jobId} failed:`, error);
+    console.error('Job failed:', { jobId, error });
     
     // Mark job as failed
     const jobs = await loadProcessingJobs();
@@ -977,4 +983,4 @@ async function processJobAsync(jobId: string) {
       await saveProcessingJobs(jobs);
     }
   }
-} 
+}            

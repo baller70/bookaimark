@@ -1,8 +1,8 @@
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { Recommendation } from './recommendation-engine';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('recommendation-performance');
+const logger = appLogger;
 
 export interface RecommendationPerformanceMetrics {
   recommendationId: string;
@@ -1179,4 +1179,4 @@ export class RecommendationPerformanceTracker {
 }
 
 // Export singleton instance
-export const performanceTracker = new RecommendationPerformanceTracker(); 
+export const performanceTracker = new RecommendationPerformanceTracker();  

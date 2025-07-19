@@ -1,7 +1,7 @@
-import { createLogger } from '../logger';
+import { appLogger } from '../logger';
 
 // Create logger instance for integrations
-const logger = createLogger('integration-manager');
+const logger = appLogger;
 
 // Ensure logger is properly initialized with fallback
 const safeLogger = {
@@ -392,4 +392,4 @@ export class IntegrationManager {
 }
 
 // Global integration manager instance
-export const integrationManager = new IntegrationManager(); 
+export const integrationManager = new IntegrationManager();  

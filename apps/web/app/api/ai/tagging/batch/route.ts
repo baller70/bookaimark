@@ -29,10 +29,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Process batch tagging
-//     const results = await performanceUtils.trackFunction('batch_tagging', async () => {
-      return await intelligentTaggingService.generateTagsBatch(bookmarks, options);
-    });
+    const results = await Promise.all(
+      bookmarks.map(async (bookmark) => {
+        return await intelligentTaggingService.generateTags(
+          bookmark.title,
+          bookmark.url,
+          bookmark.content,
+          bookmark.description,
+          options
+        );
+      })
+    );
 
     return NextResponse.json({
       success: true,
@@ -50,4 +57,4 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}    

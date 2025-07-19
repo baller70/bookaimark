@@ -78,7 +78,6 @@ class RedisCacheManager {
           host: this.config.host,
           port: this.config.port,
           connectTimeout: this.config.connectTimeoutMs,
-          commandTimeout: this.config.commandTimeoutMs,
           reconnectStrategy: (retries) => {
             if (retries > this.config.maxRetries) {
               return false; // Stop retrying
@@ -624,6 +623,10 @@ class RedisCacheManager {
     this.isConnected = false;
     console.log('✅ Redis cache shut down');
   }
+
+  getClient(): RedisClientType<RedisModules, RedisFunctions, RedisScripts> | null {
+    return this.client;
+  }
 }
 
 // ============================================================================
@@ -727,4 +730,4 @@ export function getCacheManager(): RedisCacheManager {
   return cacheManager;
 }
 
-export default RedisCacheManager; 
+export default RedisCacheManager;  

@@ -1,9 +1,10 @@
 import { JSDOM } from 'jsdom';
 import fetch from 'node-fetch';
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { performance } from 'perf_hooks';
+import { validateUrl } from '../security/url-validator';
 
-const logger = createLogger('content-extractor');
+const logger = appLogger;
 
 export interface ExtractedContent {
   url: string;
@@ -176,30 +177,46 @@ export class ContentExtractor {
   }
 
   private async fetchWebpage(url: string, options: ExtractionOptions): Promise<string> {
-    const response = await fetch(url, {
-      timeout: options.timeout,
-      headers: {
-        'User-Agent': options.userAgent || this.defaultOptions.userAgent!,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      },
-      redirect: options.followRedirects ? 'follow' : 'manual',
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // Validate URL to prevent SSRF
+    const validation = validateUrl(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.error}`);
     }
 
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('text/html')) {
-      throw new Error(`Invalid content type: ${contentType}`);
-    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), options.timeout || 10000);
 
-    return await response.text();
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': options.userAgent || this.defaultOptions.userAgent!,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        redirect: options.followRedirects ? 'follow' : 'manual',
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/html')) {
+        throw new Error(`Invalid content type: ${contentType}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
   }
 
   private extractTitle(document: Document): string {
@@ -584,4 +601,4 @@ export class ContentExtractor {
 }
 
 // Export singleton instance
-export const contentExtractor = new ContentExtractor(); 
+export const contentExtractor = new ContentExtractor();          

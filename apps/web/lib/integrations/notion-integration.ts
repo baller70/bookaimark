@@ -1,4 +1,5 @@
 import { BaseIntegration, IntegrationConfig, ImportResult, ExportResult, SyncResult, BookmarkData } from './integration-manager';
+import { validateUrl } from '../security/url-validator';
 
 export interface NotionCredentials {
   accessToken: string;
@@ -450,6 +451,11 @@ export class NotionIntegration extends BaseIntegration {
 
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint}`;
 
+    const validation = validateUrl(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.error}`);
+    }
+
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
       'Notion-Version': this.apiVersion,
@@ -482,4 +488,4 @@ export function createNotionIntegration(): NotionIntegration {
   };
 
   return new NotionIntegration(config);
-} 
+}  

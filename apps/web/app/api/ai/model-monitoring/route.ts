@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { modelMonitoringService } from '@/lib/ai/model-monitoring';
-import { createLogger } from '@/lib/logger';
+import { appLogger } from '@/lib/logger';
 
-const logger = createLogger('model-monitoring-api');
+const logger = appLogger;
 
 export async function POST(request: NextRequest) {
   try {
@@ -299,4 +299,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}  

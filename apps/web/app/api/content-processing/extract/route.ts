@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { contentExtractor } from '../../../lib/content-processing/content-extractor';
-import { createLogger } from '../../../lib/logger';
+import { contentExtractor } from '../../../../lib/content-processing/content-extractor';
+import { appLogger } from '../../../../lib/logger';
 import { z } from 'zod';
 
-const logger = createLogger('content-extraction-api');
+const logger = appLogger;
 
 // Request validation schema
 const extractRequestSchema = z.object({
@@ -275,4 +275,4 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}    

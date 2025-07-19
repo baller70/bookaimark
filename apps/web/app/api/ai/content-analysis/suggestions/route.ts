@@ -20,10 +20,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Track the suggestion generation operation
-//     const suggestions = await performanceUtils.trackFunction('content_suggestions', async () => {
-      return await contentAnalysisUtils.getSimilarContentSuggestions(analysis, count);
-    });
+    const suggestions = await contentAnalysisUtils.getSimilarContentSuggestions(analysis, count);
 
     return NextResponse.json({
       success: true,
@@ -81,10 +78,7 @@ export async function GET(request: NextRequest) {
       contentType: 'other' as const
     };
 
-    // Track the suggestion generation operation
-//     const suggestions = await performanceUtils.trackFunction('content_suggestions_get', async () => {
-      return await contentAnalysisUtils.getSimilarContentSuggestions(analysis, count);
-    });
+    const suggestions = await contentAnalysisUtils.getSimilarContentSuggestions(analysis, count);
 
     return NextResponse.json({
       success: true,
@@ -102,4 +96,4 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}  

@@ -6,7 +6,7 @@ import {
   ConnectorString, 
   TimelinePosition 
 } from '../models/timeline.models';
-import { appLogger } from '@/lib/logger';
+import { appLogger } from '@/apps/web/lib/logger';
 
 const API_BASE = '/api/timeline';
 
@@ -261,4 +261,4 @@ export class TimelineService {
       throw error;
     }
   }
-} 
+}  

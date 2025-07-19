@@ -1,8 +1,8 @@
-import { createLogger } from '../../lib/logger';
+import { appLogger } from '../../lib/logger';
 import { UserProfile, Recommendation } from './recommendation-engine';
 import { performance } from 'perf_hooks';
 
-const logger = createLogger('collaborative-filter');
+const logger = appLogger;
 
 export interface UserSimilarity {
   userId1: string;
@@ -740,4 +740,4 @@ export class CollaborativeFilter {
 }
 
 // Export singleton instance
-export const collaborativeFilter = new CollaborativeFilter(); 
+export const collaborativeFilter = new CollaborativeFilter();  

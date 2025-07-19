@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { enrichmentProcessor } from '../../../lib/content-processing/enrichment-processor';
-import { contentExtractor } from '../../../lib/content-processing/content-extractor';
-import { qualityFilter } from '../../../lib/content-processing/quality-filter';
-import { createLogger } from '../../../lib/logger';
+import { enrichmentProcessor } from '../../../../lib/content-processing/enrichment-processor';
+import { contentExtractor } from '../../../../lib/content-processing/content-extractor';
+import { qualityFilter } from '../../../../lib/content-processing/quality-filter';
+import { appLogger } from '../../../../lib/logger';
 import { z } from 'zod';
 
-const logger = createLogger('content-enrichment-api');
+const logger = appLogger;
 
 // Request validation schema
 const enrichRequestSchema = z.object({
@@ -469,4 +469,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}    
